@@ -684,7 +684,7 @@
     const inst = USERS.map((u, i) => { const r = []; for (let rb = 0; rb < NRB; rb++) r.push(bitsFor(u.snr + 10 * lg(Math.max(1e-3, chanGain(i, rb, slot))))); return r; });
     for (let rb = 0; rb < NRB; rb++) {
       let pick = 0;
-      if (mode === "rr") pick = (rb + slot * NRB) % 4;
+      if (mode === "rr") pick = (rb + slot) % 4;
       else if (mode === "max") { let b = -1; for (let i = 0; i < 4; i++) if (inst[i][rb] > b) { b = inst[i][rb]; pick = i; } }
       else { let b = -1; for (let i = 0; i < 4; i++) { const m = inst[i][rb] / avg[i]; if (m > b) { b = m; pick = i; } } }
       const got = inst[pick][rb]; col.push([pick, got]); tot[pick] += got; cells++;
@@ -702,7 +702,7 @@
   const schcv = NB.canvas($("cv-sch"), (ctx, w, h) => {
     const P = NB.palette(), cols = [P.accent, P.accent2, P.warn, P.ok];
     const narrow = w < 520, gx = 30, gy = 10, gw = narrow ? w - 40 : w * 0.68 - 30, gh = h - 40, cw = gw / NT, chh = gh / NRB;
-    NB.text(ctx, "주파수", 6, gy + gh / 2, { size: 10.5, color: P.dim });
+    ctx.save(); ctx.translate(14, gy + gh / 2); ctx.rotate(-Math.PI / 2); NB.text(ctx, "주파수 →", 0, 0, { align: "center", size: 10.5, color: P.dim }); ctx.restore();
     NB.text(ctx, "시간 →", gx + gw, gy + gh + 16, { align: "right", size: 11, color: P.dim });
     ctx.fillStyle = P.surface; ctx.fillRect(gx, gy, gw, gh);
     grid.forEach((col, t) => col.forEach(([u, b], rb) => { ctx.fillStyle = cols[u]; ctx.globalAlpha = 0.15 + 0.85 * (b / 10); ctx.fillRect(gx + t * cw + 0.5, gy + (NRB - 1 - rb) * chh + 0.5, cw - 1, chh - 1); }));
@@ -756,7 +756,7 @@
   }
   const bfcv = NB.canvas($("cv-bf"), (ctx, w, h) => {
     const P = NB.palette(), N = bfN();
-    const cx = 34, cy = h / 2, R = Math.min(w - cx - 30, h / 2 - 18);
+    const R = Math.min(w - 90, h / 2 - 26), cx = Math.max(34, (w - R) / 2 - 10), cy = h / 2;
     ctx.strokeStyle = P.grid; ctx.lineWidth = 1;
     for (let k = 1; k <= 3; k++) { ctx.beginPath(); ctx.arc(cx, cy, (R * k) / 3, -Math.PI / 2, Math.PI / 2); ctx.stroke(); }
     for (let a = -90; a <= 90; a += 30) { const t = rad(a); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + R * Math.cos(t), cy - R * Math.sin(t)); ctx.stroke(); NB.text(ctx, a + "°", cx + (R + 14) * Math.cos(t), cy - (R + 10) * Math.sin(t), { align: "center", size: 10, mono: true, color: P.faint }); }
@@ -808,7 +808,7 @@
   const tpcv = NB.canvas($("cv-tp"), (ctx, w, h) => {
     const P = NB.palette(), S = tpS(), B = tpB(), eff = tpQ() * tpR() * (1 - tpO() / 100);
     const off = Math.min(8, 60 / S), baseX = 50, baseY = h - 34;
-    const maxW = w - baseX - 30 - off * 15, maxH = h - 60 - off * 15;
+    const maxW = w - baseX - 110 - off * S, maxH = h - 60 - off * S;
     const pw = (B / 400) * maxW, ph = (eff / 12) * maxH;
     for (let s = S - 1; s >= 0; s--) {
       const x = baseX + s * off, y = baseY - ph - s * off;
