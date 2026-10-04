@@ -808,7 +808,7 @@
   const tpcv = NB.canvas($("cv-tp"), (ctx, w, h) => {
     const P = NB.palette(), S = tpS(), B = tpB(), eff = tpQ() * tpR() * (1 - tpO() / 100);
     const off = Math.min(8, 60 / S), baseX = 50, baseY = h - 34;
-    const maxW = w - baseX - 110 - off * S, maxH = h - 60 - off * S;
+    const maxW = w - baseX - (w < 500 ? 80 : 110) - off * S, maxH = h - 60 - off * S;
     const pw = (B / 400) * maxW, ph = (eff / 12) * maxH;
     for (let s = S - 1; s >= 0; s--) {
       const x = baseX + s * off, y = baseY - ph - s * off;

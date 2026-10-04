@@ -52,7 +52,7 @@
     <h2>네트워크 장비 속 칩 지도</h2>
     <p>스위치(6장)와 라우터(8장)는 겉으로는 포트가 줄지어 박힌 금속 상자다. 상자를 열면 일이 두 갈래로 나뉘어 있다. 패킷 하나하나를 받아 목적지를 찾아 내보내는 고속 작업, 즉 <b>데이터 평면</b><span class="en">(data plane)</span>은 전용 칩인 <span class="term">스위치 ASIC</span><span class="en">(Application-Specific Integrated Circuit)</span>이 맡는다. 이웃 장비와 라우팅 정보를 주고받고(BGP, 8장), 표를 계산해 ASIC에 써 넣고, 관리자의 명령을 받는 느린 두뇌 작업, 즉 <b>제어 평면</b><span class="en">(control plane)</span>은 옆의 평범한 CPU가 맡는다.</p>
     <figure class="diagram">
-      <div style="overflow-x:auto"><svg viewBox="0 0 820 330" style="min-width:640px" role="img" aria-label="스위치 상자와 서버 속 네트워크 칩의 배치">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 356" style="min-width:640px" role="img" aria-label="스위치 상자와 서버 속 네트워크 칩의 배치">
         <defs><marker id="nc-a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-dim)"/></marker></defs>
         <rect x="10" y="20" width="520" height="290" rx="14" class="f-surface"/>
         <text x="24" y="42" class="t" style="font-weight:700">스위치 상자 (1~2U)</text>
@@ -85,8 +85,8 @@
         </g>
         <g class="s-line" marker-end="url(#nc-a1)" marker-start="url(#nc-a1)"><path d="M690 134 V156"/></g>
         <text x="698" y="150" class="t-mono" style="font-size:10px">PCIe</text>
-        <path d="M30 300 C 200 326, 450 326, 586 284" fill="none" stroke="var(--warn)" stroke-width="2" stroke-dasharray="6 4"/>
-        <text x="300" y="324" text-anchor="middle" class="t-dim">광섬유 또는 구리 케이블 (16장, 19장)</text>
+        <path d="M40 300 C 200 342, 450 342, 586 284" fill="none" stroke="var(--warn)" stroke-width="2" stroke-dasharray="6 4"/>
+        <text x="300" y="350" text-anchor="middle" class="t-dim">광섬유 또는 구리 케이블 (16장, 19장)</text>
       </svg></div>
       <figcaption><b>그림 17-1.</b> 네트워크 장비 속 칩 지도(대략). 스위치 상자의 주인공은 데이터 평면을 맡는 스위치 ASIC이고, CPU는 PCIe로 붙어 표를 관리한다. 서버 쪽에서는 NIC(또는 SmartNIC·DPU)가 네트워크와 CPU 사이를 잇는다.</figcaption>
     </figure>
@@ -296,7 +296,7 @@
         </g>
         <g class="s-line" marker-end="url(#nc-a4)"><path d="M312 92 H264"/><path d="M442 92 H430"/><path d="M612 92 H600"/><path d="M661 136 V128"/><path d="M718 132 H710"/></g>
         <path d="M798 132 H816" class="s-line"/>
-        <text x="555" y="240" text-anchor="middle" class="t-dim">수신: PHY → MAC → RSS가 흐름별 큐 선택 → 오프로드 → DMA로 메모리에 → 인터럽트로 코어에 알림</text>
+        <text x="555" y="240" text-anchor="middle" class="t-dim">수신: PHY → MAC → RSS 큐 선택 → 오프로드 → DMA → 코어에 알림</text>
       </svg></div>
       <figcaption><b>그림 17-4.</b> NIC의 구성(수신 방향 중심, 대략). 서버 메모리에는 큐마다 “여기에 써 줘” 하는 빈 버퍼 목록(디스크립터 링)이 있고, NIC는 도착한 패킷을 DMA로 그 자리에 바로 써 넣는다.</figcaption>
     </figure>
@@ -462,7 +462,7 @@
     for (let i = 0; i < 2; i++) B.push({ id: "psu", x: 3.9 + i * 1.95, y: 0.2, z: -10, w: 1.85, h: 1.3, d: 6.2, color: P.series[4], alpha: 0.9, label: i === 1 ? "전원" : null });
     B.push({ id: "lid", x: -8, y: 1.6 + lidUp, z: -10, w: 16, h: 0.08, d: 20, color: P.surface, alpha: e < 0.04 ? 0.97 : 0.14 });
     return B;
-  }, { radius: 13, zoom: 1.5, center: [0, 1.2, 0], yaw: -0.55, pitch: 0.62, cyFrac: 0.54, compactBelow: 560, hint: "드래그: 회전 · 클릭: 설명", aspect: 0.62, maxHeight: 460,
+  }, { radius: 13, zoom: 1.22, center: [0, 1.2, 0.6], yaw: -0.55, pitch: 0.62, cyFrac: 0.5, compactBelow: 560, hint: "드래그: 회전 · 클릭: 설명", aspect: 0.62, maxHeight: 460,
     onPick: (id) => { $("sw-desc").innerHTML = DESC[id] || "부품을 눌러 보자. 드래그하면 모형이 돌아간다."; } });
   $("sw-top").onclick = () => { sw.stop(); sw.setView(0, 1.3); };
   $("sw-front").onclick = () => { sw.stop(); sw.setView(0, 0.25); };
