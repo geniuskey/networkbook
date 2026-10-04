@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>네트워크 보안 · NetworkBook</title>
+<meta name="description" content="도청·위조·사칭·마비라는 네 가지 위협과 그 방어. 대칭키·공개키 암호와 디피-헬먼 키 교환, TLS 1.3 핸드셰이크와 인증서, 방화벽과 VPN, DDoS 증폭 공격, Wi-Fi·DNS 보안, 포스트 양자 암호까지.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .dh-steps { font-family: var(--mono); font-size: 13px; padding: 12px 18px; border-top: 1px solid var(--border); line-height: 1.8; color: var(--text-dim); }
+  .dh-steps b { color: var(--text); }
+  .tls-desc { padding: 12px 18px; border-top: 1px solid var(--border); font-size: 15px; min-height: 84px; }
+  .fw-rules { padding: 12px 14px; display: grid; gap: 6px; }
+  .fw-rule { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); font-size: 13.5px; }
+  .fw-rule.hit { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .fw-rule .no { font-family: var(--mono); font-weight: 700; color: var(--accent); min-width: 22px; }
+  .fw-rule select { font: inherit; font-size: 13px; padding: 4px 6px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); }
+  .fw-rule .mini { font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); cursor: pointer; }
+  .fw-rule .mini:hover { border-color: var(--accent); color: var(--accent); }
+  .fw-rule.fixed { background: transparent; border-style: dashed; color: var(--text-dim); }
+  .fw-pk { display: grid; gap: 6px; padding: 12px 14px; border-top: 1px solid var(--border); }
+  .fw-p { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 7px 10px; border-radius: 9px; border: 1px solid var(--border); background: var(--bg-elev); font-size: 13.5px; cursor: pointer; }
+  .fw-p:hover, .fw-p.sel { border-color: var(--accent); }
+  .fw-p .hdr { font-family: var(--mono); font-size: 12.5px; color: var(--text-dim); }
+  .fw-p .res { font-weight: 700; font-size: 13px; text-align: right; white-space: nowrap; }
+  .fw-p .res.ok { color: var(--ok); } .fw-p .res.no { color: var(--bad); }
+  .fw-p .why { grid-column: 1 / -1; font-size: 12.5px; color: var(--text-dim); }
+  .fw-p .mark { font-weight: 700; }
+  .fw-p .mark.good { color: var(--ok); } .fw-p .mark.badm { color: var(--warn); }
+  .lock-tbl td:first-child { white-space: nowrap; font-weight: 700; }
+</style>
+</head>
+<body data-chapter="security">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 22</div>
+    <h1>네트워크 보안</h1>
+    <p class="lead">카페 Wi-Fi에 접속해 은행 앱을 연다. 옆자리 사람도, 카페 공유기도, 통신사도 내 패킷이 지나가는 길 위에 있다. 그런데도 비밀번호가 새지 않는 이유는 무엇일까? 한 번도 만난 적 없는 은행 서버와 어떻게 비밀 열쇠를 나눠 가졌고, 그 서버가 진짜 은행이라는 건 어떻게 알았을까? 이 장에서는 인터넷이라는 “누구나 들여다볼 수 있는 길” 위에서 비밀과 신뢰를 지키는 기술을 살펴본다.</p>
+    <ul class="objectives">
+      <li>도청·변조·사칭·마비라는 네 가지 위협과 각각을 막는 보안 목표를 구분한다.</li>
+      <li>대칭키 암호, 공개키 암호, 해시와 메시지 인증 코드가 각각 어디에 쓰이는지 안다.</li>
+      <li>디피-헬먼 키 교환으로 도청자 앞에서 비밀을 만드는 원리를 직접 계산해 본다.</li>
+      <li>TLS 1.3 핸드셰이크와 인증서 체인이 HTTPS 자물쇠를 만드는 과정을 따라간다.</li>
+      <li>방화벽 규칙의 “첫 일치” 원리와 상태 저장 방화벽, VPN 터널, 제로 트러스트를 이해한다.</li>
+      <li>DDoS 증폭 공격의 규모를 계산하고 애니캐스트 분산 방어가 왜 통하는지 안다.</li>
+      <li>Wi-Fi·DNS·BGP 보안의 약점과 포스트 양자 암호로의 전환을 개관한다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="threats">
+    <h2>위협 모델: 누가 무엇을 할 수 있나</h2>
+    <p>보안은 “무엇으로부터 지키는가”를 정하는 데서 시작한다. 이를 <b>위협 모델</b>이라 한다. 네트워크에서 일어나는 공격은 크게 네 가지로 나눌 수 있고, 각각에 대응하는 보안 목표가 있다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>위협</th><th>공격자가 하는 일</th><th>지켜야 할 것</th><th>택배 비유</th><th>대표 방어</th></tr></thead>
+      <tbody>
+        <tr><td><b>도청</b></td><td>지나가는 패킷을 몰래 읽는다</td><td><span class="term">기밀성</span><span class="en">(confidentiality)</span></td><td>배송 기사가 상자를 열어 본다</td><td>암호화</td></tr>
+        <tr><td><b>위조·변조</b></td><td>내용을 바꾸거나 가짜를 끼워 넣는다</td><td><span class="term">무결성</span><span class="en">(integrity)</span></td><td>상자 속 물건을 바꿔치기</td><td>해시, 메시지 인증 코드, 서명</td></tr>
+        <tr><td><b>사칭</b></td><td>다른 사람·서버인 척한다</td><td>인증<span class="en">(authentication)</span></td><td>택배 기사를 사칭해 물건을 가로챔</td><td>인증서, 비밀번호, 디지털 서명</td></tr>
+        <tr><td><b>마비</b></td><td>트래픽 폭탄으로 서비스를 멈춘다</td><td><span class="term">가용성</span><span class="en">(availability)</span></td><td>가짜 주문 수백만 건으로 물류센터 마비</td><td>DDoS 방어, 분산, 용량</td></tr>
+      </tbody>
+    </table></div>
+    <p>인터넷의 기본 설계(7장의 IP)는 이 중 어느 것도 보장하지 않는다. 패킷은 엽서처럼 내용이 그대로 보이고, 보내는 주소는 마음대로 적을 수 있으며, 누구든 패킷을 보낼 수 있다. 보안은 처음부터 있던 기능이 아니라 그 위에 덧붙여 온 기능이다. 그래서 “길 위의 누구도 믿지 않는다”는 가정에서 출발한다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 330" style="min-width:600px" role="img" aria-label="공용 Wi-Fi에서 경로 위의 각 관찰자가 볼 수 있는 정보">
+        <defs><marker id="sc-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <rect x="10" y="40" width="110" height="60" rx="10" class="f-acc-soft"/><text x="65" y="66" text-anchor="middle" class="t" style="font-weight:700">내 노트북</text><text x="65" y="86" text-anchor="middle" class="t-mono">카페 Wi-Fi</text>
+        <rect x="190" y="40" width="120" height="60" rx="10" class="f-elev"/><text x="250" y="66" text-anchor="middle" class="t" style="font-weight:700">카페 공유기</text><text x="250" y="86" text-anchor="middle" class="t-mono">AP 운영자</text>
+        <rect x="380" y="40" width="120" height="60" rx="10" class="f-elev"/><text x="440" y="66" text-anchor="middle" class="t" style="font-weight:700">통신사(ISP)</text><text x="440" y="86" text-anchor="middle" class="t-mono">라우터들</text>
+        <rect x="570" y="40" width="100" height="60" rx="10" class="f-elev"/><text x="620" y="66" text-anchor="middle" class="t" style="font-weight:700">인터넷</text><text x="620" y="86" text-anchor="middle" class="t-mono">여러 AS</text>
+        <rect x="720" y="40" width="90" height="60" rx="10" class="f-acc-soft"/><text x="765" y="66" text-anchor="middle" class="t" style="font-weight:700">은행 서버</text><text x="765" y="86" text-anchor="middle" class="t-mono">목적지</text>
+        <g class="t-dim" text-anchor="middle" style="font-size:11px"><text x="65" y="28">내용의 주인</text><text x="250" y="28">모든 패킷이 지나감</text><text x="440" y="28">모든 패킷이 지나감</text><text x="620" y="28">여러 망을 경유</text><text x="765" y="28">복호화해 읽음</text></g>
+        <path d="M120 70 H186" class="s-acc" stroke-dasharray="5 4" marker-end="url(#sc-a)"/><path d="M310 70 H376" class="s-acc" marker-end="url(#sc-a)"/><path d="M500 70 H566" class="s-acc" marker-end="url(#sc-a)"/><path d="M670 70 H716" class="s-acc" marker-end="url(#sc-a)"/>
+        <circle cx="153" cy="120" r="16" fill="color-mix(in srgb, var(--bad) 18%, transparent)" stroke="var(--bad)"/><text x="153" y="125" text-anchor="middle" class="t" style="font-weight:700;fill:var(--bad)">E</text>
+        <text x="153" y="152" text-anchor="middle" class="t-dim">옆자리 도청자</text>
+        <text x="20" y="190" class="t" style="font-weight:700">HTTPS를 쓸 때 경로 위에서 보이는 것</text>
+        <g class="t-dim">
+          <text x="20" y="216">· 목적지 IP 주소, 포트(443), 패킷 크기·시간 간격 → <tspan style="fill:var(--warn);font-weight:700">모두에게 보인다</tspan></text>
+          <text x="20" y="240">· DNS 질의(어느 사이트?) → 평문 DNS면 보인다. DoH/DoT면 숨는다</text>
+          <text x="20" y="264">· 접속하는 도메인 이름(TLS의 SNI) → 보통 보인다. ECH를 쓰면 숨는다</text>
+          <text x="20" y="288">· 어느 페이지(URL 경로), 비밀번호, 계좌 내용 → <tspan style="fill:var(--ok);font-weight:700">암호화되어 보이지 않는다</tspan></text>
+          <text x="20" y="312">· 반대로 HTTP(암호화 없음)라면 경로 위의 누구나 내용까지 읽고 고칠 수 있다</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 22-1.</b> 공용 Wi-Fi에서 내 패킷은 같은 무선망의 다른 사용자, 공유기 운영자, 통신사, 인터넷의 여러 망을 지난다. 암호화는 “내용”을 감추지만, “누구와 언제 얼마나 통신하는지”(메타데이터)는 상당 부분 남는다.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="crypto">
+    <h2>암호의 세 가지 도구</h2>
+    <p>네트워크 보안의 거의 모든 것은 세 가지 도구의 조합이다.</p>
+    <ul>
+      <li><span class="term">대칭키 암호</span><span class="en">(symmetric-key cipher)</span>: 잠그는 열쇠와 여는 열쇠가 같다. 대표는 <b>AES</b>(2001년 표준)와 <b>ChaCha20</b>. 매우 빠르다. 요즘 CPU는 AES 전용 명령이 있어 코어 하나로 초당 수 GB를 암호화한다. 문제는 “같은 열쇠를 상대에게 어떻게 안전하게 건네는가”다.</li>
+      <li><span class="term">공개키 암호</span><span class="en">(public-key cryptography)</span>: 열쇠가 한 쌍이다. <b>공개키</b>는 모두에게 알려 주고, <b>개인키</b>는 나만 가진다. 공개키로 잠근 것은 개인키로만 열리고, 개인키로 “서명”한 것은 공개키로 누구나 검증할 수 있다. 대표는 <b>RSA</b>와 <b>타원곡선 암호(ECC)</b>. 대칭키보다 수백~수천 배 느려서 열쇠 교환과 서명에만 쓴다.</li>
+      <li><span class="term">해시 함수</span><span class="en">(hash function)</span>: 임의 길이의 데이터를 고정 길이 “지문”(SHA-256은 256비트)으로 바꾼다. 한 비트만 바뀌어도 지문이 완전히 달라지고, 지문에서 원본을 거꾸로 찾을 수 없다. 여기에 비밀 열쇠를 섞으면 <span class="term">메시지 인증 코드</span><span class="en">(MAC, HMAC)</span>가 된다. 열쇠를 아는 사람만 올바른 코드를 만들 수 있으므로, 받은 메시지가 중간에 바뀌지 않았고 열쇠를 가진 상대가 보냈음을 확인한다.</li>
+    </ul>
+    <div class="table-wrap"><table>
+      <thead><tr><th>도구</th><th>대표 알고리즘</th><th>열쇠 길이(같은 안전 수준)</th><th>쓰임</th></tr></thead>
+      <tbody>
+        <tr><td>대칭키 암호</td><td>AES-128/256, ChaCha20</td><td>128비트</td><td>실제 데이터 암호화(TLS 본문, VPN, 디스크)</td></tr>
+        <tr><td>공개키 (RSA)</td><td>RSA-3072</td><td>3,072비트</td><td>인증서 서명, (옛) 열쇠 전달</td></tr>
+        <tr><td>공개키 (타원곡선)</td><td>X25519, ECDSA P-256, Ed25519</td><td>256비트</td><td>열쇠 교환, 서명 (요즘의 주력)</td></tr>
+        <tr><td>해시 / MAC</td><td>SHA-256, HMAC-SHA256</td><td>출력 256비트</td><td>무결성 검사, 서명의 재료, 비밀번호 저장</td></tr>
+        <tr><td>인증 암호화(AEAD)</td><td>AES-GCM, ChaCha20-Poly1305</td><td>128~256비트</td><td>암호화 + 무결성을 한 번에 (TLS 1.3의 유일한 방식)</td></tr>
+      </tbody>
+    </table></div>
+    <p>표의 “같은 안전 수준”은 미국 NIST 권고 기준이다. 128비트 대칭키를 무차별 대입하려면 2<sup>128</sup> ≈ 3.4×10<sup>38</sup>번을 시도해야 한다. 초당 10<sup>18</sup>번을 시도하는 가상의 컴퓨터로도 우주 나이의 수백억 배가 걸린다. 그래서 현실의 공격은 암호 자체보다 <b>열쇠 관리, 구현 실수, 사람</b>을 노린다.</p>
+    <div class="callout"><strong>열쇠 배달 문제</strong><p>대칭키 암호는 빠르고 튼튼하지만, 앨리스와 밥이 같은 열쇠를 미리 나눠 가져야 한다. 처음 접속하는 웹사이트와는 열쇠를 나눌 방법이 없다. 열쇠를 인터넷으로 보내면 도청자도 함께 받는다. 1976년 디피와 헬먼이 이 문제의 답을 내놓았다. 도청자가 모든 대화를 엿들어도, 두 사람만 아는 비밀을 만들어 내는 방법이다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="dh">
+    <h2>디피-헬먼: 엿듣는 사람 앞에서 비밀 만들기</h2>
+    <div class="callout analogy"><strong>물감 섞기</strong><p>앨리스와 밥이 공개적으로 “노란색”을 공통 물감으로 정한다(도청자 이브도 안다). 각자 아무에게도 보이지 않는 비밀 물감(앨리스는 빨강, 밥은 파랑)을 골라 노랑에 섞은 뒤, 섞은 통을 서로 교환한다. 이브는 “노랑+빨강”과 “노랑+파랑” 통을 본다. 앨리스는 받은 “노랑+파랑”에 자기 빨강을 더하고, 밥은 받은 “노랑+빨강”에 자기 파랑을 더한다. 둘 다 “노랑+빨강+파랑”이라는 같은 색을 얻는다. 섞인 물감을 다시 분리하는 일은 아주 어렵기 때문에, 이브는 그 색을 만들 수 없다.</p></div>
+    <p>수학에서 “섞기는 쉽고 분리는 어려운” 연산이 <b>모듈러 거듭제곱</b>이다. 소수 p와 생성원 g를 공개한다. 앨리스는 비밀 수 a를 골라 A = g<sup>a</sup> mod p를 보내고, 밥은 비밀 b로 B = g<sup>b</sup> mod p를 보낸다. 앨리스는 B<sup>a</sup> mod p를, 밥은 A<sup>b</sup> mod p를 계산하는데, 둘 다 g<sup>ab</sup> mod p로 같다. 이브는 p, g, A, B를 모두 알지만 A에서 a를 되찾는 일(<b>이산 로그 문제</b>)은 p가 크면 사실상 불가능하다.</p>
+    <div class="formula">공유 비밀 = B<sup>a</sup> mod p = (g<sup>b</sup>)<sup>a</sup> mod p = g<sup>ab</sup> mod p = (g<sup>a</sup>)<sup>b</sup> mod p = A<sup>b</sup> mod p<div class="where">“mod p”는 p로 나눈 나머지. 시계 바늘이 12를 넘으면 다시 0부터 도는 것과 같은 “나머지 세계”의 계산이다.</div></div>
+    <div class="sim" id="sim-dh">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3><span class="term">디피-헬먼 키 교환</span>: 앨리스, 밥, 그리고 이브</h3></div>
+      <div class="sim-view"><canvas id="cv-dh"></canvas></div>
+      <div class="dh-steps" id="dh-steps"></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>공개 소수 p (생성원 g는 자동)</span><div class="seg" id="dh-p"><button data-value="23" class="on">23</button><button data-value="97">97</button><button data-value="353">353</button><button data-value="997">997</button><button data-value="7919">7919</button></div></div>
+        <label class="ctrl"><span>앨리스의 비밀 a <output id="dh-a-out"></output></span><input type="range" id="dh-a" min="2" max="21" value="6"></label>
+        <label class="ctrl"><span>밥의 비밀 b <output id="dh-b-out"></output></span><input type="range" id="dh-b" min="2" max="21" value="15"></label>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn primary" id="dh-eve">이브의 무차별 대입</button><button class="btn" id="dh-rand">비밀 무작위로</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">앨리스가 계산한 비밀</span><span class="v" id="dh-sa">—</span></div>
+        <div class="stat"><span class="k">밥이 계산한 비밀</span><span class="v" id="dh-sb">—</span></div>
+        <div class="stat"><span class="k">이브의 시도</span><span class="v" id="dh-try">—</span></div>
+        <div class="stat"><span class="k">실제 크기라면</span><span class="v" id="dh-real" style="font-size:14px">—</span></div>
+      </div>
+      <div class="sim-note">가운데 줄은 이브가 엿볼 수 있는 공개 통로다. 이브는 p, g, A, B를 다 보지만 a와 b는 끝까지 “?”다. 해볼 것: “이브의 무차별 대입”을 눌러 g<sup>x</sup> mod p = A가 되는 x를 하나씩 찾게 해 보자. p = 23이면 순식간이지만, p가 커질수록 시도 횟수가 p에 비례해 늘어난다. 실제 TLS는 2048비트 이상의 소수나 256비트 타원곡선(X25519)을 쓰고, 가장 좋은 알고리즘으로도 약 2<sup>112</sup>~2<sup>128</sup>번의 연산이 필요하다. 단순화: 여기서 이브는 가장 단순한 방법(하나씩 대입)만 쓴다.</div>
+    </div>
+    <div class="callout warn"><strong>디피-헬먼만으로는 부족하다: 중간자 공격</strong><p>이브가 엿듣기만 하는 게 아니라 길 한가운데서 패킷을 <b>가로채고 바꿀</b> 수 있다면? 앨리스와는 이브가 밥인 척, 밥과는 앨리스인 척 각각 키 교환을 하면 된다. 이를 <span class="term">중간자 공격</span><span class="en">(man-in-the-middle)</span>이라 한다. 키 교환은 “누구와” 비밀을 나눴는지 알려 주지 않는다. 그래서 서버는 자기 공개값에 <b>서명</b>을 하고, 그 서명용 공개키가 진짜 서버의 것임을 <b>인증서</b>로 증명한다. 다음 절의 TLS가 바로 이 조합이다.</p></div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">p를 23에서 7919로 바꾸면 이브가 a를 찾기 위한 평균 시도 횟수는 대략 몇 배가 될까?</p><p class="wi-hint">디피-헬먼 시뮬레이터에서 p를 바꿔 가며 “이브의 무차별 대입”을 몇 번 눌러 보자.</p><div class="opts">
+      <button class="opt">2배 정도 (자릿수가 2자리 → 4자리)</button><button class="opt">거의 그대로 (컴퓨터는 빠르니까)</button><button class="opt" data-correct>수백 배 (p에 비례)</button><button class="opt">수백만 배 이상</button>
+    </div><div class="quiz-exp">하나씩 대입하면 평균 시도 횟수는 p/2 정도로 p에 비례한다. 7919/23 ≈ 344배다. 비트로 보면 소수가 1비트 길어질 때마다 일이 두 배가 된다. 실제로 쓰는 2048비트 소수라면 단순 대입은 10<sup>600</sup>번이 넘고, 가장 영리한 알고리즘으로도 2<sup>112</sup>번 수준이라 사실상 불가능하다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="tls">
+    <h2>TLS 1.3: HTTPS 자물쇠가 만들어지는 1 왕복</h2>
+    <p>웹 주소창의 자물쇠는 <span class="term">TLS</span><span class="en">(Transport Layer Security)</span> 연결이 맺어졌다는 뜻이다. TLS는 TCP(9장)나 QUIC 위에서 동작하며, 위의 세 도구를 이렇게 엮는다. ① <b>디피-헬먼(타원곡선 X25519 등)</b>으로 열쇠를 나누고, ② 서버가 <b>인증서와 서명</b>으로 자기가 진짜임을 증명하고, ③ 이후 모든 데이터를 <b>AES-GCM이나 ChaCha20-Poly1305</b>로 암호화하고 변조를 검사한다.</p>
+    <p>2018년에 표준이 된 TLS 1.3(RFC 8446)은 이 과정을 <b>1 왕복(1-RTT)</b>으로 줄였다. 클라이언트가 첫 메시지(ClientHello)에 “아마 이 방식을 쓰겠지” 하고 키 교환용 공개값(key_share)을 미리 넣어 보내기 때문이다. 이전의 TLS 1.2는 2 왕복이 필요했다. 다시 접속할 때는 이전 세션 열쇠로 첫 메시지부터 데이터를 싣는 0-RTT도 가능하다(단, 재전송 공격 위험이 있어 안전한 요청에만 쓴다).</p>
+    <div class="sim" id="sim-tls">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>핸드셰이크 한 단계씩: TLS 1.2 vs TLS 1.3 vs QUIC</h3></div>
+      <div class="sim-view"><canvas id="cv-tls"></canvas></div>
+      <div class="tls-desc" id="tls-desc"></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>프로토콜</span><div class="seg" id="tls-mode"><button data-value="t12">TCP + TLS 1.2</button><button data-value="t13" class="on">TCP + TLS 1.3</button><button data-value="quic">QUIC (TLS 1.3 내장)</button></div></div>
+        <label class="ctrl"><span>서버까지 왕복 시간(RTT) <output id="tls-rtt-out"></output></span><input type="range" id="tls-rtt" min="5" max="300" step="5" value="80"></label>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn" id="tls-prev">← 이전</button><button class="btn primary" id="tls-next">다음 →</button><button class="btn" id="tls-all">전체 보기</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">첫 응답까지 왕복 수</span><span class="v" id="tls-n">—</span></div>
+        <div class="stat"><span class="k">첫 응답까지 시간</span><span class="v" id="tls-t">—</span></div>
+        <div class="stat"><span class="k">암호화가 시작되는 시점</span><span class="v" id="tls-enc" style="font-size:14px">—</span></div>
+      </div>
+      <div class="sim-note">왼쪽은 브라우저, 오른쪽은 서버, 아래로 갈수록 시간이 흐른다. 실선 화살표는 평문, <b>굵은 보라색</b> 화살표는 암호화된 메시지다. TLS 1.3에서는 ServerHello 바로 다음부터, 즉 <b>인증서까지 암호화</b>된다. 해볼 것: RTT를 200 ms(지구 반대편)로 올리고 세 방식을 비교해 보자. 왕복 하나를 줄이는 것이 왜 중요한지 보인다. 단순화: 세션 재개(0-RTT), TCP 패킷 손실, 인증서 검증 시간은 뺐다.</div>
+    </div>
+    <h3>인증서 체인: “이 서버가 진짜”라는 보증</h3>
+    <p>서버가 보내는 <span class="term">인증서</span><span class="en">(certificate, X.509)</span>에는 도메인 이름, 서버의 공개키, 유효 기간이 적혀 있고, 이것을 <b>인증 기관</b><span class="en">(CA, certificate authority)</span>이 개인키로 서명했다. 브라우저는 서명을 따라 올라가서 운영체제·브라우저에 미리 들어 있는 <b>루트 인증서</b>(신뢰 저장소, 약 100~150개 기관)에 닿으면 믿는다. 인증서 유효 기간은 점점 짧아져서, 무료로 자동 발급하는 Let’s Encrypt는 90일짜리를 쓰고 업계 전체도 단계적으로 47일까지 줄이기로 했다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 250" style="min-width:600px" role="img" aria-label="루트 CA에서 중간 CA, 서버 인증서로 이어지는 인증서 체인">
+        <defs><marker id="sc-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"/></marker></defs>
+        <rect x="20" y="40" width="220" height="130" rx="12" class="f-acc2-soft"/>
+        <text x="130" y="66" text-anchor="middle" class="t" style="font-weight:700">루트 CA 인증서</text>
+        <text x="36" y="92" class="t-mono">이름: Root CA X1</text><text x="36" y="112" class="t-mono">공개키: K_root</text><text x="36" y="132" class="t-mono">서명: 스스로 서명</text>
+        <text x="130" y="158" text-anchor="middle" class="t-dim">OS·브라우저에 미리 설치</text>
+        <rect x="290" y="40" width="220" height="130" rx="12" class="f-elev"/>
+        <text x="400" y="66" text-anchor="middle" class="t" style="font-weight:700">중간 CA 인증서</text>
+        <text x="306" y="92" class="t-mono">이름: Issuing CA R3</text><text x="306" y="112" class="t-mono">공개키: K_mid</text><text x="306" y="132" class="t-mono" style="fill:var(--accent-2)">서명: K_root의 개인키로</text>
+        <text x="400" y="158" text-anchor="middle" class="t-dim">서버가 함께 보내 준다</text>
+        <rect x="560" y="40" width="220" height="130" rx="12" class="f-acc-soft"/>
+        <text x="670" y="66" text-anchor="middle" class="t" style="font-weight:700">서버 인증서</text>
+        <text x="576" y="92" class="t-mono">이름: bank.example</text><text x="576" y="112" class="t-mono">공개키: K_server</text><text x="576" y="132" class="t-mono" style="fill:var(--accent-2)">서명: K_mid의 개인키로</text>
+        <text x="670" y="158" text-anchor="middle" class="t-dim">유효 기간 90일 등</text>
+        <path d="M290 105 H244" stroke="var(--accent-2)" stroke-width="2" fill="none" marker-end="url(#sc-b)"/>
+        <path d="M560 105 H514" stroke="var(--accent-2)" stroke-width="2" fill="none" marker-end="url(#sc-b)"/>
+        <text x="20" y="206" class="t">브라우저의 검증: ① 이름이 주소창 도메인과 맞나 ② 기간이 유효한가 ③ 각 서명을 위 단계의 공개키로 검증 ④ 루트가 신뢰 목록에 있나</text>
+        <text x="20" y="230" class="t-dim">⑤ 서버가 CertificateVerify에서 K_server의 개인키로 핸드셰이크 내용에 서명 → 인증서를 훔쳐 복사만 한 가짜 서버는 이 서명을 못 만든다</text>
+      </svg></div>
+      <figcaption><b>그림 22-2.</b> 인증서 체인. 화살표는 “이 인증서는 저 인증서의 공개키로 검증한다”는 뜻이다. 루트 CA의 개인키는 오프라인 금고에 보관하고, 실제 발급은 중간 CA가 한다.</figcaption>
+    </figure>
+    <p>ClientHello에는 접속하려는 도메인 이름이 담긴 <b>SNI</b><span class="en">(Server Name Indication)</span>가 평문으로 들어 있다. IP 주소 하나에 수천 개 사이트가 있는 CDN(10장)이 어느 인증서를 보낼지 알아야 하기 때문이다. 이 때문에 통신사나 검열 장비는 HTTPS여도 “어느 사이트에 가는지”는 볼 수 있었다. 이를 감추는 ECH(Encrypted Client Hello)가 표준화되어 보급되는 중이다.</p>
+    <div class="table-wrap"><table class="lock-tbl">
+      <thead><tr><th>HTTPS 자물쇠가</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr><td style="color:var(--ok)">보장하는 것</td><td>주소창의 도메인을 가진 서버와 통신 중이다(인증). 경로 위의 누구도 내용을 읽을 수 없다(기밀성). 오가는 데이터가 바뀌면 즉시 들통난다(무결성). 열쇠는 매번 새로 만들어, 나중에 서버 개인키가 털려도 지난 대화는 풀 수 없다(전방 비밀성).</td></tr>
+        <tr><td style="color:var(--bad)">보장하지 않는 것</td><td>그 사이트가 <b>착한 사이트</b>라는 것. 피싱 사이트 <code>bank-example-login.com</code>도 정상 인증서를 무료로 받는다. 서버에 저장된 데이터의 안전, 내 PC의 악성코드, 접속 사실 자체(IP·SNI·시간)도 지켜 주지 않는다.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="firewall">
+    <h2>방화벽: 들어오고 나가는 상자 검사</h2>
+    <p><span class="term">방화벽</span><span class="en">(firewall)</span>은 망과 망 사이에서 규칙에 따라 패킷을 통과시키거나 버리는 장비(또는 소프트웨어)다. 건물 경비실처럼 “누가, 어디로, 어떤 문(포트)으로” 가는지 보고 판단한다. 세대에 따라 볼 수 있는 깊이가 다르다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>종류</th><th>보는 것</th><th>판단 예</th><th>한계</th></tr></thead>
+      <tbody>
+        <tr><td><b>패킷 필터</b> (1980년대~)</td><td>패킷 하나의 IP·포트·프로토콜 (3·4계층)</td><td>“외부 → 22번 포트 거부”</td><td>앞뒤 맥락을 모른다. 응답 패킷을 허용하려면 구멍을 넓게 뚫어야 한다</td></tr>
+        <tr><td><b>상태 저장</b> (1990년대~)</td><td>+ 연결 상태 표(누가 먼저 시작했나)</td><td>“안에서 시작한 연결의 응답만 허용”</td><td>허용된 포트(443) 안에서 무슨 일이 일어나는지는 모른다</td></tr>
+        <tr><td><b>차세대(NGFW)</b> (2010년대~)</td><td>+ 응용 계층(7계층): 앱 종류, 사용자, 악성 패턴</td><td>“443이라도 파일 공유 앱은 차단”, 침입 방지(IPS)</td><td>암호화 트래픽은 TLS 검사(복호화)를 해야 보이고, 처리 비용이 크다</td></tr>
+      </tbody>
+    </table></div>
+    <p>방화벽 규칙은 목록이다. 패킷이 오면 <b>위에서부터 차례로</b> 비교해 처음 맞는 규칙 하나만 적용하고 멈춘다(<b>첫 일치</b>). 맨 아래에는 보통 “나머지는 모두 거부”라는 <b>기본 거부</b> 규칙이 있다. 허용할 것만 명시하고 나머지는 막는 것이 안전한 기본값이다. <b>상태 저장 방화벽</b><span class="en">(stateful firewall)</span>은 규칙을 보기 전에 “이미 허용된 연결의 일부인가?”를 먼저 확인한다(연결 추적 표). 그래서 서버가 바깥 DNS 서버에 물어본 질문의 답은 별도 규칙 없이도 들어온다.</p>
+    <div class="sim" id="sim-fw">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>방화벽 규칙 편집기: 위에서부터 첫 일치</h3></div>
+      <div class="fw-rules" id="fw-rules"></div>
+      <div class="sim-controls" style="padding-top:10px">
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn" id="fw-add">+ 규칙 추가</button><button class="btn" id="fw-reset">처음 규칙으로</button></div></div>
+        <label class="check"><input type="checkbox" id="fw-state" checked> 상태 저장(연결 추적) 켜기</label>
+      </div>
+      <div class="fw-pk" id="fw-pk"></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">정책대로 처리된 패킷</span><span class="v" id="fw-score">—</span></div>
+        <div class="stat"><span class="k">허용 / 거부</span><span class="v" id="fw-cnt">—</span></div>
+        <div class="stat"><span class="k">상황</span><span class="v" id="fw-msg" style="font-size:14px">—</span></div>
+      </div>
+      <div class="sim-note">우리 웹 서버(10.0.0.10) 앞의 방화벽이다. 아래 테스트 패킷을 누르면 걸린 규칙이 강조된다. 각 패킷 오른쪽의 ✓/✗는 “원하는 정책(웹은 공개, SSH는 사내에서만, 나머지는 차단, 내가 보낸 요청의 응답은 허용)”과 맞는지를 뜻한다. 해볼 것: ① 상태 저장을 끄면 DNS 응답이 막힌다. 이를 고치려고 “허용 · 모든 곳 · UDP · 모든 포트”를 추가하면? 요청한 적 없는 위조 UDP까지 들어온다. ② “거부 · 모든 곳 · 모두 · 모든 포트”를 맨 위로 올려 보자.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">규칙 1번이 “허용 · 모든 곳 · TCP · 22”이고 규칙 2번이 “거부 · 외부 · TCP · 22”라면, 외부에서 22번 포트로 들어오는 SSH 패킷은?</p><p class="wi-hint">방화벽 시뮬레이터에서 규칙을 그렇게 바꾸고 외부 SSH 패킷을 눌러 보자.</p><div class="opts">
+      <button class="opt">더 구체적인 2번 규칙이 이겨서 거부된다</button><button class="opt" data-correct>1번에 먼저 걸려 허용된다</button><button class="opt">두 규칙이 충돌해 방화벽이 오류를 낸다</button><button class="opt">거부 규칙이 항상 우선이라 거부된다</button>
+    </div><div class="quiz-exp">방화벽 규칙은 대부분 “위에서부터 첫 일치”다. 더 구체적이든 아니든 먼저 맞은 규칙으로 끝난다. 그래서 좁은 예외(거부)는 넓은 허용보다 위에 두어야 한다. 실제 사고의 상당수가 이런 순서 실수에서 나온다. (라우팅 테이블의 최장 접두사 일치(8장)와 헷갈리지 말자.)</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="vpn">
+    <h2>VPN과 제로 트러스트</h2>
+    <p><span class="term">VPN</span><span class="en">(Virtual Private Network)</span>은 공용 인터넷 위에 암호화된 <b>터널</b>을 뚫어, 멀리 떨어진 두 망이 마치 전용선으로 연결된 것처럼 쓰게 한다. 원리는 3장의 캡슐화를 한 번 더 하는 것이다. 원래 패킷(사내 주소가 적힌)을 통째로 암호화한 뒤, 바깥에 공인 IP가 적힌 새 봉투를 씌워 보낸다. 길 위의 라우터는 바깥 봉투만 보고 배달하고, 터널 끝의 장비가 봉투를 벗기고 복호화해 원래 패킷을 사내망에 풀어놓는다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 270" style="min-width:600px" role="img" aria-label="VPN 터널 안에서 원래 패킷이 암호화되어 새 IP 헤더로 감싸지는 구조">
+        <text x="20" y="26" class="t" style="font-weight:700">원래 패킷 (사내망 주소)</text>
+        <rect x="20" y="38" width="170" height="40" rx="6" fill="color-mix(in srgb, var(--accent) 16%, transparent)" stroke="var(--accent)"/><text x="105" y="63" text-anchor="middle" class="t-mono" style="fill:var(--text)">IP 10.0.5.20→10.8.1.7</text>
+        <rect x="194" y="38" width="90" height="40" rx="6" class="f-surface"/><text x="239" y="63" text-anchor="middle" class="t-mono" style="fill:var(--text)">TCP 443</text>
+        <rect x="288" y="38" width="200" height="40" rx="6" class="f-surface"/><text x="388" y="63" text-anchor="middle" class="t-mono" style="fill:var(--text)">데이터 (사내 문서…)</text>
+        <path d="M250 84 L250 110" stroke="var(--text-dim)" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <text x="262" y="102" class="t-dim">통째로 암호화 + 인증 태그</text>
+        <text x="20" y="136" class="t" style="font-weight:700">터널로 나가는 패킷 (WireGuard 예)</text>
+        <rect x="20" y="148" width="190" height="44" rx="6" fill="color-mix(in srgb, var(--warn) 18%, transparent)" stroke="var(--warn)"/><text x="115" y="175" text-anchor="middle" class="t-mono" style="fill:var(--text)">새 IP 203.0.113.5→198.51.100.1</text>
+        <rect x="214" y="148" width="86" height="44" rx="6" class="f-surface"/><text x="257" y="175" text-anchor="middle" class="t-mono" style="fill:var(--text)">UDP 51820</text>
+        <rect x="304" y="148" width="74" height="44" rx="6" class="f-surface"/><text x="341" y="175" text-anchor="middle" class="t-mono" style="fill:var(--text)">WG 헤더</text>
+        <rect x="382" y="148" width="300" height="44" rx="6" fill="var(--accent-2-soft)" stroke="var(--accent-2)" stroke-width="2"/>
+        <text x="532" y="168" text-anchor="middle" class="t-mono" style="fill:var(--accent-2);font-weight:700">█▓▒░ 암호화된 원래 패킷 ░▒▓█</text>
+        <text x="532" y="184" text-anchor="middle" class="t-mono">(사내 IP·포트·내용 모두 숨음)</text>
+        <rect x="686" y="148" width="94" height="44" rx="6" class="f-surface"/><text x="733" y="175" text-anchor="middle" class="t-mono" style="fill:var(--text)">인증 태그</text>
+        <text x="20" y="226" class="t-dim">경로 위의 라우터·도청자가 보는 것: 지사 VPN 장비 ↔ 본사 VPN 장비 사이의 UDP 패킷, 크기와 시간뿐.</text>
+        <text x="20" y="250" class="t-dim">대가: 바깥 헤더(약 60~80바이트)만큼 오버헤드가 붙어 안쪽 MTU가 줄고(보통 1420바이트 안팎), 암복호화에 CPU를 쓴다.</text>
+      </svg></div>
+      <figcaption><b>그림 22-3.</b> VPN 터널의 캡슐화. 봉투 속에 “암호화된 봉투”를 넣는다. IPsec(ESP)도 구조는 같고, 바깥 헤더와 머리말의 형식만 다르다.</figcaption>
+    </figure>
+    <ul>
+      <li><b>IPsec</b>: 1990년대부터 쓰인 IP 계층 표준. 지사와 본사, 회사와 클라우드(21장)를 잇는 사이트 간 VPN의 표준처럼 쓰인다. 기능이 많고 설정이 복잡하다(IKE로 열쇠 교환, ESP로 암호화).</li>
+      <li><b>WireGuard</b>: 2020년 리눅스 커널에 들어간 신세대 VPN. 코드가 약 4,000줄로 아주 작고, 암호 방식을 하나로 고정(Curve25519, ChaCha20-Poly1305)해 설정 실수의 여지를 줄였다. 휴대폰의 개인 VPN 앱과 메시 VPN 서비스가 많이 쓴다.</li>
+      <li><b>TLS 기반 VPN</b>: 웹과 같은 443 포트를 써서 방화벽을 잘 통과한다. 회사 원격 근무용 VPN 클라이언트에 많다.</li>
+    </ul>
+    <div class="callout tip"><strong>개인 VPN 앱은 무엇을 지켜 주나</strong><p>상용 VPN 앱을 켜면 카페 공유기와 통신사는 “VPN 서버와 통신 중”이라는 것만 본다. 하지만 그 대신 <b>VPN 회사</b>가 통신사 자리에 서서 내 트래픽의 목적지를 보게 된다. 신뢰의 대상을 옮기는 것이지 없애는 것이 아니다. 대부분의 사이트가 HTTPS인 지금, 공용 Wi-Fi에서 VPN의 이득은 DNS·SNI 같은 메타데이터를 감추는 쪽에 더 가깝다.</p></div>
+    <h3>성벽에서 검문소로: 제로 트러스트</h3>
+    <p>전통적인 보안은 성과 해자 모델이었다. 방화벽(성벽) 안쪽 사내망은 믿고, 바깥은 믿지 않는다. VPN은 바깥 사람을 성 안으로 들여보내는 비밀 통로다. 문제는 한 번 성 안에 들어온 공격자(피싱으로 털린 노트북 하나)가 내부를 마음대로 돌아다닌다는 것이다. <span class="term">제로 트러스트</span><span class="en">(zero trust)</span>는 “망의 위치는 아무것도 보장하지 않는다”는 원칙이다. 사내망 안에서도 모든 요청마다 <b>사용자 신원(다중 인증), 기기 상태, 최소 권한</b>을 확인하고, 앱 하나하나를 따로 연결한다. 구글이 2010년대 초 BeyondCorp로 VPN을 걷어낸 사례가 유명하고, 지금은 많은 기업이 VPN 대신 ID 기반 접근 프록시(ZTNA)를 도입하고 있다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="ddos">
+    <h2>DDoS: 물량으로 밀어붙이는 공격</h2>
+    <p><span class="term">DDoS</span><span class="en">(Distributed Denial of Service, 분산 서비스 거부)</span>는 수많은 기기에서 동시에 트래픽을 쏟아 부어 서비스를 마비시키는 공격이다. 공격자는 보통 해킹한 공유기·IP 카메라·서버 수만~수십만 대로 이루어진 <b>봇넷</b>을 부린다. 겨냥하는 자원에 따라 세 종류로 나뉜다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>종류</th><th>노리는 것</th><th>예</th><th>규모 단위</th><th>방어</th></tr></thead>
+      <tbody>
+        <tr><td><b>볼류메트릭</b></td><td>회선 대역폭</td><td>UDP 플러드, 반사·증폭(DNS, NTP, memcached)</td><td>Tbps</td><td>대용량 분산망, 스크러빙, 업스트림 필터</td></tr>
+        <tr><td><b>프로토콜</b></td><td>서버·방화벽의 연결 상태 표</td><td>SYN 플러드, 조각난 패킷</td><td>초당 패킷 수(Mpps~Gpps)</td><td>SYN 쿠키, 상태 표 보호</td></tr>
+        <tr><td><b>응용 계층</b></td><td>웹 서버의 CPU·DB</td><td>HTTP 요청 폭탄, 무거운 검색 반복</td><td>초당 요청 수(수천만 rps)</td><td>요청 속도 제한, 봇 판별, 캐시</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>반사·증폭 공격</b>이 특히 무섭다. UDP는 연결 없이 보낸 주소를 믿으므로(9장), 공격자는 보내는 주소를 <b>피해자 IP로 위조</b>해서 인터넷의 열린 서버(DNS 리졸버, NTP 서버 등)에 작은 질문을 보낸다. 서버들은 친절하게도 훨씬 큰 답을 피해자에게 보낸다. 질문 대비 답의 크기가 <span class="term">증폭 공격</span><span class="en">(amplification attack)</span>의 배수다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>반사에 쓰이는 프로토콜</th><th>대략의 증폭 배수 (대역폭 기준)</th><th>메모</th></tr></thead>
+      <tbody>
+        <tr><td>DNS (열린 리졸버, ANY 질의 등)</td><td class="num">28~54배</td><td>가장 오래되고 흔한 방식</td></tr>
+        <tr><td>CLDAP</td><td class="num">56~70배</td><td>2020년 2.3 Tbps 공격에 쓰였다고 보고됨</td></tr>
+        <tr><td>NTP (monlist 명령)</td><td class="num">약 556배</td><td>2014년 대규모 공격 이후 기능 제거</td></tr>
+        <tr><td>memcached (UDP)</td><td class="num">1만~5만 배</td><td>2018년 GitHub 1.35 Tbps 공격. 이후 UDP 기본 비활성화</td></tr>
+      </tbody>
+    </table></div>
+    <p>DDoS 기록은 해마다 경신된다. 2018년 1.35 Tbps가 화제였는데, 2024년 말 약 5.6 Tbps, 2025년에는 20 Tbps를 넘는 공격이 여러 차례 보고되어 <b>수십 Tbps 수준</b>에 이르렀다. 대부분 몇십 초~몇 분 동안의 짧은 폭발이다. 이런 공격은 어느 한 회사의 회선으로 버틸 수 없다. 방어의 핵심은 <b>더 큰 망에 흡수</b>시키는 것이다. 수백 개 도시에 같은 IP를 광고하는 <b>애니캐스트</b>(8장의 BGP를 이용)를 쓰면, 전 세계에 흩어진 봇들의 트래픽이 각자 가까운 거점으로 나뉘어 들어간다. 각 거점에서 공격 패킷을 걸러 내는 곳을 <b>스크러빙 센터</b>라 한다.</p>
+    <div class="sim" id="sim-ddos">
+      <div class="sim-head"><span class="sim-tag">CALCULATOR</span><h3>증폭 공격의 규모와 방어 용량</h3></div>
+      <div class="sim-view"><canvas id="cv-ddos"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>봇 수 <output id="dd-bots-out"></output></span><input type="range" id="dd-bots" min="2" max="6" step="0.05" value="4"></label>
+        <label class="ctrl"><span>봇 하나의 업링크 <output id="dd-up-out"></output></span><input type="range" id="dd-up" min="1" max="100" step="1" value="10"></label>
+        <div class="ctrl"><span>공격 방식 (증폭 배수)</span><div class="seg" id="dd-amp"><button data-value="1">직접 ×1</button><button data-value="50" class="on">DNS ×50</button><button data-value="556">NTP ×556</button><button data-value="10000">memcached ×1만</button></div></div>
+        <div class="ctrl"><span>방어</span><div class="seg" id="dd-def"><button data-value="none" class="on">없음 (10 Gbps 회선)</button><button data-value="scrub">스크러빙 센터 1곳 (2 Tbps)</button><button data-value="any">애니캐스트 (6지역 · 300 Tbps)</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">봇이 보내는 트래픽</span><span class="v" id="dd-raw">—</span></div>
+        <div class="stat"><span class="k">피해자에게 도착</span><span class="v" id="dd-att">—</span></div>
+        <div class="stat"><span class="k">가장 바쁜 지점의 부하</span><span class="v" id="dd-load">—</span></div>
+        <div class="stat"><span class="k">결과</span><span class="v" id="dd-res" style="font-size:15px">—</span></div>
+      </div>
+      <div class="sim-note">공격 트래픽 = 봇 수 × 업링크 × 증폭 배수. 애니캐스트에서는 봇 분포(아시아 35%, 북미 20%, 유럽 20%, 남미 12%, 중동·아프리카 8%, 오세아니아 5%)대로 공격이 지역별 거점에 나뉜다고 가정했다. 단순화: 실제로는 반사 서버의 수와 회선이 상한이 되어 memcached × 대규모 봇넷 같은 조합은 계산만큼 커지지 않는다. 또 어느 정도 걸러 낸 뒤 남는 트래픽, 응용 계층 공격은 따로 다뤄야 한다. 해볼 것: 봇 1만 대 × 10 Mbps에 DNS 증폭이면 10 Gbps 회선은 몇 배 넘치나? 그 공격을 애니캐스트는 어떻게 버티나?</div>
+    </div>
+    <div class="callout deep"><strong>SYN 플러드와 SYN 쿠키</strong><p>TCP 3방향 악수(9장)에서 서버는 SYN을 받으면 “반쯤 열린 연결”을 표에 적어 두고 마지막 ACK를 기다린다. 공격자가 가짜 출발지로 SYN만 초당 수백만 개 보내면 이 표가 가득 차 진짜 손님이 못 들어온다. <span class="term">SYN 쿠키</span><span class="en">(SYN cookie)</span>는 표에 아무것도 적지 않는 묘수다. 서버는 SYN-ACK의 초기 순서 번호에 (상대 주소·포트·시간·비밀 열쇠)의 해시를 담아 보낸다. 진짜 클라이언트는 그 번호+1로 ACK를 돌려주고, 서버는 해시를 다시 계산해 맞으면 그때 연결을 만든다. 상태를 패킷 안에 “쿠키”로 맡겨 두는 셈이다. 리눅스는 표가 넘칠 때 자동으로 이 방식으로 바뀐다.</p></div>
+    <div class="callout tip"><strong>근본 대책: 출발지 위조 막기</strong><p>반사 공격은 보내는 주소를 위조할 수 있어서 가능하다. 통신사가 자기 고객망에서 나가는 패킷의 출발지 주소가 실제로 그 고객의 것인지 확인하면(BCP 38, 진입 필터링) 위조가 막힌다. 이 권고가 나온 지 25년이 넘었지만 아직 모든 망이 지키지는 않는다. 그리고 열린 리졸버·memcached 같은 반사 서버를 닫는 것도 모두의 몫이다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="wireless">
+    <h2>Wi-Fi, DNS, BGP: 기반 시설의 약점</h2>
+    <h3>Wi-Fi 보안의 역사</h3>
+    <p>전파(11장)는 벽을 넘어 누구에게나 닿는다. 그래서 무선 랜(13장)은 공기 중의 프레임을 암호화해야 한다. 그 방법은 여러 번 깨지고 고쳐졌다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>방식</th><th>도입</th><th>암호</th><th>상태</th></tr></thead>
+      <tbody>
+        <tr><td><b>WEP</b></td><td>1997</td><td>RC4 + 24비트 IV</td><td style="color:var(--bad)">완전히 깨짐. IV가 짧아 금방 반복되고, 패킷을 모으면 몇 분 안에 열쇠를 알아낸다</td></tr>
+        <tr><td><b>WPA2</b></td><td>2004</td><td>AES-CCMP, 4방향 핸드셰이크</td><td style="color:var(--warn)">널리 쓰임. 2017년 KRACK(열쇠 재설치) 취약점은 패치됨. 핸드셰이크를 녹화해 약한 비밀번호를 오프라인으로 대입하는 공격에 약하다</td></tr>
+        <tr><td><b>WPA3</b></td><td>2018</td><td>SAE(드래곤플라이) 키 교환</td><td style="color:var(--ok)">비밀번호를 쓰는 디피-헬먼 방식이라 녹화해도 오프라인 대입이 안 된다. 전방 비밀성. Wi-Fi 6E·7(6 GHz)에서는 필수</td></tr>
+      </tbody>
+    </table></div>
+    <p>카페처럼 비밀번호가 모두에게 공개된 망은, 비밀번호를 아는 다른 손님이 이론상 내 트래픽을 엿볼 수 있다(WPA2-PSK에서는 핸드셰이크를 지켜보면 내 세션 열쇠를 계산할 수 있다). 더 흔한 위험은 <span class="term">이블 트윈</span><span class="en">(evil twin)</span>이다. 공격자가 “Cafe_Free_WiFi”처럼 똑같은 이름의 가짜 공유기를 더 강한 신호로 띄우면 기기가 그쪽에 붙는다. 그러면 공격자가 DNS를 조작하거나 가짜 로그인 페이지를 띄울 수 있다. 방어는 결국 위의 TLS다. HTTPS와 인증서 경고를 무시하지 않는 습관이 가장 큰 방패이고, 민감한 작업은 휴대폰 데이터나 VPN을 쓰는 것이 낫다.</p>
+    <h3>DNS: 주소록을 조작하면</h3>
+    <p>DNS(10장)는 원래 암호화도 서명도 없는 UDP 질의응답이다. 공격자가 리졸버에 가짜 답을 먼저 밀어 넣으면 <code>bank.example</code>이 공격자 IP로 연결된다(<b>DNS 스푸핑</b>, 캐시 중독). 2008년 카민스키 공격 이후 리졸버는 질의마다 출발지 포트를 무작위로 바꿔 추측을 어렵게 했다. 근본 대책은 두 갈래다.</p>
+    <ul>
+      <li><span class="term">DNSSEC</span>: 도메인 소유자가 DNS 레코드에 <b>서명</b>한다. 루트부터 체인으로 검증하므로 위조를 막는다(무결성). 다만 내용은 여전히 평문이고, 서명된 도메인 비율은 아직 낮은 편이다.</li>
+      <li><b>DoT·DoH</b>: 내 기기와 리졸버 사이의 DNS를 TLS(853번 포트)나 HTTPS(443번)로 <b>암호화</b>한다(기밀성). 공용 Wi-Fi나 통신사가 내가 묻는 이름을 보지 못한다. 대부분의 브라우저와 휴대폰 OS가 지원한다.</li>
+    </ul>
+    <h3>BGP 하이재킹</h3>
+    <p>8장에서 본 BGP는 이웃이 광고하는 경로를 대체로 믿는다. 어떤 망이 실수나 악의로 남의 주소 블록을 “내가 가장 가까운 길”이라고 광고하면, 인터넷 일부의 트래픽이 그쪽으로 빨려 들어간다. 2008년 파키스탄 통신사가 국내 유튜브 차단을 위해 만든 경로가 전 세계로 새어 나가 유튜브가 두 시간가량 마비된 사건이 대표적이다. 주소 블록의 주인을 서명된 기록으로 확인하는 <b>RPKI</b>와 경로 출처 검증(ROV)이 빠르게 보급되어, 이제 인터넷 경로의 절반 이상이 RPKI로 보호된다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="pqc">
+    <h2>양자 컴퓨터와 포스트 양자 암호</h2>
+    <p>지금의 공개키 암호(RSA, 디피-헬먼, 타원곡선)는 “소인수분해·이산 로그가 어렵다”는 데 기대고 있다. 그런데 충분히 큰 양자 컴퓨터에서 <b>쇼어 알고리즘</b>을 돌리면 이 문제들이 빠르게 풀린다. 그런 양자 컴퓨터는 아직 없지만, 공격자가 오늘 암호문을 녹화해 두었다가 10~20년 뒤에 푸는 “<b>지금 수집, 나중에 해독</b>(harvest now, decrypt later)”은 지금 당장의 위협이다. 반면 AES 같은 대칭키 암호와 해시는 양자 컴퓨터로도 대략 열쇠 길이가 절반이 되는 효과뿐이라, AES-256을 쓰면 충분하다고 본다.</p>
+    <p>그래서 양자 컴퓨터로도 풀기 어려운 수학 문제(격자 문제 등)에 기반한 <span class="term">포스트 양자 암호</span><span class="en">(PQC, post-quantum cryptography)</span>로 옮겨 가는 중이다. 미국 NIST는 2024년 8월 첫 표준을 확정했다. 열쇠 교환용 <b>ML-KEM</b>(FIPS 203, 옛 이름 Kyber)과 서명용 ML-DSA(FIPS 204), SLH-DSA(FIPS 205)다.</p>
+    <p>새 알고리즘을 바로 단독으로 믿기는 이르므로, TLS는 <b>하이브리드 키 교환</b>을 쓴다. 기존의 X25519와 ML-KEM-768을 동시에 수행해 두 비밀을 섞는다. 둘 중 하나만 안전해도 결과가 안전하다. 크롬·파이어폭스 등 주요 브라우저와 대형 CDN이 2024년부터 이를 기본으로 켜서, 2025년에는 주요 CDN에 들어오는 브라우저 TLS 연결의 상당 부분(절반 가까이)이 이미 양자 내성 키 교환을 쓴다. 대가는 크기다. ML-KEM의 공개값은 1 KB 남짓으로 X25519(32바이트)보다 훨씬 커서, ClientHello가 패킷 하나에 안 들어가는 경우가 생긴다.</p>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>네트워크 위협은 <b>도청·변조·사칭·마비</b>이고, 각각 <b>기밀성·무결성·인증·가용성</b>으로 막는다. 인터넷 기본 설계는 어느 것도 보장하지 않는다.</li>
+      <li><b>대칭키 암호</b>(AES)는 빠르지만 열쇠 배달이 문제이고, <b>공개키 암호</b>(RSA, ECC)는 느리지만 열쇠 교환과 서명을 푼다. <b>해시·MAC</b>은 변조를 잡는다.</li>
+      <li><b>디피-헬먼</b>은 g<sup>a</sup>, g<sup>b</sup>만 공개해 도청자 앞에서 g<sup>ab</sup>라는 비밀을 만든다. 하지만 상대가 누군지는 알려 주지 않아 인증서가 필요하다.</li>
+      <li><b>TLS 1.3</b>은 키 공유를 첫 메시지에 실어 <b>1-RTT</b>로 연결하고, 인증서 체인으로 서버를 검증한다. 자물쇠는 “그 도메인과 안전하게 통신 중”일 뿐 “착한 사이트”를 보증하지 않는다.</li>
+      <li><b>방화벽</b>은 위에서부터 첫 일치 규칙을 적용하며, <b>상태 저장</b>이면 내가 시작한 연결의 응답만 안전하게 들인다. <b>VPN</b>은 암호화한 패킷을 새 봉투에 넣는 터널이고, <b>제로 트러스트</b>는 망 위치 대신 매 요청의 신원을 검증한다.</li>
+      <li><b>DDoS</b>는 반사·증폭으로 수십 Tbps에 이른다. 애니캐스트로 전 세계 거점에 나눠 흡수하고, SYN 쿠키·출발지 위조 차단 등으로 막는다.</li>
+      <li>Wi-Fi는 <b>WEP → WPA2 → WPA3(SAE)</b>로, DNS는 <b>DNSSEC·DoH/DoT</b>로, BGP는 <b>RPKI</b>로 보강 중이며, 공개키 암호는 <b>ML-KEM 하이브리드</b>로 양자 시대를 준비한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>공격자가 송금 요청 패킷의 계좌 번호를 바꿔치기했다. 어떤 보안 목표가 깨진 것이고, 무엇이 이를 잡아내는가?</p><div class="opts">
+        <button class="opt">기밀성 — 대칭키 암호</button>
+        <button class="opt">가용성 — 방화벽</button>
+        <button class="opt" data-correct>무결성 — 메시지 인증 코드(또는 AEAD의 인증 태그)</button>
+        <button class="opt">인증 — 디피-헬먼 키 교환</button>
+      </div><div class="quiz-exp">내용을 바꾸는 공격은 무결성 문제다. 열쇠를 섞은 MAC이나 AES-GCM 같은 인증 암호화의 태그는 한 비트만 바뀌어도 검증에 실패한다. 암호화만으로는 변조를 막지 못한다.</div></div>
+      <div class="quiz-q"><p>디피-헬먼 키 교환에서 도청자 이브가 알 수 <b>없는</b> 값은?</p><div class="opts">
+        <button class="opt">소수 p와 생성원 g</button>
+        <button class="opt">앨리스가 보낸 A = g<sup>a</sup> mod p</button>
+        <button class="opt">밥이 보낸 B = g<sup>b</sup> mod p</button>
+        <button class="opt" data-correct>공유 비밀 g<sup>ab</sup> mod p</button>
+      </div><div class="quiz-exp">p, g, A, B는 모두 공개 통로로 오가므로 이브도 본다. 공유 비밀을 계산하려면 a나 b가 필요하고, A에서 a를 되찾는 이산 로그 문제가 어렵기 때문에 안전하다.</div></div>
+      <div class="quiz-q"><p>TLS 1.3이 TLS 1.2보다 왕복 한 번을 줄일 수 있었던 핵심 이유는?</p><div class="opts">
+        <button class="opt" data-correct>클라이언트가 ClientHello에 키 교환용 공개값(key_share)을 미리 넣어 보내기 때문</button>
+        <button class="opt">인증서 검증을 생략하기 때문</button>
+        <button class="opt">TCP 연결 없이 UDP만 쓰기 때문</button>
+        <button class="opt">암호화를 하지 않고 서명만 하기 때문</button>
+      </div><div class="quiz-exp">클라이언트가 서버가 고를 방식을 예상해 공개값을 첫 메시지에 싣는다. 서버는 바로 자기 공개값과 인증서, Finished를 보내므로 1 왕복이면 열쇠가 정해진다. 인증서 검증은 그대로 한다.</div></div>
+      <div class="quiz-q"><p>주소창에 자물쇠가 떠 있는 <code>secure-bank-login.com</code>에 대해 말할 수 있는 것은?</p><div class="opts">
+        <button class="opt">은행이 공식 운영하는 사이트다</button>
+        <button class="opt" data-correct>그 도메인을 가진 서버와 암호화된 연결을 맺었다는 것뿐이다</button>
+        <button class="opt">사이트에 악성 코드가 없다는 것이 검증되었다</button>
+        <button class="opt">내 접속 사실을 통신사가 전혀 알 수 없다</button>
+      </div><div class="quiz-exp">도메인 확인(DV) 인증서는 도메인 소유만 확인하므로 피싱 사이트도 자물쇠를 단다. 자물쇠는 “누구와”가 아니라 “그 이름의 서버와 안전하게”를 보장한다. 목적지 IP나 SNI 같은 메타데이터도 남는다.</div></div>
+      <div class="quiz-q"><p>공격자가 봇 1만 대(각 10 Mbps 업링크)로 출발지를 피해자 IP로 위조한 DNS 질의를 보내고, 증폭 배수가 50이라면 피해자에게 도착하는 트래픽은 대략?</p><div class="opts">
+        <button class="opt">100 Mbps</button>
+        <button class="opt">10 Gbps</button>
+        <button class="opt" data-correct>5 Tbps</button>
+        <button class="opt">500 Gbps</button>
+      </div><div class="quiz-exp">1만 × 10 Mbps = 100 Gbps의 질의가 50배로 증폭되어 5 Tbps가 된다. 일반 기업 회선(1~100 Gbps)으로는 막을 수 없는 크기라 수백 Tbps 용량의 분산망이 흡수해야 한다.</div></div>
+      <div class="quiz-q"><p>“지금 수집, 나중에 해독” 위협 때문에 TLS가 서둘러 도입하고 있는 것은?</p><div class="opts">
+        <button class="opt">AES-128을 DES로 교체</button>
+        <button class="opt">인증서 유효 기간을 10년으로 연장</button>
+        <button class="opt">RSA 키 길이를 512비트로 축소</button>
+        <button class="opt" data-correct>X25519와 ML-KEM을 함께 쓰는 하이브리드 키 교환</button>
+      </div><div class="quiz-exp">양자 컴퓨터가 생기면 오늘 녹화한 키 교환이 풀릴 수 있다. 그래서 2024년 표준화된 ML-KEM을 기존 X25519와 함께 써서, 둘 중 하나만 안전해도 비밀이 지켜지게 한다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  /* ================= Diffie-Hellman ================= */
+  const modpow = (b, e, m) => { let r = 1; b %= m; while (e > 0) { if (e & 1) r = (r * b) % m; b = (b * b) % m; e = Math.floor(e / 2); } return r; };
+  const primeFactors = (n) => { const f = []; for (let d = 2; d * d <= n; d++) { if (n % d === 0) { f.push(d); while (n % d === 0) n /= d; } } if (n > 1) f.push(n); return f; };
+  const primRoot = (p) => { const fs = primeFactors(p - 1); for (let g = 2; g < p; g++) if (fs.every((q) => modpow(g, (p - 1) / q, p) !== 1)) return g; return 2; };
+  let dhP = 23, dhG = primRoot(23), eve = null;
+  const aGet = NB.range("dh-a", (v) => String(v), () => { eve = null; dhUpdate(); });
+  const bGet = NB.range("dh-b", (v) => String(v), () => { eve = null; dhUpdate(); });
+  NB.seg("dh-p", (v) => {
+    dhP = Number(v); dhG = primRoot(dhP); eve = null;
+    [aGet, bGet].forEach((g) => { g.el.max = dhP - 2; if (Number(g.el.value) > dhP - 2) g.el.value = Math.floor((dhP - 2) * 0.4); });
+    aGet.set(Math.min(Number(aGet.el.value), dhP - 2)); bGet.set(Math.min(Number(bGet.el.value), dhP - 2));
+  });
+  function dhVals() {
+    const a = aGet(), b = bGet(), A = modpow(dhG, a, dhP), B = modpow(dhG, b, dhP);
+    return { a, b, A, B, sa: modpow(B, a, dhP), sb: modpow(A, b, dhP) };
+  }
+  function powStr(g, e, p) { const full = Math.pow(g, e); return full < 1e12 ? `${g}<sup>${e}</sup> mod ${p} = ${full.toLocaleString("en-US")} mod ${p}` : `${g}<sup>${e}</sup> mod ${p}`; }
+  function dhUpdate() {
+    const v = dhVals();
+    NB.stat("dh-sa", String(v.sa)); NB.stat("dh-sb", String(v.sb) + (v.sa === v.sb ? ' <small>일치</small>' : ""));
+    $("dh-steps").innerHTML =
+      `공개 약속: <b>p = ${dhP}, g = ${dhG}</b><br>` +
+      `앨리스: A = ${powStr(dhG, v.a, dhP)} = <b>${v.A}</b> &nbsp;→ 공개 전송<br>` +
+      `밥: B = ${powStr(dhG, v.b, dhP)} = <b>${v.B}</b> &nbsp;→ 공개 전송<br>` +
+      `앨리스: s = B<sup>a</sup> mod p = ${v.B}<sup>${v.a}</sup> mod ${dhP} = <b style="color:var(--ok)">${v.sa}</b> &nbsp;|&nbsp; 밥: s = A<sup>b</sup> mod p = ${v.A}<sup>${v.b}</sup> mod ${dhP} = <b style="color:var(--ok)">${v.sb}</b>`;
+    if (!eve) NB.stat("dh-try", "—");
+    const bits = Math.ceil(Math.log2(dhP));
+    NB.stat("dh-real", `지금 p는 ${bits}비트. 실제는 2048비트 이상`);
+    dhcv.redraw();
+  }
+  const dhcv = NB.canvas("#cv-dh", (ctx, w, h) => {
+    const P = NB.palette(), v = dhVals(), narrow = w < 520;
+    const cols = [w * 0.17, w * 0.5, w * 0.83], fs = narrow ? 11 : 13;
+    // lanes
+    ctx.globalAlpha = 0.07; ctx.fillStyle = P.bad; ctx.fillRect(w * 0.34, 0, w * 0.32, h); ctx.globalAlpha = 1;
+    NB.text(ctx, "앨리스", cols[0], 18, { align: "center", bold: true, size: 14, color: P.accent });
+    NB.text(ctx, "공개 통로 · 이브가 엿봄", cols[1], 18, { align: "center", bold: true, size: narrow ? 11.5 : 14, color: P.bad });
+    NB.text(ctx, "밥", cols[2], 18, { align: "center", bold: true, size: 14, color: P.accent2 });
+    const rows = [h * 0.24, h * 0.46, h * 0.68, h * 0.88];
+    const labels = ["공통 물감", "비밀 물감", "섞어서 교환", "최종 색 = 비밀"];
+    // paint blob: list of colors as pie
+    const blob = (x, y, colors, r, label, sub) => {
+      const n = colors.length;
+      colors.forEach((c, i) => { ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, r, -Math.PI / 2 + (i / n) * Math.PI * 2, -Math.PI / 2 + ((i + 1) / n) * Math.PI * 2); ctx.closePath(); ctx.fillStyle = c; ctx.fill(); });
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.strokeStyle = P.border; ctx.lineWidth = 1.5; ctx.stroke();
+      if (label != null) NB.text(ctx, label, x + r + 6, y - (sub ? 7 : 0), { size: fs, bold: true, mono: true, color: P.text });
+      if (sub) NB.text(ctx, sub, x + r + 6, y + 9, { size: fs - 1.5, color: P.dim });
+    };
+    const R = narrow ? 11 : 15, cY = P.warn, cA = P.accent, cB = P.accent2;
+    const off = narrow ? w * 0.09 : w * 0.06;
+    if (!narrow) rows.forEach((y, i) => NB.text(ctx, labels[i], 8, y - R - 8, { size: 11, color: P.faint }));
+    // row 1: public p,g
+    blob(cols[1] - off, rows[0], [cY], R, `p=${dhP}`, `g=${dhG}`);
+    blob(cols[0] - off, rows[0], [cY], R, "p, g"); blob(cols[2] - off, rows[0], [cY], R, "p, g");
+    // row 2: secrets
+    blob(cols[0] - off, rows[1], [cA], R, `a=${v.a}`, "비밀");
+    blob(cols[2] - off, rows[1], [cB], R, `b=${v.b}`, "비밀");
+    NB.text(ctx, "a = ?   b = ?", cols[1], rows[1], { align: "center", size: fs + 1, bold: true, mono: true, color: P.bad });
+    // row 3: exchange
+    blob(cols[0] - off, rows[2], [cY, cA], R, `A=${v.A}`);
+    blob(cols[2] - off, rows[2], [cY, cB], R, `B=${v.B}`);
+    blob(cols[1] - off - R * 1.4, rows[2], [cY, cA], R * 0.8, null); blob(cols[1] + R * 0.4, rows[2], [cY, cB], R * 0.8, null);
+    NB.text(ctx, `A=${v.A}, B=${v.B}`, cols[1], rows[2] + R + 10, { align: "center", size: fs - 1, mono: true, color: P.text });
+    NB.arrow(ctx, cols[0] + w * 0.08, rows[2] - 4, cols[1] - off - R * 2.6, rows[2] - 4, { color: P.accent, head: 6 });
+    NB.arrow(ctx, cols[2] - off - R - 4, rows[2] + 4, cols[1] + R * 1.6, rows[2] + 4, { color: P.accent2, head: 6 });
+    // row 4: shared
+    blob(cols[0] - off, rows[3], [cY, cA, cB], R, `s=${v.sa}`);
+    blob(cols[2] - off, rows[3], [cY, cB, cA], R, `s=${v.sb}`);
+    let eveTxt = "s = ?  (a나 b가 필요)", eveCol = P.bad;
+    if (eve) { eveTxt = eve.done ? `찾았다! a=${eve.x} → s=${modpow(v.B, eve.x, dhP)}` : `x=${eve.x} 시도 중… g^x=${modpow(dhG, eve.x, dhP)}`; eveCol = eve.done ? P.warn : P.dim; }
+    NB.text(ctx, eveTxt, cols[1], rows[3], { align: "center", size: fs, bold: true, mono: true, color: eveCol });
+  }, { aspect: 0.5, minHeight: 280, maxHeight: 360 });
+  $("dh-eve").onclick = () => { eve = { x: 1, done: false, acc: 0 }; };
+  $("dh-rand").onclick = () => { eve = null; aGet.set(2 + Math.floor(Math.random() * (dhP - 3))); bGet.set(2 + Math.floor(Math.random() * (dhP - 3))); };
+  NB.loop($("cv-dh"), (dt) => {
+    if (!eve || eve.done) return;
+    const v = dhVals(), speed = Math.max(6, dhP / 4); // 시도/초 (보기 좋게)
+    eve.acc += dt * speed;
+    while (eve.acc >= 1 && !eve.done) { eve.acc -= 1; if (modpow(dhG, eve.x, dhP) === v.A) eve.done = true; else eve.x++; }
+    NB.stat("dh-try", eve.done ? `${eve.x}번 만에 성공` : `${eve.x}번째…`);
+    dhcv.redraw();
+  });
+  dhUpdate();
+
+  /* ================= TLS handshake ================= */
+  // t: 반 RTT 단위의 송신 시각, dir: 1 = 클라→서버, -1 = 서버→클라
+  const TLS = {
+    t12: { n: 4, enc: "4번째 반 왕복부터(키 교환 후)", msgs: [
+      { t: 0, dir: 1, lab: "TCP SYN", enc: 0, d: "<b>TCP 3방향 악수</b> 시작. 아직 TLS는 시작도 안 했다. 이 왕복 하나가 TCP 연결 비용이다(9장)." },
+      { t: 1, dir: -1, lab: "TCP SYN-ACK", enc: 0, d: "서버가 SYN-ACK로 답한다. 클라이언트는 다음 패킷에 ACK와 함께 TLS를 시작할 수 있다." },
+      { t: 2, dir: 1, lab: "ClientHello", enc: 0, d: "<b>ClientHello</b>: 지원하는 암호 방식 목록, 난수, SNI(접속할 도메인). TLS 1.2는 아직 키 교환 공개값을 보내지 않는다. 서버가 방식을 정해 주기를 기다린다." },
+      { t: 3, dir: -1, lab: "ServerHello, Certificate, KeyExchange, Done", enc: 0, d: "<b>ServerHello + Certificate + ServerKeyExchange</b>: 방식을 정하고, 인증서(평문으로 보인다!)와 서명된 디피-헬먼 공개값을 보낸다." },
+      { t: 4, dir: 1, lab: "ClientKeyExchange, CCS, {Finished}", enc: 1, d: "클라이언트가 인증서 체인을 검증하고 자기 공개값을 보낸다. 이제 양쪽이 같은 비밀을 안다. ChangeCipherSpec 뒤의 Finished부터 암호화된다." },
+      { t: 5, dir: -1, lab: "CCS, {Finished}", enc: 1, d: "서버도 Finished를 보낸다. Finished에는 지금까지 오간 모든 메시지의 MAC이 들어 있어, 중간에 누가 목록을 바꿔치기했다면 여기서 들통난다." },
+      { t: 6, dir: 1, lab: "{HTTP GET /}", enc: 1, d: "드디어 <b>실제 요청</b>. TCP 1 + TLS 2 왕복을 기다린 뒤다." },
+      { t: 7, dir: -1, lab: "{HTTP 200 응답}", enc: 1, d: "응답 도착. 첫 바이트까지 <b>4 왕복</b>. RTT 100 ms라면 0.4초가 인사에만 쓰인다." },
+    ] },
+    t13: { n: 3, enc: "ServerHello 직후(인증서도 암호화)", msgs: [
+      { t: 0, dir: 1, lab: "TCP SYN", enc: 0, d: "<b>TCP 3방향 악수</b> 시작. TLS 1.3도 TCP 위에서는 이 1 왕복이 먼저 필요하다." },
+      { t: 1, dir: -1, lab: "TCP SYN-ACK", enc: 0, d: "서버가 SYN-ACK로 답한다." },
+      { t: 2, dir: 1, lab: "ClientHello + key_share", enc: 0, d: "<b>ClientHello</b>: 암호 방식 목록, SNI, 그리고 핵심인 <b>key_share</b>(X25519 공개값, 요즘은 ML-KEM 하이브리드도). 서버가 이 방식을 고를 거라 예상하고 미리 보낸다." },
+      { t: 3, dir: -1, lab: "ServerHello + key_share | {EE, Cert, CertVerify, Fin}", enc: 2, d: "<b>ServerHello</b>(서버 공개값)를 보내는 순간 양쪽이 같은 비밀을 안다. 그 뒤의 EncryptedExtensions, <b>Certificate</b>, <b>CertificateVerify</b>(개인키 서명), Finished는 <b>모두 암호화</b>되어 같은 비행에 실린다." },
+      { t: 4, dir: 1, lab: "{Finished} + {HTTP GET /}", enc: 1, d: "클라이언트는 인증서 체인과 서명을 검증하고 Finished를 보내면서 <b>곧바로 HTTP 요청을 함께</b> 싣는다. TLS 몫은 1 왕복." },
+      { t: 5, dir: -1, lab: "{HTTP 200 응답}", enc: 1, d: "응답 도착. 첫 바이트까지 <b>3 왕복</b>(TCP 1 + TLS 1 + 요청 1). TLS 1.2보다 한 왕복 빠르다." },
+    ] },
+    quic: { n: 2, enc: "첫 서버 응답의 Handshake 부분부터", msgs: [
+      { t: 0, dir: 1, lab: "Initial[ClientHello + key_share]", enc: 0, d: "<b>QUIC</b>(HTTP/3, 10장)은 UDP 위에서 전송 연결과 TLS 1.3 핸드셰이크를 <b>한 번에</b> 한다. 첫 패킷이 곧 ClientHello다. (Initial 패킷도 공개된 값으로 가볍게 보호되지만 비밀은 아니다.)" },
+      { t: 1, dir: -1, lab: "Initial[ServerHello] | Handshake{EE, Cert, CV, Fin}", enc: 2, d: "서버가 ServerHello와 함께 암호화된 인증서·서명·Finished를 보낸다. 전송 연결도 이것으로 성립." },
+      { t: 2, dir: 1, lab: "{Finished} + {HTTP/3 GET /}", enc: 1, d: "클라이언트가 검증 후 Finished와 요청을 함께 보낸다." },
+      { t: 3, dir: -1, lab: "{HTTP/3 200 응답}", enc: 1, d: "응답 도착. 첫 바이트까지 <b>2 왕복</b>. 다시 접속할 때는 0-RTT로 1 왕복까지 줄일 수 있다." },
+    ] },
+  };
+  let tlsStep = 0;
+  const tlsMode = NB.seg("tls-mode", () => { tlsStep = 0; tlsUpdate(); });
+  const tlsRtt = NB.range("tls-rtt", (v) => v + " ms", () => tlsUpdate());
+  function tlsUpdate() {
+    const M = TLS[tlsMode()], m = M.msgs[tlsStep];
+    $("tls-desc").innerHTML = `<b>${tlsStep + 1}/${M.msgs.length}</b> — ` + m.d;
+    NB.stat("tls-n", M.n + " RTT");
+    NB.stat("tls-t", Math.round(M.n * tlsRtt()) + " ms");
+    NB.stat("tls-enc", M.enc);
+    $("tls-prev").disabled = tlsStep === 0; $("tls-next").disabled = tlsStep === M.msgs.length - 1;
+    tlscv.redraw();
+  }
+  $("tls-next").onclick = () => { tlsStep = Math.min(TLS[tlsMode()].msgs.length - 1, tlsStep + 1); tlsUpdate(); };
+  $("tls-prev").onclick = () => { tlsStep = Math.max(0, tlsStep - 1); tlsUpdate(); };
+  $("tls-all").onclick = () => { tlsStep = TLS[tlsMode()].msgs.length - 1; tlsUpdate(); };
+  const tlscv = NB.canvas("#cv-tls", (ctx, w, h) => {
+    const P = NB.palette(), M = TLS[tlsMode()], narrow = w < 520;
+    const lx = narrow ? 40 : w * 0.16, rx = narrow ? w - 40 : w * 0.84, top = 40, bot = h - 16;
+    const span = 8; // 반 RTT 8칸(=4 RTT) 고정 축
+    const Y = (t) => top + (t / span) * (bot - top);
+    NB.text(ctx, "브라우저", lx, 16, { align: "center", bold: true, size: 13, color: P.text });
+    NB.text(ctx, "서버", rx, 16, { align: "center", bold: true, size: 13, color: P.text });
+    ctx.strokeStyle = P.border; ctx.lineWidth = 3;
+    [lx, rx].forEach((x) => { ctx.beginPath(); ctx.moveTo(x, top - 8); ctx.lineTo(x, bot); ctx.stroke(); });
+    // RTT ticks
+    for (let k = 0; k <= 4; k++) {
+      const y = Y(k * 2);
+      ctx.strokeStyle = P.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(lx - 6, y); ctx.lineTo(rx + 6, y); ctx.stroke();
+      NB.text(ctx, k === 0 ? "0" : k + " RTT", lx - 8, y, { align: "right", size: 10, mono: true, color: P.faint });
+    }
+    // response arrival line
+    const arr = Y(M.n * 2);
+    M.msgs.forEach((m, i) => {
+      if (i > tlsStep) return;
+      const cur = i === tlsStep;
+      const x1 = m.dir === 1 ? lx : rx, x2 = m.dir === 1 ? rx : lx, y1 = Y(m.t), y2 = Y(m.t + 1);
+      const col = m.enc === 1 ? P.accent2 : P.accent;
+      if (m.enc === 2) {
+        // 평문(ServerHello) + 바로 뒤따르는 암호화 묶음
+        NB.arrow(ctx, x1, y1, x2, y2, { color: P.accent, lw: cur ? 2.4 : 1.6, head: 8 });
+        NB.arrow(ctx, x1, y1 + 10, x2, y2 + 10, { color: P.accent2, lw: cur ? 4 : 3, head: 9 });
+      } else NB.arrow(ctx, x1, y1, x2, y2, { color: col, lw: m.enc ? (cur ? 4 : 3) : (cur ? 2.4 : 1.6), head: 8 });
+      // label
+      const midx = (x1 + x2) / 2, midy = (y1 + y2) / 2;
+      ctx.save();
+      ctx.translate(midx, midy);
+      ctx.rotate(Math.atan2(y2 - y1, x2 - x1) + (m.dir === -1 ? Math.PI : 0));
+      const txt = m.lab, size = narrow ? 9.5 : 11.5;
+      ctx.font = (cur ? "700 " : "") + size + "px " + NB.font();
+      const tw = Math.min(ctx.measureText(txt).width + 10, rx - lx - 10);
+      NB.rrect(ctx, -tw / 2, -size - 10, tw, size + 6, 4); ctx.fillStyle = P.bg; ctx.globalAlpha = 0.85; ctx.fill(); ctx.globalAlpha = 1;
+      NB.text(ctx, txt, 0, -size / 2 - 7, { align: "center", size, bold: cur, color: cur ? P.text : P.dim });
+      ctx.restore();
+    });
+    if (tlsStep === M.msgs.length - 1) {
+      ctx.strokeStyle = P.ok; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(lx, arr); ctx.lineTo(rx, arr); ctx.stroke(); ctx.setLineDash([]);
+      NB.text(ctx, `첫 응답 도착: ${M.n} RTT = ${Math.round(M.n * tlsRtt())} ms`, (lx + rx) / 2, arr + 12, { align: "center", size: narrow ? 11 : 12.5, bold: true, color: P.ok });
+    }
+  }, { aspect: 0.62, minHeight: 360, maxHeight: 480 });
+  tlsUpdate();
+
+  /* ================= Firewall ================= */
+  const SRC = { any: "모든 곳", int: "사내망 10.0.0.0/8", ext: "외부(사내 제외)" };
+  const PROTO = { tcp: "TCP", udp: "UDP", any: "모두" };
+  const PORTS = ["any", "22", "53", "80", "443", "3389", "51514"];
+  const DEFAULT_RULES = () => [
+    { act: "allow", src: "any", proto: "tcp", port: "443" },
+    { act: "allow", src: "any", proto: "tcp", port: "80" },
+    { act: "allow", src: "int", proto: "tcp", port: "22" },
+  ];
+  let rules = DEFAULT_RULES(), selPk = 0;
+  const PKS = [
+    { name: "외부 방문자의 웹 접속", src: "203.0.113.50", int: false, proto: "tcp", port: 443, reply: false, want: true },
+    { name: "외부에서 SSH 로그인 시도", src: "198.51.100.23", int: false, proto: "tcp", port: 22, reply: false, want: false },
+    { name: "사내 관리자의 SSH", src: "10.1.2.3", int: true, proto: "tcp", port: 22, reply: false, want: true },
+    { name: "원격 데스크톱 포트 스캔", src: "192.0.2.77", int: false, proto: "tcp", port: 3389, reply: false, want: false },
+    { name: "서버가 보낸 DNS 질의의 응답", src: "8.8.8.8:53", int: false, proto: "udp", port: 51514, reply: true, want: true },
+    { name: "요청한 적 없는 UDP (위조)", src: "203.0.113.99:53", int: false, proto: "udp", port: 51514, reply: false, want: false },
+  ];
+  const matches = (r, p) => (r.src === "any" || (r.src === "int") === p.int) && (r.proto === "any" || r.proto === p.proto) && (r.port === "any" || Number(r.port) === p.port);
+  function decide(p) {
+    if ($("fw-state").checked && p.reply) return { ok: true, by: -1, why: "연결 추적 표에 있는 응답 → 규칙 보기 전에 허용" };
+    for (let i = 0; i < rules.length; i++) if (matches(rules[i], p)) return { ok: rules[i].act === "allow", by: i, why: `규칙 ${i + 1}번에 첫 일치` };
+    return { ok: false, by: rules.length, why: "어느 규칙에도 안 맞아 기본 거부" };
+  }
+  const opt = (obj, cur) => Object.keys(obj).map((k) => `<option value="${k}"${k === cur ? " selected" : ""}>${obj[k]}</option>`).join("");
+  function fwRender() {
+    const hit = decide(PKS[selPk]).by;
+    let html = rules.map((r, i) => `<div class="fw-rule${hit === i ? " hit" : ""}" data-i="${i}"><span class="no">${i + 1}</span>
+      <select data-k="act" aria-label="동작">${opt({ allow: "허용", deny: "거부" }, r.act)}</select>
+      <select data-k="src" aria-label="출발지">${opt(SRC, r.src)}</select>
+      <select data-k="proto" aria-label="프로토콜">${opt(PROTO, r.proto)}</select>
+      <select data-k="port" aria-label="목적지 포트">${PORTS.map((p) => `<option value="${p}"${p === r.port ? " selected" : ""}>${p === "any" ? "모든 포트" : "포트 " + p}</option>`).join("")}</select>
+      <button class="mini" data-a="up" title="위로">↑</button><button class="mini" data-a="down" title="아래로">↓</button><button class="mini" data-a="del" title="삭제">✕</button></div>`).join("");
+    html += `<div class="fw-rule fixed${hit === rules.length ? " hit" : ""}"><span class="no">끝</span> 기본 정책: 나머지는 모두 거부</div>`;
+    $("fw-rules").innerHTML = html;
+    let good = 0, allow = 0;
+    $("fw-pk").innerHTML = PKS.map((p, i) => {
+      const d = decide(p); if (d.ok) allow++; const right = d.ok === p.want; if (right) good++;
+      return `<div class="fw-p${i === selPk ? " sel" : ""}" data-p="${i}"><div><b>${p.name}</b><div class="hdr">${p.src} → 10.0.0.10 · ${p.proto.toUpperCase()} ${p.port}</div></div>
+        <div class="res ${d.ok ? "ok" : "no"}">${d.ok ? "허용" : "거부"} <span class="mark ${right ? "good" : "badm"}">${right ? "✓" : "✗"}</span></div><div class="why">${d.why}${right ? "" : p.want ? " — 막히면 안 되는 패킷" : " — 들어오면 안 되는 패킷"}</div></div>`;
+    }).join("");
+    NB.stat("fw-score", `${good} / ${PKS.length}`);
+    NB.stat("fw-cnt", `${allow} / ${PKS.length - allow}`);
+    NB.stat("fw-msg", good === PKS.length ? '<span style="color:var(--ok)">정책과 일치</span>' : '<span style="color:var(--warn)">구멍 또는 과잉 차단</span>');
+  }
+  $("fw-rules").addEventListener("change", (e) => { const row = e.target.closest(".fw-rule"); if (!row || row.dataset.i == null) return; rules[+row.dataset.i][e.target.dataset.k] = e.target.value; fwRender(); });
+  $("fw-rules").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return; const i = +b.closest(".fw-rule").dataset.i;
+    if (b.dataset.a === "del") rules.splice(i, 1);
+    if (b.dataset.a === "up" && i > 0) [rules[i - 1], rules[i]] = [rules[i], rules[i - 1]];
+    if (b.dataset.a === "down" && i < rules.length - 1) [rules[i + 1], rules[i]] = [rules[i], rules[i + 1]];
+    fwRender();
+  });
+  $("fw-pk").addEventListener("click", (e) => { const r = e.target.closest(".fw-p"); if (r) { selPk = +r.dataset.p; fwRender(); } });
+  $("fw-add").onclick = () => { if (rules.length < 8) rules.push({ act: "deny", src: "any", proto: "any", port: "any" }); fwRender(); };
+  $("fw-reset").onclick = () => { rules = DEFAULT_RULES(); $("fw-state").checked = true; fwRender(); };
+  $("fw-state").addEventListener("change", fwRender);
+  fwRender();
+
+  /* ================= DDoS ================= */
+  const REG = [["아시아", 0.35], ["북미", 0.2], ["유럽", 0.2], ["남미", 0.12], ["중동·아프리카", 0.08], ["오세아니아", 0.05]];
+  const REGCAP = [80e12, 70e12, 70e12, 30e12, 25e12, 25e12]; // 합계 300 Tbps
+  const bots = NB.range("dd-bots", (v) => NB.kn(Math.round(Math.pow(10, v))) + "대", () => ddcv.redraw());
+  const up = NB.range("dd-up", (v) => v + " Mbps", () => ddcv.redraw());
+  const amp = NB.seg("dd-amp", () => ddcv.redraw());
+  const def = NB.seg("dd-def", () => ddcv.redraw());
+  const bps = (x) => NB.si(x, "bps");
+  const ddcv = NB.canvas("#cv-ddos", (ctx, w, h) => {
+    const P = NB.palette(), narrow = w < 520;
+    const nb = Math.round(Math.pow(10, bots())), raw = nb * up() * 1e6, A = raw * Number(amp()), mode = def();
+    let bars, worst = 0, ok;
+    if (mode === "any") {
+      bars = REG.map(([n, f], i) => ({ n, v: A * f, cap: REGCAP[i] }));
+      bars.forEach((b) => (worst = Math.max(worst, b.v / b.cap)));
+    } else {
+      const cap = mode === "none" ? 10e9 : 2e12;
+      bars = [{ n: "봇 송신", v: raw, cap: null }, { n: mode === "none" ? "피해자 회선" : "스크러빙 센터", v: A, cap }];
+      worst = A / cap;
+    }
+    ok = worst <= 1;
+    NB.stat("dd-raw", bps(raw)); NB.stat("dd-att", bps(A));
+    NB.stat("dd-load", (worst * 100 >= 1000 ? NB.fmt(worst, 3) + "배" : Math.round(worst * 100) + "%") + " <small>용량 대비</small>");
+    NB.stat("dd-res", ok ? '<span style="color:var(--ok)">버틴다 · 서비스 유지</span>' : '<span style="color:var(--bad)">넘친다 · 서비스 마비</span>');
+    // log bar chart
+    const x0 = narrow ? 92 : 130, x1 = w - 20, rowH = Math.min(36, (h - 60) / bars.length), top = Math.max(26, (h - rowH * bars.length) / 2 - 6);
+    const lmin = 9, lmax = 16; // 1 Gbps ~ 10 Pbps
+    const X = (v) => x0 + NB.clamp((Math.log10(Math.max(v, 1e9)) - lmin) / (lmax - lmin), 0, 1) * (x1 - x0);
+    NB.text(ctx, "도착 트래픽 vs 용량 (로그 눈금)", x0, top - 14, { size: 11.5, color: P.dim });
+    for (let e = lmin; e <= lmax; e++) { const x = X(Math.pow(10, e)); ctx.strokeStyle = P.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top + rowH * bars.length); ctx.stroke(); if (!narrow || e % 2 === 1) NB.text(ctx, ["1G", "10G", "100G", "1T", "10T", "100T", "1P", "10P"][e - lmin], x, top + rowH * bars.length + 12, { align: "center", size: 10, mono: true, color: P.faint }); }
+    bars.forEach((b, i) => {
+      const y = top + i * rowH + 4, bh = rowH - 10, over = b.cap != null && b.v > b.cap;
+      NB.text(ctx, b.n, x0 - 8, y + bh / 2, { align: "right", size: narrow ? 10.5 : 12, color: P.text });
+      NB.rrect(ctx, x0, y, Math.max(2, X(b.v) - x0), bh, 4); ctx.fillStyle = b.cap == null ? P.faint : over ? P.bad : P.accent; ctx.globalAlpha = 0.8; ctx.fill(); ctx.globalAlpha = 1;
+      if (b.cap == null) { NB.text(ctx, bps(b.v), Math.min(X(b.v) + 6, x1 - 60), y + bh / 2, { size: 11, mono: true, color: P.dim }); return; }
+      const cx = X(b.cap); ctx.strokeStyle = P.ok; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(cx, y - 3); ctx.lineTo(cx, y + bh + 3); ctx.stroke();
+      if (!narrow || bars.length <= 2) NB.text(ctx, bps(b.v), Math.min(X(b.v) + 6, x1 - 60), y + bh / 2, { size: 11, mono: true, bold: true, color: P.text });
+    });
+    NB.text(ctx, "초록 세로선 = 그 지점의 처리 용량", x1, h - 8, { align: "right", size: 10.5, color: P.faint });
+  }, { aspect: 0.42, minHeight: 250, maxHeight: 320 });
+})();
+</script>
+</body>
+</html>

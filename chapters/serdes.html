@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>SerDes와 고속 인터페이스 · NetworkBook</title>
+<meta name="description" content="칩 밖으로 초당 수천억 비트를 내보내는 SerDes의 원리. 병렬 대신 직렬을 쓰는 이유, NRZ와 PAM4, 채널 손실과 이퀄라이저(FFE·CTLE·DFE), 클럭 데이터 복원, FEC, 반사와 신호 무결성을 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .sd-desc { padding: 12px 18px; border-top: 1px solid var(--border); font-size: 15px; min-height: 52px; }
+  .sd-verdict b.ok { color: var(--ok); } .sd-verdict b.warn { color: var(--warn); } .sd-verdict b.bad { color: var(--bad); }
+  .lane-tbl td:first-child { white-space: nowrap; font-weight: 700; }
+</style>
+</head>
+<body data-chapter="serdes">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 16</div>
+    <h1>SerDes와 고속 인터페이스</h1>
+    <p class="lead">데이터센터의 스위치 칩 하나는 1초에 수십 테라비트를 주고받는다. 그런데 그 많은 데이터가 드나드는 길은 손톱만 한 칩 가장자리의 구리 배선 몇백 쌍뿐이다. 배선 한 쌍에 초당 1,000억 비트 넘게 밀어 넣어야 하는데, 그 속도에서 구리선은 신호를 뭉개고, 비틀고, 되튕긴다. 이 장은 그 뭉개진 신호에서 비트를 되살려 내는 회로, <strong>SerDes</strong>의 이야기다.</p>
+    <ul class="objectives">
+      <li>여러 줄의 병렬 버스 대신 고속 직렬 링크를 쓰는 이유(스큐·핀 수)를 설명한다.</li>
+      <li>레인 속도가 10G에서 200G로 오른 역사와, 포트 속도 = 레인 수 × 레인 속도 관계를 안다.</li>
+      <li>배선의 주파수별 손실과 나이퀴스트 주파수에서의 삽입 손실을 계산해 본다.</li>
+      <li>NRZ와 PAM4의 차이, PAM4가 눈 높이를 1/3로 줄이는 대가를 눈 그림으로 확인한다.</li>
+      <li>FFE·CTLE·DFE 이퀄라이저로 닫힌 눈을 다시 여는 과정을 직접 조절해 본다.</li>
+      <li>클럭 데이터 복원(CDR)과 FEC가 링크를 지키는 방식을 이해한다.</li>
+      <li>특성 임피던스와 반사, 그리고 구리의 한계 너머(광, 칩렛 인터페이스)를 내다본다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="why-serial">
+    <h2>왜 병렬이 아니라 직렬인가</h2>
+    <p>옛날 컴퓨터는 데이터를 <b>여러 줄로 나란히</b> 보냈다. 32비트를 보내려면 선 32가닥과 박자를 맞출 클럭선 하나를 깔고, 클럭이 “지금!” 하고 칠 때 32가닥을 한꺼번에 읽는다. 이것이 <b>병렬 버스</b><span class="en">(parallel bus)</span>다. 직관적으로는 선이 많을수록 빨라 보인다. 그런데 오늘날 PCIe, USB, 이더넷, SATA 같은 고속 인터페이스는 모두 반대로 갔다. 선 한 쌍에 비트를 <b>한 줄로 세워</b> 아주 빠르게 보낸다.</p>
+    <p>이유는 두 가지다. 첫째, <span class="term">스큐</span><span class="en">(skew)</span>. 32가닥의 길이와 주변 환경이 조금씩 달라서 같은 순간 출발한 비트들이 도착하는 시각이 어긋난다. 1 GHz에서 1비트 시간은 1 ns인데, 기판 위 배선에서 신호는 1 ns에 15 cm쯤 간다. 길이가 몇 mm만 달라도 수십 ps가 어긋나고, 비트 시간이 짧아질수록 이 어긋남이 비트 시간 전체를 잡아먹는다. 둘째, <b>핀 수</b>. 칩 패키지 바닥의 단자(볼)는 개수가 한정되어 있고, 선이 늘수록 기판 층수와 전력, 서로 간섭하는 잡음(동시 스위칭 잡음)도 늘어난다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 300" style="min-width:600px" role="img" aria-label="병렬 버스의 스큐와 직렬 링크 비교">
+        <defs><marker id="sd-a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <text x="200" y="22" text-anchor="middle" class="t" style="font-weight:700">병렬 버스: 8가닥 + 클럭</text>
+        <text x="600" y="22" text-anchor="middle" class="t" style="font-weight:700">직렬 링크: 차동 선 한 쌍</text>
+        <g transform="translate(20,40)">
+          <rect x="0" y="0" width="54" height="200" rx="8" class="f-acc-soft"/><text x="27" y="105" text-anchor="middle" class="t-mono">TX</text>
+          <rect x="306" y="0" width="54" height="200" rx="8" class="f-acc-soft"/><text x="333" y="105" text-anchor="middle" class="t-mono">RX</text>
+          <g stroke="var(--border)" stroke-width="1.5">
+            <path d="M54 14 H306 M54 36 H306 M54 58 H306 M54 80 H306 M54 102 H306 M54 124 H306 M54 146 H306 M54 168 H306"/>
+          </g>
+          <path d="M54 190 H306" stroke="var(--accent-2)" stroke-width="2" stroke-dasharray="5 4"/>
+          <text x="180" y="206" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">클럭선</text>
+          <g fill="var(--accent)">
+            <rect x="236" y="8" width="10" height="12" rx="2"/><rect x="250" y="30" width="10" height="12" rx="2"/><rect x="230" y="52" width="10" height="12" rx="2"/><rect x="262" y="74" width="10" height="12" rx="2"/>
+            <rect x="242" y="96" width="10" height="12" rx="2"/><rect x="226" y="118" width="10" height="12" rx="2"/><rect x="256" y="140" width="10" height="12" rx="2"/><rect x="238" y="162" width="10" height="12" rx="2"/>
+          </g>
+          <rect x="222" y="2" width="54" height="180" rx="4" fill="none" stroke="var(--bad)" stroke-dasharray="4 3"/>
+          <text x="249" y="-4" text-anchor="middle" class="t-mono" style="fill:var(--bad)">스큐</text>
+          <text x="180" y="236" text-anchor="middle" class="t-dim">같이 출발했지만 도착 시각이 제각각.</text>
+          <text x="180" y="254" text-anchor="middle" class="t-dim">비트 시간이 짧아지면 함께 읽을 순간이 사라진다.</text>
+        </g>
+        <g transform="translate(420,40)">
+          <rect x="0" y="40" width="54" height="120" rx="8" class="f-acc-soft"/><text x="27" y="96" text-anchor="middle" class="t-mono">TX</text><text x="27" y="114" text-anchor="middle" class="t-mono" style="font-size:9px">직렬화</text>
+          <rect x="306" y="40" width="54" height="120" rx="8" class="f-acc-soft"/><text x="333" y="96" text-anchor="middle" class="t-mono">RX</text><text x="333" y="114" text-anchor="middle" class="t-mono" style="font-size:9px">CDR</text>
+          <path d="M54 88 H306" stroke="var(--accent)" stroke-width="2.5"/>
+          <path d="M54 112 H306" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="1 0" opacity=".55"/>
+          <path d="M70 80 h10 v-14 h20 v14 h10 v-14 h10 v14 h30 v-14 h10 v14 h10 v-14 h20 v14 h10 v-14 h10 v14 h20 v-14 h20 v14 h10" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="180" y="138" text-anchor="middle" class="t-mono">+ / − 두 선에 반대 극성</text>
+          <text x="180" y="36" text-anchor="middle" class="t-dim">클럭은 따로 없다. 데이터 전이에 녹아 있다.</text>
+          <text x="180" y="196" text-anchor="middle" class="t-dim">스큐 걱정은 두 선 사이만. 외부 잡음은</text>
+          <text x="180" y="214" text-anchor="middle" class="t-dim">두 선에 똑같이 실려서 빼면 사라진다.</text>
+          <text x="180" y="248" text-anchor="middle" class="t-acc">레인 1개 = 송신 1쌍 + 수신 1쌍</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 16-1.</b> 병렬 버스와 직렬 링크. 병렬은 선마다 도착 시각이 달라지는 스큐 때문에 속도를 올리기 어렵다. 직렬 링크는 <span class="term">차동 신호</span><span class="en">(differential signaling)</span> 한 쌍에 데이터를 보내고, 받는 쪽이 데이터 자체에서 박자를 뽑아낸다.</figcaption>
+    </figure>
+    <div class="callout analogy"><strong>단체 행진과 고속열차</strong><p>32명이 손을 잡지 않고 나란히 달려 결승선을 동시에 밟으라고 하면, 천천히 걸을 땐 되지만 전력 질주에서는 반드시 누군가 앞서고 누군가 처진다. 대신 선수 한 명이 엄청 빠르게 32번 왕복하면 줄 맞출 걱정이 없다. 직렬 링크는 택배 상자를 여러 트럭에 나눠 동시에 도착시키려 애쓰는 대신, 고속열차 한 편성에 일렬로 싣고 달리는 방식이다.</p></div>
+    <p>이렇게 병렬 데이터를 한 줄로 늘어세우는 회로를 <b>직렬화기</b><span class="en">(serializer)</span>, 받는 쪽에서 다시 병렬로 펼치는 회로를 <b>역직렬화기</b><span class="en">(deserializer)</span>라 하고, 둘을 합쳐 <span class="term">SerDes</span>(서데스)라 부른다. 하지만 이름과 달리 오늘날 SerDes의 일은 대부분 “늘어세우기”가 아니다. 망가진 신호를 미리 비틀어 보내고(송신 이퀄라이저), 받아서 고치고(수신 이퀄라이저), 박자를 찾아내고(CDR), 남은 오류를 수학으로 지우는(FEC) 일이 거의 전부다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 220" style="min-width:640px" role="img" aria-label="SerDes 송신부와 수신부의 블록 구성">
+        <defs><marker id="sd-a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-dim)"/></marker></defs>
+        <text x="16" y="24" class="t" style="font-weight:700">송신(TX)</text>
+        <text x="520" y="24" class="t" style="font-weight:700">수신(RX)</text>
+        <g class="t-mono">
+          <rect x="10" y="40" width="80" height="54" rx="8" class="f-surface"/><text x="50" y="62" text-anchor="middle">병렬 데이터</text><text x="50" y="80" text-anchor="middle">예: 64비트</text>
+          <rect x="110" y="40" width="78" height="54" rx="8" class="f-acc-soft"/><text x="149" y="62" text-anchor="middle">직렬화</text><text x="149" y="80" text-anchor="middle">MUX</text>
+          <rect x="208" y="40" width="78" height="54" rx="8" class="f-acc-soft"/><text x="247" y="62" text-anchor="middle">FFE</text><text x="247" y="80" text-anchor="middle">송신 등화</text>
+          <rect x="306" y="40" width="70" height="54" rx="8" class="f-acc-soft"/><text x="341" y="62" text-anchor="middle">드라이버</text><text x="341" y="80" text-anchor="middle">DAC</text>
+          <rect x="396" y="34" width="110" height="66" rx="10" fill="color-mix(in srgb, var(--warn) 14%, transparent)" stroke="var(--warn)"/><text x="451" y="58" text-anchor="middle" style="fill:var(--text)">채널</text><text x="451" y="76" text-anchor="middle">패키지·기판·</text><text x="451" y="90" text-anchor="middle">커넥터·케이블</text>
+          <rect x="526" y="40" width="70" height="54" rx="8" class="f-acc2-soft"/><text x="561" y="62" text-anchor="middle">CTLE</text><text x="561" y="80" text-anchor="middle">아날로그</text>
+          <rect x="612" y="40" width="70" height="54" rx="8" class="f-acc2-soft"/><text x="647" y="62" text-anchor="middle">ADC</text><text x="647" y="80" text-anchor="middle">또는 비교기</text>
+          <rect x="698" y="40" width="112" height="54" rx="8" class="f-acc2-soft"/><text x="754" y="62" text-anchor="middle">DSP: FFE·DFE</text><text x="754" y="80" text-anchor="middle">판정</text>
+          <rect x="612" y="132" width="90" height="50" rx="8" class="f-acc2-soft"/><text x="657" y="152" text-anchor="middle">CDR</text><text x="657" y="170" text-anchor="middle">박자 복원</text>
+          <rect x="722" y="132" width="88" height="50" rx="8" class="f-acc2-soft"/><text x="766" y="152" text-anchor="middle">역직렬화</text><text x="766" y="170" text-anchor="middle">→ FEC</text>
+          <rect x="110" y="132" width="176" height="50" rx="8" class="f-surface"/><text x="198" y="152" text-anchor="middle">PLL: 기준 클럭 ×</text><text x="198" y="170" text-anchor="middle">수십~수백 배 체배</text>
+        </g>
+        <g class="s-line" marker-end="url(#sd-a2)"><path d="M90 67 H106"/><path d="M188 67 H204"/><path d="M286 67 H302"/><path d="M376 67 H392"/><path d="M506 67 H522"/><path d="M596 67 H608"/><path d="M682 67 H694"/><path d="M754 94 V128"/><path d="M702 157 H718"/><path d="M198 132 V98"/><path d="M754 112 H657 V128"/></g>
+      </svg></div>
+      <figcaption><b>그림 16-2.</b> SerDes 한 레인의 구성(대략). 요즘의 100G·200G급 SerDes는 수신부에서 신호를 곧바로 <b>ADC</b>로 숫자로 바꾼 다음 디지털 신호 처리(DSP)로 등화와 판정을 한다. 레인 하나가 사실상 작은 모뎀이다.</figcaption>
+    </figure>
+    <p>그래서 SerDes는 칩에서 차지하는 비중이 크다. 수백 개 레인을 가진 스위치 칩에서는 SerDes가 다이 가장자리를 빙 둘러 차지하고, 칩 전체 면적과 전력에서 수십 %를 쓴다고 알려져 있다. 레인 하나가 비트당 몇 pJ(피코줄)을 쓰는데, 51.2 Tbps 칩이라면 4 pJ/bit만 잡아도 송수신에 200 W 가까이 된다. SerDes를 잘 만드는 것이 곧 네트워크 칩의 경쟁력인 이유다.</p>
+    <div class="callout deep"><strong>아직 병렬이 살아 있는 곳</strong><p>모든 인터페이스가 직렬로 간 것은 아니다. PC의 DDR 메모리는 지금도 64비트 병렬 버스인데, 바이트(8줄)마다 별도의 박자 신호(스트로브)를 붙이고 전원을 켤 때마다 줄마다 지연을 재서 맞추는 “트레이닝”으로 스큐를 견딘다. GPU 옆의 HBM은 아예 1,024줄 이상의 넓은 병렬 버스를 쓰는데, 칩과 메모리가 같은 패키지 안에서 수 mm 거리에 붙어 있어 스큐가 문제 되지 않기 때문이다. 거리가 짧으면 병렬, 길면 직렬이라는 원칙은 이 장 끝의 칩렛 인터페이스에서 다시 나온다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="lanes">
+    <h2>레인과 속도의 진화</h2>
+    <p>직렬 링크의 기본 단위는 <span class="term">레인</span><span class="en">(lane)</span>이다. 레인 하나는 송신용 차동 쌍 하나와 수신용 차동 쌍 하나, 즉 구리선 4가닥이다. 이더넷 포트나 PCIe 슬롯은 이 레인을 여러 개 묶어 만든다.</p>
+    <div class="formula"><b>포트 속도 = 레인 수 × 레인 속도</b><div class="where">예: 400GbE = 8 × 50G 또는 4 × 100G · 800GbE = 8 × 100G · 1.6TbE = 8 × 200G · PCIe x16 = 레인 16개</div></div>
+    <p>레인 속도를 정하는 숫자는 두 개다. 1초에 보내는 기호(심볼)의 수인 <span class="term">보 레이트</span><span class="en">(baud rate, Bd)</span>와, 기호 하나에 싣는 비트 수다. 기호마다 전압 2단계(0/1)만 쓰면 <span class="term">NRZ</span><span class="en">(Non-Return-to-Zero)</span>, 4단계를 쓰면 기호당 2비트인 <span class="term">PAM4</span><span class="en">(4-level Pulse Amplitude Modulation)</span>다. 신호가 0101…처럼 가장 빨리 바뀔 때의 주파수, 즉 보 레이트의 절반을 <span class="term">나이퀴스트 주파수</span><span class="en">(Nyquist frequency)</span>라 하는데, 채널이 이 주파수를 얼마나 잘 통과시키느냐가 링크의 성패를 가른다.</p>
+    <div class="table-wrap"><table class="lane-tbl">
+      <thead><tr><th>레인 속도</th><th>변조</th><th class="num">보 레이트</th><th class="num">나이퀴스트</th><th>쓰이는 이더넷 포트</th><th>보급 시기</th></tr></thead>
+      <tbody>
+        <tr><td>10G</td><td>NRZ</td><td class="num">10.3125 GBd</td><td class="num">≈ 5.2 GHz</td><td>10GbE, 40GbE(4×10G)</td><td>2000년대 후반</td></tr>
+        <tr><td>25G</td><td>NRZ</td><td class="num">25.78 GBd</td><td class="num">≈ 12.9 GHz</td><td>25GbE, 100GbE(4×25G)</td><td>2010년대 중반</td></tr>
+        <tr><td>50G (“56G”)</td><td>PAM4</td><td class="num">26.56 GBd</td><td class="num">≈ 13.3 GHz</td><td>200GbE(4×), 400GbE(8×)</td><td>2018년 무렵</td></tr>
+        <tr><td>100G (“112G”)</td><td>PAM4</td><td class="num">53.125 GBd</td><td class="num">≈ 26.6 GHz</td><td>400GbE(4×), 800GbE(8×)</td><td>2020년대 초</td></tr>
+        <tr><td>200G (“224G”)</td><td>PAM4</td><td class="num">106.25 GBd</td><td class="num">≈ 53 GHz</td><td>800GbE(4×), 1.6TbE(8×)</td><td>2024~2026</td></tr>
+      </tbody>
+    </table></div>
+    <p>“56G”, “112G”, “224G”는 업계가 SerDes를 부르는 이름으로, FEC 등 부가 비트를 포함한 대략의 선로 속도다. 보 레이트가 소수점까지 딱 떨어지지 않는 이유는 데이터에 <b>64b/66b 부호화</b>(64비트마다 2비트 머리표를 붙여 전이를 보장하고 블록 경계를 표시)와 FEC 패리티가 더해지기 때문이다. 25G에서 50G로 갈 때 업계는 보 레이트를 올리는 대신 PAM4로 갈아탔다. 이 결정의 이유를 아래 두 시뮬레이터에서 확인한다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>PCIe 세대</th><th class="num">레인당 속도</th><th>부호화·변조</th><th class="num">x16 한 방향 대역폭(약)</th></tr></thead>
+      <tbody>
+        <tr><td>Gen3</td><td class="num">8 GT/s</td><td>NRZ, 128b/130b</td><td class="num">16 GB/s</td></tr>
+        <tr><td>Gen4</td><td class="num">16 GT/s</td><td>NRZ, 128b/130b</td><td class="num">32 GB/s</td></tr>
+        <tr><td>Gen5</td><td class="num">32 GT/s</td><td>NRZ, 128b/130b</td><td class="num">64 GB/s</td></tr>
+        <tr><td>Gen6</td><td class="num">64 GT/s</td><td>PAM4, FLIT + 가벼운 FEC</td><td class="num">128 GB/s</td></tr>
+        <tr><td>Gen7</td><td class="num">128 GT/s</td><td>PAM4, FLIT</td><td class="num">256 GB/s</td></tr>
+      </tbody>
+    </table></div>
+    <p>PCIe는 서버 안에서 CPU와 GPU·NIC·SSD를 잇는 내부 도로다. 세대마다 정확히 두 배씩 올랐고, Gen6부터 이더넷처럼 PAM4로 넘어갔다. 다만 PCIe는 메모리 접근처럼 지연에 민감한 용도라서 FEC를 수 ns 수준으로 가볍게 쓰고, 이더넷은 더 강한 FEC로 더 긴 거리를 버틴다(뒤에서 다룬다).</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="channel">
+    <h2>채널 손실: 구리는 고주파를 먹는다</h2>
+    <p>칩에서 나온 신호는 패키지, 기판 배선, 커넥터, 케이블을 지나는데, 이 전체를 <b>채널</b><span class="en">(channel)</span>이라 부른다. 채널은 낮은 주파수는 잘 통과시키지만 높은 주파수일수록 많이 깎아 먹는다. 원인은 두 가지다. 주파수가 높으면 전류가 도체 표면의 얇은 층으로만 흐르는 <b>표피 효과</b> 때문에 저항이 √주파수에 비례해 늘고, 기판의 절연 재료(유리섬유+에폭시, FR4)가 전기장이 떨릴 때마다 에너지를 열로 빼앗는 <b>유전 손실</b>은 주파수에 비례해 는다. 그래서 신호가 빨라질수록 손실이 가파르게 커진다.</p>
+    <p>신호가 채널을 지나며 잃는 세기를 <span class="term">삽입 손실</span><span class="en">(insertion loss)</span>이라 하고 데시벨(dB, 2장)로 쓴다. 20 dB는 진폭이 1/10, 30 dB는 약 1/32로 줄었다는 뜻이다. 엔지니어는 이 값을 <b>나이퀴스트 주파수에서</b> 따진다. 고속 SerDes의 장거리(LR) 규격은 칩과 칩 사이 나이퀴스트 손실 약 28~30 dB까지를 목표로 설계된다.</p>
+    <div class="sim" id="sim-loss">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>배선 길이와 속도에 따른 채널 손실</h3></div>
+      <div class="sim-view"><canvas id="cv-loss"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>레인 속도</span><div class="seg" id="ls-rate"><button data-value="0">10G NRZ</button><button data-value="1">25G NRZ</button><button data-value="2">50G PAM4</button><button data-value="3" class="on">100G PAM4</button><button data-value="4">200G PAM4</button></div></div>
+        <label class="ctrl"><span>기판 배선 길이 <output id="ls-len-out"></output></span><input type="range" id="ls-len" min="2" max="80" value="25"></label>
+        <div class="ctrl"><span>기판 재료</span><div class="seg" id="ls-mat"><button data-value="0">일반 FR4</button><button data-value="1" class="on">중저손실</button><button data-value="2">초저손실</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">보 레이트</span><span class="v" id="ls-baud">—</span></div>
+        <div class="stat"><span class="k">나이퀴스트 주파수</span><span class="v" id="ls-fn">—</span></div>
+        <div class="stat"><span class="k">나이퀴스트 손실</span><span class="v" id="ls-il">—</span></div>
+        <div class="stat"><span class="k">남은 진폭</span><span class="v" id="ls-amp">—</span></div>
+        <div class="stat"><span class="k">보정 없는 눈 높이</span><span class="v" id="ls-eye">—</span></div>
+      </div>
+      <div class="sd-desc sd-verdict" id="ls-verdict"></div>
+      <div class="sim-note">왼쪽: 주파수별 손실(세로선이 나이퀴스트). 오른쪽: 이퀄라이저 없이 받은 눈 그림. 손실 모델은 dB/인치 = a·√f + b·f 꼴의 대략값에 패키지·커넥터 손실을 더한 것이며, 반사·누화는 뺐다. 해볼 것: 100G PAM4에서 FR4로 바꾸고 길이를 늘려 보자. 같은 길이를 10G NRZ로 보내면?</div>
+    </div>
+    <p>손실이 왜 그렇게 치명적일까? 비트 하나를 나타내는 네모난 펄스가 채널을 지나면 높은 주파수 성분(가파른 모서리)이 깎여 낮고 퍼진 언덕 모양이 된다. 퍼진 꼬리는 다음 비트, 그다음 비트 자리까지 흘러 들어가 그 비트들의 값을 헷갈리게 만든다. 이를 <span class="term">심볼 간 간섭</span><span class="en">(ISI, Inter-Symbol Interference)</span>이라 한다. 여러 비트의 파형을 한 비트 시간 폭으로 잘라 겹쳐 그린 <b>눈 그림</b>(eye diagram, 4장)에서 가운데 빈 공간, 즉 “눈”이 ISI 때문에 닫힌다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="pam4">
+    <h2>NRZ와 PAM4: 같은 박자에 두 배의 비트</h2>
+    <p>레인 속도를 두 배로 올리는 방법은 둘이다. 보 레이트를 두 배로 올리거나(NRZ 유지), 보 레이트는 그대로 두고 기호당 비트를 두 배로 하거나(PAM4). 보 레이트를 올리면 나이퀴스트 주파수도 두 배가 되어 채널 손실이 크게 는다. PAM4는 같은 주파수 대역에 두 배의 비트를 싣지만, 같은 전압 범위를 4단계로 나누므로 단계 사이 간격이 1/3로 줄어든다. 눈이 세 개로 쪼개지고 각각의 높이가 1/3이 된다. 신호 대 잡음비로 치면 20·log₁₀3 ≈ <b>9.5 dB 손해</b>다.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 210" role="img" aria-label="NRZ와 PAM4의 전압 단계와 비트 매핑">
+        <text x="190" y="22" text-anchor="middle" class="t" style="font-weight:700">NRZ: 2단계, 기호당 1비트</text>
+        <text x="600" y="22" text-anchor="middle" class="t" style="font-weight:700">PAM4: 4단계, 기호당 2비트</text>
+        <g transform="translate(30,40)">
+          <path d="M0 20 H300 M0 140 H300" stroke="var(--border)" stroke-dasharray="4 4"/>
+          <text x="306" y="24" class="t-mono">1</text><text x="306" y="144" class="t-mono">0</text>
+          <path d="M0 140 H40 V20 H80 V140 H160 V20 H240 V140 H280" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+          <path d="M-6 20 V140" stroke="var(--ok)" stroke-width="2" marker-end="none"/><text x="-10" y="84" text-anchor="end" class="t-mono" style="fill:var(--ok)">1</text>
+          <text x="150" y="168" text-anchor="middle" class="t-dim">눈 하나, 높이 = 전체 진폭</text>
+        </g>
+        <g transform="translate(450,40)">
+          <path d="M0 20 H300 M0 60 H300 M0 100 H300 M0 140 H300" stroke="var(--border)" stroke-dasharray="4 4"/>
+          <text x="306" y="24" class="t-mono">10</text><text x="306" y="64" class="t-mono">11</text><text x="306" y="104" class="t-mono">01</text><text x="306" y="144" class="t-mono">00</text>
+          <path d="M0 140 H40 V60 H80 V20 H120 V100 H160 V140 H200 V60 H240 V100 H280" fill="none" stroke="var(--accent-2)" stroke-width="2.5"/>
+          <path d="M-6 20 V60" stroke="var(--warn)" stroke-width="2"/><text x="-10" y="44" text-anchor="end" class="t-mono" style="fill:var(--warn)">1/3</text>
+          <text x="150" y="168" text-anchor="middle" class="t-dim">눈 세 개, 각각 높이 1/3 (그레이 부호)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 16-3.</b> NRZ와 PAM4. PAM4는 이웃한 단계끼리 비트 하나만 다르게 배치(그레이 부호: 00·01·11·10)해서, 잡음 때문에 옆 단계로 잘못 읽혀도 비트 오류가 하나로 끝나게 한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-pam">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>NRZ vs PAM4 눈 그림 비교</h3></div>
+      <div class="sim-view"><canvas id="cv-pam"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>비교 기준</span><div class="seg" id="pm-mode"><button data-value="baud" class="on">같은 보 레이트</button><button data-value="bit">같은 비트 레이트</button></div></div>
+        <label class="ctrl"><span>채널 손실 (PAM4 나이퀴스트 기준) <output id="pm-loss-out"></output></span><input type="range" id="pm-loss" min="0" max="24" value="8"></label>
+        <label class="ctrl"><span>수신 잡음 <output id="pm-noise-out"></output></span><input type="range" id="pm-noise" min="0" max="20" value="2"></label>
+        <label class="check"><input type="checkbox" id="pm-eq" checked> 이퀄라이저 자동 적용 (CTLE 최대 15 dB + DFE 3탭)</label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">NRZ 보 레이트 · 손실</span><span class="v" id="pm-nrz-b">—</span></div>
+        <div class="stat"><span class="k">NRZ 눈 높이 (전체 진폭 대비)</span><span class="v" id="pm-nrz">—</span></div>
+        <div class="stat"><span class="k">PAM4 눈 높이 (전체 진폭 대비)</span><span class="v" id="pm-pam">—</span></div>
+        <div class="stat"><span class="k">비트 레이트 (NRZ : PAM4)</span><span class="v" id="pm-rate">—</span></div>
+      </div>
+      <div class="sim-note">‘같은 보 레이트’는 같은 채널에서 PAM4가 비트를 두 배로 싣는 경우, ‘같은 비트 레이트’는 NRZ가 PAM4와 같은 비트를 보내려고 보 레이트를 두 배로 올린 경우다(나이퀴스트가 두 배라 손실이 커지고, 잡음 대역도 넓어진다). 눈 높이는 잡음 여유(±3σ)를 뺀 값. 해볼 것: ‘같은 비트 레이트’에서 손실을 0 → 24 dB로 올리며 어느 쪽이 먼저 닫히는지 보자.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">같은 비트 레이트로 보낼 때, 채널 손실이 아주 크면(PAM4 기준 18~22 dB) 어느 쪽 눈이 더 많이 열려 있을까?</p><p class="wi-hint">위 시뮬레이터에서 ‘같은 비트 레이트’를 고르고 손실을 18~22 dB로 올려 보자.</p><div class="opts">
+      <button class="opt">NRZ. 눈 높이가 처음부터 세 배니까 언제나 이긴다</button>
+      <button class="opt" data-correct>PAM4. NRZ는 나이퀴스트가 두 배라 손실이 훨씬 더 커진다</button>
+      <button class="opt">둘이 똑같다. 비트 레이트가 같으니까</button>
+    </div><div class="quiz-exp">손실이 작을 때는 NRZ가 유리하지만, 손실은 주파수에 따라 가파르게 늘기 때문에 보 레이트를 두 배로 올린 NRZ는 PAM4보다 훨씬 많은 dB를 잃는다. 어느 지점에서 그 손해가 PAM4의 9.5 dB 손해를 넘어선다. 업계는 레인당 50G에서 이 갈림길을 만났고 PAM4를 택했다. 그 뒤 100G·200G 레인은 모두 PAM4다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="equalizer">
+    <h2>이퀄라이저: 닫힌 눈을 다시 연다</h2>
+    <p>채널이 고주파를 깎아 먹는다면, 그만큼 고주파를 <b>미리 키우거나 나중에 키우면</b> 된다. 이것이 <span class="term">이퀄라이저</span><span class="en">(equalizer, 등화기)</span>다. SerDes에는 세 종류가 함께 쓰인다.</p>
+    <ul>
+      <li><span class="term">FFE</span><span class="en">(Feed-Forward Equalizer)</span>: 송신 쪽에서, 지금 비트에 앞뒤 비트를 조금씩 빼서 섞어 보낸다. 앞 비트 몫을 빼는 탭을 <b>프리커서</b>(pre-cursor), 뒤 비트 몫을 빼는 탭을 <b>포스트커서</b>(post-cursor)라 한다. 0→1로 바뀌는 순간에만 힘을 세게 주는 효과(디엠퍼시스)가 생겨 고주파가 상대적으로 커진다. 대신 송신 진폭의 일부를 탭에 나눠 주므로 신호의 평균 세기는 줄어든다.</li>
+      <li><span class="term">CTLE</span><span class="en">(Continuous-Time Linear Equalizer)</span>: 수신 입구의 아날로그 필터. 저주파를 깎아 고주파를 상대적으로 키운다(부스트, dB). 간단하고 빠르지만 고주파 잡음과 누화도 같이 키운다.</li>
+      <li><span class="term">DFE</span><span class="en">(Decision Feedback Equalizer)</span>: 수신 쪽에서, <b>이미 판정한</b> 이전 비트들이 남긴 꼬리를 계산해 빼 준다. 잡음을 키우지 않는 것이 큰 장점이지만, 앞 판정이 틀리면 오류가 번질 수 있고 판정 전에 피드백을 끝내야 하므로 한 비트 시간(200G PAM4에서 약 9.4 ps) 안에 계산을 마쳐야 하는 타이밍 압박이 있다.</li>
+    </ul>
+    <div class="callout analogy"><strong>메아리가 심한 강당에서 말하기</strong><p>울림이 심한 강당에서는 앞 단어의 메아리가 다음 단어를 덮는다(ISI). 말하는 사람은 단어의 첫 자음을 또박또박 세게 발음하고(FFE), 듣는 사람은 낮게 웅웅대는 소리를 걸러 내는 귀마개를 끼고(CTLE), 방금 들은 단어의 메아리가 어떻게 들릴지 알고 머릿속에서 지운다(DFE). 셋을 함께 써야 긴 메아리 속에서도 말을 알아듣는다.</p></div>
+    <div class="sim" id="sim-eq">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>이퀄라이저 실험실: 펄스 응답과 눈 그림</h3></div>
+      <div class="sim-view"><canvas id="cv-eq"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>채널 (나이퀴스트 손실)</span><div class="seg" id="eq-ch"><button data-value="10">10 dB</button><button data-value="20" class="on">20 dB</button><button data-value="28">28 dB</button></div></div>
+        <div class="ctrl"><span>변조</span><div class="seg" id="eq-mod"><button data-value="nrz" class="on">NRZ</button><button data-value="pam4">PAM4</button></div></div>
+        <label class="ctrl"><span>TX FFE 프리커서 탭 <output id="eq-pre-out"></output></span><input type="range" id="eq-pre" min="0" max="0.25" step="0.01" value="0"></label>
+        <label class="ctrl"><span>TX FFE 포스트커서 탭 <output id="eq-post-out"></output></span><input type="range" id="eq-post" min="0" max="0.4" step="0.01" value="0"></label>
+        <label class="ctrl"><span>RX CTLE 부스트 <output id="eq-ctle-out"></output></span><input type="range" id="eq-ctle" min="0" max="24" step="1" value="0"></label>
+        <label class="ctrl"><span>RX DFE 탭 수 <output id="eq-dfe-out"></output></span><input type="range" id="eq-dfe" min="0" max="6" step="1" value="0"></label>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn primary" id="eq-auto">자동 최적화</button><button class="btn" id="eq-reset">모두 끄기</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">눈 높이 (이상적 눈 대비)</span><span class="v" id="eq-eh">—</span></div>
+        <div class="stat"><span class="k">눈 폭</span><span class="v" id="eq-ew">—</span></div>
+        <div class="stat"><span class="k">남은 ISI 합 / 메인 커서</span><span class="v" id="eq-isi">—</span></div>
+        <div class="stat"><span class="k">메인 커서 (원 신호 대비)</span><span class="v" id="eq-h0">—</span></div>
+      </div>
+      <div class="sim-note">왼쪽은 비트 하나(네모 펄스)를 보냈을 때 받은 파형, 즉 <b>펄스 응답</b>이다. 메인 커서 높이를 1로 맞춰 그렸고, 점은 한 비트 간격(UI)마다의 값이다. 0이 아닌 점 하나하나가 이웃 비트를 괴롭히는 ISI다. 회색 = 등화 전, 파랑 = 등화 후, 보라 고리 = DFE가 지운 커서. 해볼 것: 20 dB NRZ에서 CTLE만 올려 보고, 너무 올리면(과등화) 커서가 음수로 뒤집히는 것을 확인하자. 그다음 DFE 탭을 더해 보자. 모델은 최소 위상 손실 채널 + 1영점 2극점 CTLE + 이상적 DFE(오류 전파 없음)이며, 잡음 여유 ±3σ를 뺀 눈 높이를 보여 준다.</div>
+    </div>
+    <p>실제 100G·200G SerDes는 이 세 가지를 모두 쓰고, 수신부 디지털 FFE에 수십 개의 탭을 두기도 한다. 탭 값은 사람이 정하지 않는다. 링크가 켜질 때 양쪽 SerDes가 시험 패턴을 주고받으며 오류가 가장 적어지는 값을 스스로 찾는 <b>링크 트레이닝</b>을 거치고, 그 뒤에도 온도와 전압 변화를 따라 계속 미세 조정한다(적응 등화).</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="cdr">
+    <h2>클럭 데이터 복원: 박자는 데이터에 숨어 있다</h2>
+    <p>직렬 링크에는 클럭선이 없다. 받는 쪽은 언제 신호를 읽어야 할지 스스로 알아내야 한다. 이 일을 하는 회로가 <span class="term">CDR</span><span class="en">(Clock and Data Recovery, 클럭 데이터 복원)</span>이다. 원리는 신호가 0→1, 1→0으로 바뀌는 <b>전이</b>를 지켜보는 것이다. 전이는 비트 경계에서 일어나므로, 전이 시각들의 한가운데가 곧 눈의 중심, 가장 안전하게 읽을 수 있는 순간이다.</p>
+    <p>CDR은 위상 고정 루프(PLL, 18장)의 한 종류다. 지금 샘플링 순간이 전이보다 이른지 늦은지(early/late)를 판정해서, 늦으면 박자를 조금 당기고 이르면 조금 미룬다. 송신 칩과 수신 칩은 각자 다른 수정 발진기를 쓰기 때문에 주파수가 정확히 같지 않다. 이더넷은 ±100 ppm(백만분의 100)까지 차이를 허용하는데, 100 ppm이면 1만 비트마다 한 비트 시간만큼 박자가 밀린다. CDR이 이 차이를 계속 따라잡지 못하면 샘플링 지점이 눈 밖으로 걸어 나간다.</p>
+    <p>박자가 들쭉날쭉 떨리는 현상을 <span class="term">지터</span><span class="en">(jitter)</span>라 한다. 송신 PLL의 잡음, 전원 잡음, ISI가 모두 지터를 만든다. 200G 레인의 한 비트 시간(UI)은 약 9.4 ps이니, 지터는 수백 펨토초(fs) 수준으로 관리해야 한다. 또 0이나 1만 길게 이어지면 전이가 없어 CDR이 박자를 놓치므로, 송신 쪽에서 데이터를 의사 난수와 섞는 <b>스크램블링</b>과 64b/66b 부호화로 전이를 충분히 만들어 준다.</p>
+    <div class="sim" id="sim-cdr">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>CDR이 샘플링 위치를 붙잡는 모습</h3></div>
+      <div class="sim-view"><canvas id="cv-cdr"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>송·수신 클럭 주파수 차이 <output id="cd-ppm-out"></output></span><input type="range" id="cd-ppm" min="0" max="300" step="10" value="100"></label>
+        <label class="ctrl"><span>랜덤 지터 (RMS) <output id="cd-jit-out"></output></span><input type="range" id="cd-jit" min="0" max="0.12" step="0.005" value="0.03"></label>
+        <label class="ctrl"><span>CDR 루프 이득 <output id="cd-gain-out"></output></span><input type="range" id="cd-gain" min="1" max="20" step="1" value="6"></label>
+        <div class="ctrl"><label class="check"><input type="checkbox" id="cd-on" checked> CDR 켜기</label><div class="btn-row"><button class="btn" id="cd-reset">위상 초기화</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">샘플링 위치 (눈 중심 기준)</span><span class="v" id="cd-ph">—</span></div>
+        <div class="stat"><span class="k">눈 폭</span><span class="v" id="cd-w">—</span></div>
+        <div class="stat"><span class="k">최근 비트 오류율(추정)</span><span class="v" id="cd-ber">—</span></div>
+      </div>
+      <div class="sim-note">위: 받은 눈 그림과 지금의 샘플링 위치(세로선), 지터 분포(아래 종 모양). 아래: 시간에 따른 샘플링 위치의 기록, 점선은 눈의 가장자리. 애니메이션 한 프레임은 약 200 UI다. 해볼 것: CDR을 끄면 주파수 차이만큼 샘플링 지점이 흘러가 눈 밖으로 나간다. 루프 이득을 너무 낮추면 따라가지 못하고, 너무 높이면 판정마다 크게 흔들려 그 자체가 지터가 된다. 뱅뱅(bang-bang) CDR을 단순화한 모델이며, 오류율은 가우시안 지터로 가정해 계산했다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="fec">
+    <h2>FEC: 남은 오류는 수학으로 지운다</h2>
+    <p>이퀄라이저와 CDR을 아무리 잘 만들어도 200G 레인의 원시 비트 오류율(BER)은 대략 1만 비트에 하나(10⁻⁴) 수준까지 나빠질 수 있다. 400 Gbps 링크라면 1초에 4,000만 개의 오류다. 그래서 고속 이더넷은 <b>순방향 오류 정정</b><span class="en">(FEC, Forward Error Correction)</span>을 기본으로 쓴다. 보내는 쪽이 데이터에 계산된 여분(패리티)을 붙이면, 받는 쪽이 재전송 요청 없이 그 자리에서 오류를 찾아 고친다.</p>
+    <p>이더넷이 쓰는 대표 FEC는 <span class="term">리드-솔로몬 부호</span><span class="en">(Reed-Solomon code)</span>다. 10비트를 한 “심볼”로 묶고, 데이터 심볼 514개에 패리티 심볼을 붙여 부호어 하나를 만든다. 25G NRZ 시대의 <b>RS(528,514)</b>(“KR4”)는 패리티 14개로 심볼 7개까지, 50G 이상 PAM4 시대의 <b>RS(544,514)</b>(“KP4”)는 패리티 30개로 심볼 15개까지 고친다. 심볼 단위로 고치므로, 한 심볼 안에서 비트 여러 개가 한꺼번에 틀리는 묶음 오류(DFE 오류 전파 등)에 강하다.</p>
+    <div class="sim" id="sim-fec">
+      <div class="sim-head"><span class="sim-tag">CALCULATOR</span><h3>FEC 전후의 비트 오류율</h3></div>
+      <div class="sim-view"><canvas id="cv-fec"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>FEC 전 비트 오류율 (BER) <output id="fc-ber-out"></output></span><input type="range" id="fc-ber" min="-7" max="-2.5" step="0.05" value="-4"></label>
+        <div class="ctrl"><span>부호</span><div class="seg" id="fc-code"><button data-value="kr4">RS(528,514) KR4</button><button data-value="kp4" class="on">RS(544,514) KP4</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">고칠 수 있는 심볼 수</span><span class="v" id="fc-t">—</span></div>
+        <div class="stat"><span class="k">부가 비트(오버헤드)</span><span class="v" id="fc-oh">—</span></div>
+        <div class="stat"><span class="k">FEC 후 BER(추정)</span><span class="v" id="fc-post">—</span></div>
+        <div class="stat"><span class="k">400G 링크에서 오류 비트 간격</span><span class="v" id="fc-gap">—</span></div>
+        <div class="stat"><span class="k">부호어 1개 도착 시간 (100G 레인)</span><span class="v" id="fc-lat">—</span></div>
+      </div>
+      <div class="sim-note">비트 오류가 서로 독립이라고 가정하고, 부호어 안의 틀린 심볼이 t개를 넘으면 정정에 실패한다고 계산했다(이항 분포). 실제로는 오류가 몰려 오는 경우가 있어 이보다 나쁠 수 있다. 해볼 것: KP4에서 FEC 전 BER 2.4×10⁻⁴ 근처를 보자. 이더넷이 KP4 FEC의 입력 오류율 한계로 잡는 값 근처이며, 정정 후 10⁻¹⁵ 안팎이 된다.</div>
+    </div>
+    <p>공짜는 아니다. 부호어 하나(544 × 10 = 5,440비트)를 다 받아야 복호를 시작할 수 있고, 오류 위치를 찾는 계산에도 시간이 든다. KP4 FEC는 링크 한 번 지날 때마다 대략 <b>100 ns 수준</b>의 지연을 더한다. 빛이 광섬유 20 m를 가는 시간이다. 스위치를 여러 단 지나는 AI 클러스터처럼 지연에 민감한 곳에서는 이 지연이 쌓이므로, 더 가벼운 FEC나 링크 계층 재전송을 쓰는 방안도 함께 연구된다. 200G 레인 세대에는 광 모듈 안에 내부 부호를 하나 더 겹쳐 쓰는(연접 FEC) 방식도 도입되었다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="si">
+    <h2>전송선로와 신호 무결성: 되튕기는 신호</h2>
+    <p>신호가 이렇게 빠르면 기판 위의 배선은 더 이상 “전기가 즉시 통하는 전선”이 아니다. 신호가 배선을 따라 파도처럼 진행하는 <b>전송선로</b>가 된다. 전송선로에는 선의 굵기, 간격, 절연체 두께로 정해지는 고유한 저항 같은 값, <b>특성 임피던스</b>(Z₀)가 있다. 고속 기판은 보통 한 가닥 기준 50 Ω, 차동 쌍 기준 85~100 Ω에 맞춰 설계한다.</p>
+    <p>신호가 임피던스가 다른 곳을 만나면 일부가 되튕긴다. 끝에 붙은 저항(<b>종단 저항</b><span class="en">(termination)</span>)이 Z₀와 같으면 신호는 모두 흡수되고, 다르면 <span class="term">반사 계수</span><span class="en">(reflection coefficient)</span> Γ = (R − Z₀) / (R + Z₀)만큼 되돌아온다. 끝이 열려 있으면(R = ∞) Γ = +1로 전부 같은 극성으로, 단락이면(R = 0) Γ = −1로 전부 뒤집혀 돌아온다. 되돌아온 신호는 다음 비트들 위에 겹쳐 또 하나의 ISI가 된다.</p>
+    <div class="sim" id="sim-refl">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>종단 저항과 반사</h3></div>
+      <div class="sim-view"><canvas id="cv-refl"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>수신단 종단 저항 R <output id="rf-r-out"></output></span><input type="range" id="rf-r" min="0" max="200" step="1" value="50"></label>
+        <div class="ctrl"><span>송신단(소스) 임피던스</span><div class="seg" id="rf-src"><button data-value="50" class="on">50 Ω (정합)</button><button data-value="15">15 Ω (불일치)</button></div></div>
+        <label class="check"><input type="checkbox" id="rf-open"> 끝을 열어 두기 (R = ∞)</label>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn primary" id="rf-go">펄스 보내기</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">반사 계수 Γ</span><span class="v" id="rf-g">—</span></div>
+        <div class="stat"><span class="k">되돌아가는 전압 비율</span><span class="v" id="rf-pct">—</span></div>
+        <div class="stat"><span class="k">반사 손실 (리턴 로스)</span><span class="v" id="rf-rl">—</span></div>
+        <div class="stat"><span class="k">수신단 첫 펄스 높이</span><span class="v" id="rf-vl">—</span></div>
+      </div>
+      <div class="sim-note">선로의 특성 임피던스 Z₀ = 50 Ω, 손실 없는 선로로 단순화했다. 위: 선로 위 전압의 순간 모습(오른쪽으로 가는 파 + 되돌아오는 파). 아래: 수신단에서 시간에 따라 본 전압. 해볼 것: R을 50 Ω에 맞추면 반사가 사라진다. 소스를 15 Ω로 바꾸고 R을 100 Ω로 하면 신호가 양 끝에서 계속 튕기며 울린다(링잉).</div>
+    </div>
+    <p>실제 기판에서 반사를 만드는 범인은 종단만이 아니다. 층을 건너는 구멍인 <b>비아</b>(via)는 쓰지 않는 아래쪽 토막(스텁)이 작은 안테나처럼 공진해 특정 주파수를 크게 먹는다. 그래서 고속 기판은 스텁을 드릴로 깎아 내는 <b>백드릴</b><span class="en">(back-drilling)</span>을 한다. 커넥터, 패키지 볼, 칩 안의 정전기 보호 회로(ESD) 용량도 모두 임피던스를 흔든다. 이런 것들을 통틀어 다루는 분야가 <b>신호 무결성</b>(SI, Signal Integrity)이다. 이웃 선끼리 새어 드는 <b>누화</b>(crosstalk, 4장)도 SI의 큰 숙제다.</p>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">50 Ω 선로 끝에 100 Ω 저항을 달았다. 도착한 신호 전압의 몇 %가 되돌아갈까?</p><p class="wi-hint">반사 시뮬레이터에서 R을 100 Ω로 맞춰 확인하자.</p><div class="opts">
+      <button class="opt">0% — 저항이 크면 다 흡수한다</button>
+      <button class="opt">50%</button>
+      <button class="opt" data-correct>약 33%, 같은 극성으로</button>
+      <button class="opt">100%, 뒤집혀서</button>
+    </div><div class="quiz-exp">Γ = (100 − 50) / (100 + 50) = 1/3. 저항이 Z₀보다 크면 같은 극성, 작으면 반대 극성으로 반사된다. 그래서 수신단 첫 펄스는 1 + Γ ≈ 1.33배로 솟고, 되돌아간 1/3이 송신단에서 다시 튕기면 뒤따르는 비트를 오염시킨다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="beyond">
+    <h2>구리의 한계, 그리고 그 너머</h2>
+    <p>레인 속도가 두 배가 될 때마다 같은 손실 예산으로 갈 수 있는 구리 거리는 크게 줄어든다. 10G 시절에는 기판 위로 수십 cm, 케이블로 7 m를 갔지만, 200G 레인에서는 기판 배선을 극도로 아끼고 칩 바로 옆에서 케이블로 빠지는 설계가 등장했다. 그래서 거리에 따라 쓰는 기술이 나뉜다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 230" style="min-width:640px" role="img" aria-label="거리에 따른 고속 인터페이스 기술의 영역">
+        <path d="M40 150 H790" class="s-axis"/>
+        <g class="t-mono" text-anchor="middle">
+          <path d="M60 145 v10 M190 145 v10 M320 145 v10 M450 145 v10 M580 145 v10 M710 145 v10" class="s-axis"/>
+          <text x="60" y="172">1 mm</text><text x="190" y="172">1 cm</text><text x="320" y="172">10 cm</text><text x="450" y="172">1 m</text><text x="580" y="172">10 m</text><text x="710" y="172">100 m+</text>
+        </g>
+        <rect x="50" y="40" width="150" height="40" rx="8" class="f-acc2-soft"/><text x="125" y="58" text-anchor="middle" class="t" style="font-weight:700">칩렛 사이 (UCIe 등)</text><text x="125" y="74" text-anchor="middle" class="t-mono">넓은 병렬, ≤1 pJ/bit</text>
+        <rect x="200" y="92" width="290" height="40" rx="8" class="f-acc-soft"/><text x="345" y="110" text-anchor="middle" class="t" style="font-weight:700">기판 위 칩–칩 · 칩–모듈 (SerDes)</text><text x="345" y="126" text-anchor="middle" class="t-mono">손실 예산 ~30 dB, 리타이머로 연장</text>
+        <rect x="400" y="40" width="130" height="40" rx="8" fill="color-mix(in srgb, var(--warn) 16%, transparent)" stroke="var(--warn)"/><text x="465" y="58" text-anchor="middle" class="t" style="font-weight:700">DAC 구리 케이블</text><text x="465" y="74" text-anchor="middle" class="t-mono">수동, ~2–3 m</text>
+        <rect x="470" y="186" width="140" height="36" rx="8" fill="color-mix(in srgb, var(--warn) 16%, transparent)" stroke="var(--warn)"/><text x="540" y="202" text-anchor="middle" class="t" style="font-weight:700">AEC 능동 구리</text><text x="540" y="216" text-anchor="middle" class="t-mono">리타이머 내장, ~7 m</text>
+        <rect x="560" y="40" width="230" height="40" rx="8" fill="color-mix(in srgb, var(--ok) 14%, transparent)" stroke="var(--ok)"/><text x="675" y="58" text-anchor="middle" class="t" style="font-weight:700">광 (19장)</text><text x="675" y="74" text-anchor="middle" class="t-mono">수 m ~ 수십 km</text>
+      </svg></div>
+      <figcaption><b>그림 16-4.</b> 거리에 따른 인터페이스 영역(대략, 레인당 100~200G 기준). 수 mm 안쪽은 칩렛 인터페이스, 1 m 안팎은 SerDes와 구리 케이블, 그 너머는 광의 영역이다. 레인 속도가 오를수록 경계가 왼쪽으로 밀린다.</figcaption>
+    </figure>
+    <ul>
+      <li><b>리타이머</b><span class="en">(retimer)</span>: 채널 중간에서 신호를 완전히 받아(CDR·등화·판정) 깨끗하게 다시 만들어 보내는 칩. 손실 예산을 두 번 쓰게 해 준다. 신호를 단순히 키우기만 하는 리드라이버(redriver)와 달리 잡음과 지터까지 씻어 낸다.</li>
+      <li><b>DAC</b><span class="en">(Direct Attach Copper)</span>: 양 끝에 커넥터만 달린 수동 구리 케이블. 싸고 전력이 거의 0이라 랙 안 서버–스위치 연결에 널리 쓰인다. 200G 레인에서는 1~2 m 수준으로 짧아진다.</li>
+      <li><span class="term">AEC</span><span class="en">(Active Electrical Cable)</span>: 케이블 양 끝 커넥터 안에 리타이머 칩을 넣은 능동 구리 케이블. 광보다 싸고 전력이 적으면서 DAC보다 멀리 간다.</li>
+      <li><b>광</b>: 구리로 갈 수 없는 거리는 전기를 빛으로 바꾼다(5장, 19장). 스위치 칩 바로 옆에 광 엔진을 붙이는 공동 패키징 광학(CPO)은 기판 위 전기 구간을 거의 없애려는 시도다.</li>
+      <li><span class="term">UCIe</span><span class="en">(Universal Chiplet Interconnect Express)</span>: 한 패키지 안 칩렛끼리 잇는 표준. 거리가 수 mm라 다시 <b>넓은 병렬</b>로 돌아간다. 핀 하나당 수십 GT/s로 느긋하게 보내되 핀을 수천 개 써서, 비트당 에너지를 SerDes의 수분의 1 수준으로 낮춘다.</li>
+    </ul>
+    <h3>반도체 관점: 아날로그 설계의 정수</h3>
+    <p>SerDes는 디지털 칩 한가운데 박힌 가장 까다로운 아날로그 회로다. 수십 GHz의 PLL, 수 ps 단위의 타이밍, 수십 mV의 신호를 다룬다. 최근에는 수신 신호를 초당 1,000억 번 넘게 6~8비트로 숫자화하는 고속 <b>ADC</b>를 앞단에 두고, 등화와 판정을 디지털 신호 처리로 하는 <b>ADC·DSP 기반 SerDes</b>가 주류가 되었다. 디지털 회로는 공정이 미세해질수록 작고 저전력이 되므로, 5 nm·3 nm 같은 첨단 공정의 이점을 최대한 살리는 구조다. 그래서 스위치 칩, GPU, AI 가속기 회사들은 SerDes를 직접 설계하거나 전문 IP 회사에서 사 오며, “세계 최초 200G SerDes 실리콘 검증” 같은 소식이 칩 업계의 큰 뉴스가 된다. 이 SerDes들이 모여 만드는 칩이 다음 장의 스위치 ASIC과 NIC다(17장).</p>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>병렬 버스는 <b>스큐</b>와 핀 수 때문에 한계에 부딪혔다. 고속 인터페이스는 차동 쌍 하나에 비트를 일렬로 보내는 <b>SerDes</b>를 쓴다.</li>
+      <li><b>포트 속도 = 레인 수 × 레인 속도</b>. 레인은 10G NRZ → 25G NRZ → 50G·100G·200G PAM4로 발전했고, PCIe도 Gen6부터 PAM4다.</li>
+      <li>구리 채널은 표피 효과와 유전 손실로 <b>고주파를 깎는다</b>. 나이퀴스트 주파수에서의 삽입 손실(dB)이 링크 설계의 핵심 숫자다.</li>
+      <li><b>PAM4</b>는 같은 보 레이트에 두 배 비트를 싣지만 눈 높이가 1/3(약 9.5 dB 손해)이다. 손실이 큰 채널에서는 그래도 NRZ보다 낫다.</li>
+      <li>손실이 만든 <b>ISI</b>는 송신 FFE, 수신 CTLE, DFE가 함께 지운다. 과하게 등화하면 오히려 눈이 닫힌다.</li>
+      <li><b>CDR</b>은 데이터 전이에서 박자를 뽑아 샘플링 위치를 눈 중심에 붙잡고, <b>RS-FEC</b>(KP4)는 10⁻⁴ 수준의 오류를 10⁻¹⁵ 수준으로 낮추는 대신 ~100 ns 지연을 더한다.</li>
+      <li>임피던스 불일치는 <b>반사</b>를 만든다(Γ = (R − Z₀)/(R + Z₀)). 구리의 거리가 줄어들수록 리타이머, AEC, 광, 칩렛 인터페이스로 역할이 나뉜다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>고속 인터페이스가 넓은 병렬 버스 대신 직렬 링크를 쓰게 된 가장 큰 이유는?</p><div class="opts">
+        <button class="opt">직렬 링크는 전기를 전혀 쓰지 않아서</button>
+        <button class="opt">병렬 버스는 데이터를 암호화할 수 없어서</button>
+        <button class="opt" data-correct>선마다 도착 시각이 어긋나는 스큐와 핀 수 문제가 속도가 오를수록 감당이 안 되어서</button>
+        <button class="opt">직렬 링크는 손실이 주파수와 무관해서</button>
+      </div><div class="quiz-exp">비트 시간이 수십 ps로 줄면 선 길이의 작은 차이도 비트 시간 전체를 잡아먹는다. 직렬 링크는 박자를 데이터에서 뽑아 이 문제를 피한다.</div></div>
+      <div class="quiz-q"><p>800GbE 포트를 레인당 100G로 만들려면 레인이 몇 개 필요한가?</p><div class="opts">
+        <button class="opt">4개</button><button class="opt" data-correct>8개</button><button class="opt">16개</button><button class="opt">2개</button>
+      </div><div class="quiz-exp">포트 속도 = 레인 수 × 레인 속도이므로 800 ÷ 100 = 8. 레인당 200G라면 4개면 된다.</div></div>
+      <div class="quiz-q"><p>100G PAM4 레인(53.125 GBd)의 나이퀴스트 주파수는 대략?</p><div class="opts">
+        <button class="opt">106 GHz</button><button class="opt">53 GHz</button><button class="opt">13 GHz</button><button class="opt" data-correct>26.6 GHz</button>
+      </div><div class="quiz-exp">나이퀴스트 주파수는 보 레이트의 절반이다. PAM4는 기호당 2비트라 106 Gb/s를 53 GBd로 보내고, 나이퀴스트는 그 절반인 약 26.6 GHz다.</div></div>
+      <div class="quiz-q"><p>PAM4가 NRZ보다 불리한 점은?</p><div class="opts">
+        <button class="opt" data-correct>같은 진폭을 4단계로 나눠 눈 높이가 1/3이 되므로 잡음에 약 9.5 dB 더 민감하다</button>
+        <button class="opt">같은 비트 레이트에서 보 레이트가 두 배로 높아진다</button>
+        <button class="opt">클럭선이 따로 필요하다</button>
+        <button class="opt">기호당 비트 수가 절반이다</button>
+      </div><div class="quiz-exp">PAM4는 같은 비트 레이트에서 보 레이트가 오히려 절반이다. 대가는 단계 간격이 1/3로 줄어드는 것, 즉 20·log₁₀3 ≈ 9.5 dB의 신호 대 잡음비 손해다.</div></div>
+      <div class="quiz-q"><p>DFE(판정 궤환 등화기)의 특징으로 옳은 것은?</p><div class="opts">
+        <button class="opt">송신 쪽에서 미리 신호를 비틀어 보낸다</button>
+        <button class="opt">고주파 잡음도 함께 키운다</button>
+        <button class="opt" data-correct>이미 판정한 이전 비트가 남긴 꼬리(포스트커서)를 빼 주므로 잡음을 키우지 않는다</button>
+        <button class="opt">프리커서 ISI를 가장 잘 없앤다</button>
+      </div><div class="quiz-exp">DFE는 판정 결과로 이전 비트의 ISI를 계산해 빼므로 잡음을 증폭하지 않는다. 아직 판정하지 않은 다음 비트의 영향(프리커서)은 지울 수 없어서 FFE·CTLE가 맡는다.</div></div>
+      <div class="quiz-q"><p>이더넷의 RS(544,514) “KP4” FEC에 대한 설명으로 틀린 것은?</p><div class="opts">
+        <button class="opt">10비트 심볼 514개에 패리티 심볼 30개를 붙인다</button>
+        <button class="opt">부호어 하나에서 심볼 15개까지 고칠 수 있다</button>
+        <button class="opt">링크마다 대략 100 ns 수준의 지연을 더한다</button>
+        <button class="opt" data-correct>오류가 나면 송신 쪽에 재전송을 요청해서 고친다</button>
+      </div><div class="quiz-exp">FEC는 ‘순방향’ 오류 정정이다. 받는 쪽이 패리티만으로 그 자리에서 오류를 고치며, 재전송 요청을 하지 않는다.</div></div>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  /* ================= 공통 엔진: 손실 채널 → 펄스 응답 → 눈 그림 ================= */
+  const SPU = 32, NF = 2048, DF = SPU / NF, OFF = 2 * SPU;
+  function fft(re, im, inv) {
+    const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) { let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+    for (let len = 2; len <= n; len <<= 1) {
+      const ang = (2 * Math.PI / len) * (inv ? 1 : -1), wr = Math.cos(ang), wi = Math.sin(ang), hl = len >> 1;
+      for (let i = 0; i < n; i += len) {
+        let cr = 1, ci = 0;
+        for (let k = 0; k < hl; k++) {
+          const a = i + k, b = a + hl, br = re[b] * cr - im[b] * ci, bi = re[b] * ci + im[b] * cr;
+          re[b] = re[a] - br; im[b] = im[a] - bi; re[a] += br; im[a] += bi;
+          const t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t;
+        }
+      }
+    }
+    if (inv) for (let i = 0; i < n; i++) { re[i] /= n; im[i] /= n; }
+  }
+  const fOf = (k) => (k <= NF / 2 ? k : k - NF) * DF; // 주파수(보 레이트 단위, 부호 있음)
+  const chanCache = {};
+  // 나이퀴스트 손실 Ln(dB), 표피 효과 비중 s → 최소 위상 채널 응답
+  function chanH(Ln, s) {
+    const key = Ln.toFixed(2) + "/" + s.toFixed(2); if (chanCache[key]) return chanCache[key];
+    const re = new Float64Array(NF), im = new Float64Array(NF);
+    for (let k = 0; k < NF; k++) { const f = Math.abs(fOf(k)), x = f / 0.5; const L = Ln * (s * Math.sqrt(x) + (1 - s) * x) + 10 * Math.log10(1 + Math.pow(f / 0.75, 4)); re[k] = (-Math.min(L, 150) / 20) * Math.LN10; }
+    fft(re, im, true);
+    for (let k = 0; k < NF; k++) { im[k] = 0; if (k > 0 && k < NF / 2) re[k] *= 2; else if (k > NF / 2) re[k] = 0; }
+    fft(re, im, false);
+    const Hr = new Float64Array(NF), Hi = new Float64Array(NF);
+    for (let k = 0; k < NF; k++) { const m = Math.exp(re[k]); Hr[k] = m * Math.cos(im[k]); Hi[k] = m * Math.sin(im[k]); }
+    const keys = Object.keys(chanCache); if (keys.length > 40) delete chanCache[keys[0]];
+    return (chanCache[key] = [Hr, Hi]);
+  }
+  // CTLE: 1영점 2극점, 고주파 이득 ≈ 1, 저주파를 B dB 깎는다
+  function ctleC(f, B) { const g = Math.pow(10, -B / 20), fp1 = 0.55, fp2 = 1.3, fz = fp1 * g; const ni = f / fz, dr = 1 - (f * f) / (fp1 * fp2), di = f / fp1 + f / fp2, dd = dr * dr + di * di; return [(g * (dr + ni * di)) / dd, (g * (ni * dr - di)) / dd]; }
+  function pulse(H, B) {
+    const re = new Float64Array(NF), im = new Float64Array(NF); let ng = 0, nc = 0;
+    for (let k = 0; k < NF; k++) { const f = fOf(k), c = ctleC(f, B); re[k] = H[0][k] * c[0] - H[1][k] * c[1]; im[k] = H[0][k] * c[1] + H[1][k] * c[0]; if (f >= 0 && f <= 1) { ng += c[0] * c[0] + c[1] * c[1]; nc++; } }
+    fft(re, im, true);
+    const q = new Float64Array(NF); let acc = 0;
+    for (let n = 0; n < NF + SPU; n++) { acc += re[n % NF]; if (n >= SPU) acc -= re[(n - SPU) % NF]; if (n >= SPU - 1) q[(n - SPU + 1 + OFF + NF) % NF] = acc; }
+    return { q, ng: Math.sqrt(ng / nc) };
+  }
+  function ffe(q, pre, post) { const c0 = 1 - Math.abs(pre) - Math.abs(post), o = new Float64Array(NF); for (let n = 0; n < NF; n++) o[n] = c0 * q[n] + pre * q[(n + SPU) % NF] + post * q[(n - SPU + NF) % NF]; return o; }
+  const NS = 420, K0 = 66, K1 = NS - 3;
+  function mkSeq(pam4, seed) { const r = NB.rng(seed), a = new Float64Array(NS), l = new Int8Array(NS); for (let k = 0; k < NS; k++) { const v = pam4 ? Math.floor(r() * 4) : Math.floor(r() * 2) * 3; l[k] = pam4 ? v : v / 3; a[k] = -1 + (2 * v) / 3; } return { a, l, pam4 }; }
+  const SEQ = { nrz: mkSeq(false, 11), pam4: mkSeq(true, 23) };
+  const NOISE = (() => { const r = NB.rng(5), raw = new Float64Array(NS * SPU + 8), out = new Float64Array(NS * SPU); for (let i = 0; i < raw.length; i++) { const u = Math.max(1e-9, r()), v = r(); raw[i] = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); } for (let i = 0; i < out.length; i++) { let s = 0; for (let j = 0; j < 8; j++) s += raw[i + j]; out[i] = s / Math.sqrt(8); } return out; })();
+  function cursorsOf(qe) { let n0 = 0; for (let n = 0; n < NF / 2; n++) if (qe[n] > qe[n0]) n0 = n; return { n0, h0: qe[n0], hj: (j) => { const i = n0 + j * SPU; return i >= 0 && i < NF ? qe[i] : 0; } }; }
+  // 빠른 평가: 샘플링 순간만 (최적화용)
+  function quickEye(qe, seq, nd, sig, ng) {
+    const c = cursorsOf(qe), pam4 = seq.pam4, h = []; for (let j = -2; j <= 60; j++) h.push(j >= 1 && j <= nd ? 0 : c.hj(j));
+    const mn = [1e9, 1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9, -1e9];
+    for (let k = K0; k < K1; k++) { let v = 0; for (let j = -2; j <= 60; j++) { const kk = k - j; if (kk >= 0 && kk < NS) v += seq.a[kk] * h[j + 2]; } v /= c.h0; const L = seq.l[k]; if (v < mn[L]) mn[L] = v; if (v > mx[L]) mx[L] = v; }
+    let o = 1e9; for (let i = 0; i < (pam4 ? 3 : 1); i++) o = Math.min(o, mn[i + 1] - mx[i]);
+    return (o - 6 * (sig * ng) / c.h0) / (pam4 ? 2 / 3 : 2);
+  }
+  function analyze(qe, seq, nd, sig, ng) {
+    const c = cursorsOf(qe), pam4 = seq.pam4, n0 = c.n0, h0 = c.h0;
+    const y = new Float64Array(NS * SPU);
+    for (let k = 0; k < NS; k++) { const ak = seq.a[k], base = k * SPU; for (let m = 0; m < NF && base + m < y.length; m++) y[base + m] += ak * qe[m]; }
+    const corr = new Float64Array(NS);
+    for (let k = 0; k < NS; k++) { let s = 0; for (let j = 1; j <= nd; j++) if (k - j >= 0) s += c.hj(j) * seq.a[k - j]; corr[k] = s; }
+    const sr = (sig * ng) / Math.abs(h0), ideal = pam4 ? 2 / 3 : 2, lv = pam4 ? 4 : 2, open = [];
+    for (let p = -SPU / 2; p < SPU / 2; p++) {
+      const mn = [1e9, 1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9, -1e9];
+      for (let k = K0; k < K1; k++) { const v = (y[k * SPU + n0 + p] - corr[k]) / h0, L = seq.l[k]; if (v < mn[L]) mn[L] = v; if (v > mx[L]) mx[L] = v; }
+      let o = 1e9; for (let i = 0; i < lv - 1; i++) o = Math.min(o, mn[i + 1] - mx[i]); open.push(o);
+    }
+    const eh = Math.max(0, open[SPU / 2] - 6 * sr) / ideal; let wc = 0; open.forEach((o) => { if (o - 6 * sr > 0) wc++; });
+    let isi = 0; for (let j = -2; j <= 40; j++) if (j !== 0 && !(j >= 1 && j <= nd)) isi += Math.abs(c.hj(j));
+    return { n0, h0, hj: c.hj, y, corr, sr, eh, ew: wc / SPU, open, isi: isi / h0, pam4, nd, seq };
+  }
+  // 눈 그림 그리기
+  function drawEye(ctx, x, y, w, h, r, o = {}) {
+    const P = NB.palette(), Y0 = y + h / 2, ys = (h / 2) / 1.45;
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.fillStyle = P.surface; ctx.globalAlpha = 0.5; ctx.fillRect(x, y, w, h); ctx.globalAlpha = 1;
+    ctx.strokeStyle = P.grid; ctx.lineWidth = 1;
+    [-1, -1 / 3, 1 / 3, 1, 0].forEach((v) => { if (!r.pam4 && Math.abs(v) < 0.5 && v !== 0) return; ctx.beginPath(); ctx.moveTo(x, Y0 - v * ys); ctx.lineTo(x + w, Y0 - v * ys); ctx.stroke(); });
+    ctx.beginPath(); ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w / 2, y + h); ctx.stroke();
+    if (r && r.h0 > 0) {
+      const col = o.color || P.accent, sr = r.sr, nTr = Math.min(K1 - K0, o.traces || 220);
+      ctx.strokeStyle = col; ctx.globalAlpha = o.alpha || 0.16; ctx.lineWidth = 1;
+      for (let t = 0; t < nTr; t++) {
+        const k = K0 + Math.floor((t * (K1 - K0)) / nTr), c0 = k * SPU + r.n0;
+        ctx.beginPath();
+        for (let p = -SPU; p <= SPU; p += 2) {
+          const n = c0 + p; if (n < 0 || n >= r.y.length) continue;
+          const ku = k + Math.round(p / SPU); const cc = ku >= 0 && ku < NS ? r.corr[ku] : 0;
+          const v = (r.y[n] - cc) / r.h0 + sr * NOISE[n];
+          const px = x + ((p + SPU) / (2 * SPU)) * w, py = Y0 - NB.clamp(v, -1.6, 1.6) * ys;
+          p === -SPU ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      // 눈 높이 표시 (가운데 눈)
+      if (r.eh > 0.01) {
+        const half = (r.eh * (r.pam4 ? 2 / 3 : 2)) / 2, mid = r.pam4 ? 0 : 0;
+        ctx.strokeStyle = P.ok; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + w / 2, Y0 - (mid + half) * ys); ctx.lineTo(x + w / 2, Y0 - (mid - half) * ys); ctx.stroke();
+        const ew = r.ew * w / 2; ctx.beginPath(); ctx.moveTo(x + w / 2 - ew / 2, Y0 - mid * ys); ctx.lineTo(x + w / 2 + ew / 2, Y0 - mid * ys); ctx.stroke();
+      } else NB.text(ctx, "눈이 닫힘", x + w / 2, Y0, { align: "center", size: 13, bold: true, color: P.bad });
+    }
+    ctx.restore();
+    ctx.strokeStyle = P.border; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    if (o.title) NB.text(ctx, o.title, x + 8, y + 12, { size: 12, bold: true, color: P.text });
+    if (o.sub) NB.text(ctx, o.sub, x + w - 8, y + 12, { size: 11, align: "right", mono: true, color: P.dim });
+  }
+
+  /* ================= 1. 채널 손실 ================= */
+  const RATES = [{ n: "10G NRZ", bd: 10.3125, pam4: false }, { n: "25G NRZ", bd: 25.78125, pam4: false }, { n: "50G PAM4", bd: 26.5625, pam4: true }, { n: "100G PAM4", bd: 53.125, pam4: true }, { n: "200G PAM4", bd: 106.25, pam4: true }];
+  const MATS = [{ n: "일반 FR4", a: 0.065, b: 0.085 }, { n: "중저손실", a: 0.06, b: 0.04 }, { n: "초저손실", a: 0.05, b: 0.018 }];
+  const lossAt = (fGHz, lenIn, m) => lenIn * (m.a * Math.sqrt(fGHz) + m.b * fGHz) + 0.08 * fGHz;
+  const lsRate = NB.seg("ls-rate", () => lsUpd()), lsMat = NB.seg("ls-mat", () => lsUpd());
+  const lsLen = NB.range("ls-len", (v) => v + " cm (" + (v / 2.54).toFixed(1) + "″)", () => lsUpd());
+  let lsRes = null, lsInfo = null;
+  function lsUpd() {
+    const R = RATES[+lsRate()], m = MATS[+lsMat()], lenIn = lsLen() / 2.54, fn = R.bd / 2;
+    const Ln = lossAt(fn, lenIn, m), skin = (lenIn * m.a * Math.sqrt(fn)) / Math.max(1e-6, Ln);
+    const H = chanH(Math.round(Ln * 4) / 4, Math.round(NB.clamp(skin, 0.05, 0.9) * 20) / 20), pu = pulse(H, 0);
+    lsRes = analyze(pu.q, R.pam4 ? SEQ.pam4 : SEQ.nrz, 0, 0.004, pu.ng);
+    lsInfo = { R, m, lenIn, fn, Ln };
+    NB.stat("ls-baud", R.bd + "<small>GBd</small>");
+    NB.stat("ls-fn", fn.toFixed(1) + "<small>GHz</small>");
+    NB.stat("ls-il", Ln.toFixed(1) + "<small>dB</small>");
+    NB.stat("ls-amp", (100 * Math.pow(10, -Ln / 20)).toFixed(Ln > 30 ? 1 : 0) + "<small>%</small>");
+    NB.stat("ls-eye", lsRes.eh > 0.005 ? (lsRes.eh * 100).toFixed(0) + "<small>%</small>" : "<span style='color:var(--bad)'>닫힘</span>");
+    let v;
+    if (Ln < 10) v = "<b class='ok'>여유 있음</b> — 간단한 CTLE나 송신 FFE 정도로 충분한 손실이다.";
+    else if (Ln < 22) v = "<b class='warn'>등화 필요</b> — 눈이 거의 닫혔다. CTLE + DFE 등 본격적인 이퀄라이저가 있어야 열린다.";
+    else if (Ln <= 32) v = "<b class='warn'>한계 근처</b> — 장거리(LR) SerDes가 감당하는 손실 예산(~28–30 dB) 근처다. ADC·DSP 기반 강한 등화와 FEC가 필요하다.";
+    else v = "<b class='bad'>예산 초과</b> — 한 번에 가기 어렵다. 더 좋은 기판 재료, 짧은 배선, 리타이머, 케이블이나 광으로 우회해야 한다.";
+    $("ls-verdict").innerHTML = v;
+    lsCv.redraw();
+  }
+  const lsCv = NB.canvas($("cv-loss"), (ctx, w, h) => {
+    if (!lsInfo) return; const P = NB.palette();
+    const narrow = w < 560, cw = narrow ? w : w * 0.58, chH = narrow ? h * 0.55 : h;
+    const fmax = Math.max(10, lsInfo.R.bd * 1.0), ymax = Math.max(10, Math.ceil((lossAt(fmax, lsInfo.lenIn, lsInfo.m) * 1.05) / 10) * 10);
+    const data = []; for (let i = 0; i <= 80; i++) { const f = (fmax * i) / 80; data.push([f, lossAt(f, lsInfo.lenIn, lsInfo.m)]); }
+    NB.chart(ctx, { x: 52, y: 14, w: cw - 52 - 14, h: chH - 14 - 44 }, { x: [0, fmax], y: [0, ymax], xLabel: "주파수 (GHz)", yLabel: "손실 (dB)", series: [{ data, color: P.accent, width: 2.5 }], vlines: [{ x: lsInfo.fn, color: P.warn, label: "나이퀴스트 " + lsInfo.fn.toFixed(1) + " GHz" }], hlines: [{ y: 30, color: P.bad, label: "~30 dB" }], points: [{ x: lsInfo.fn, y: lsInfo.Ln, color: P.warn, r: 5 }] });
+    const ex = narrow ? 12 : cw + 6, ey = narrow ? chH + 6 : 10, ew = narrow ? w - 24 : w - cw - 18, eh = narrow ? h - chH - 14 : h - 24;
+    drawEye(ctx, ex, ey, ew, eh, lsRes, { title: "보정 없는 눈", sub: lsInfo.R.n });
+  }, { aspect: 0.42, minHeight: 330, maxHeight: 400 });
+  lsUpd();
+
+  /* ================= 2. NRZ vs PAM4 ================= */
+  const pmMode = NB.seg("pm-mode", () => pmUpd());
+  const pmLoss = NB.range("pm-loss", (v) => v + " dB", () => pmUpd());
+  const pmNoise = NB.range("pm-noise", (v) => (v * 0.25).toFixed(2) + "%", () => pmUpd());
+  $("pm-eq").addEventListener("change", () => pmUpd());
+  let pmR = null;
+  function bestEq(Ln, seq, sig) {
+    const H = chanH(Ln, 0.3);
+    if (!$("pm-eq").checked) { const pu = pulse(H, 0); return analyze(pu.q, seq, 0, sig, pu.ng); }
+    let best = null;
+    for (let B = 0; B <= 15; B += 1.5) { const pu = pulse(H, B); const s = quickEye(pu.q, seq, 3, sig, pu.ng); if (!best || s > best.s) best = { s, pu }; }
+    return analyze(best.pu.q, seq, 3, sig, best.pu.ng);
+  }
+  function pmUpd() {
+    const Ln = pmLoss(), sig = pmNoise() * 0.0025, same = pmMode() === "bit", s = 0.3;
+    const LnN = same ? Ln * (s * Math.SQRT2 + (1 - s) * 2) : Ln, sigN = same ? sig * Math.SQRT2 : sig;
+    const rN = bestEq(Math.round(LnN * 4) / 4, SEQ.nrz, sigN), rP = bestEq(Ln, SEQ.pam4, sig);
+    pmR = { rN, rP, LnN, Ln, same };
+    const pct = (r) => (r.eh > 0.003 ? (r.eh * 100 * (r.pam4 ? 1 / 3 : 1)).toFixed(0) + "<small>%</small>" : "<span style='color:var(--bad)'>닫힘</span>");
+    NB.stat("pm-nrz-b", (same ? "2× · " : "1× · ") + LnN.toFixed(0) + "<small>dB</small>");
+    NB.stat("pm-nrz", pct(rN)); NB.stat("pm-pam", pct(rP));
+    NB.stat("pm-rate", same ? "1 : 1" : "1 : 2");
+    pmCv.redraw();
+  }
+  const pmCv = NB.canvas($("cv-pam"), (ctx, w, h) => {
+    if (!pmR) return; const P = NB.palette(); const narrow = w < 520, gap = 12;
+    const bw = narrow ? w - 24 : (w - 24 - gap) / 2, bh = narrow ? (h - 24 - gap) / 2 : h - 24;
+    drawEye(ctx, 12, 12, bw, bh, pmR.rN, { title: "NRZ", sub: (pmR.same ? "보 레이트 2배 · " : "") + pmR.LnN.toFixed(0) + " dB", color: P.accent });
+    drawEye(ctx, narrow ? 12 : 12 + bw + gap, narrow ? 12 + bh + gap : 12, bw, bh, pmR.rP, { title: "PAM4", sub: pmR.Ln.toFixed(0) + " dB", color: P.accent2 });
+  }, { aspect: 0.4, minHeight: 300, maxHeight: 380 });
+  pmUpd();
+
+  /* ================= 3. 이퀄라이저 ================= */
+  const eqCh = NB.seg("eq-ch", () => eqUpd()), eqMod = NB.seg("eq-mod", () => eqUpd());
+  const eqPre = NB.range("eq-pre", (v) => (v ? "−" : "") + v.toFixed(2), () => eqUpd());
+  const eqPost = NB.range("eq-post", (v) => (v ? "−" : "") + v.toFixed(2), () => eqUpd());
+  const eqCtle = NB.range("eq-ctle", (v) => v + " dB", () => eqUpd());
+  const eqDfe = NB.range("eq-dfe", (v) => v + "개", () => eqUpd());
+  const EQ_SIG = 0.004;
+  let eqR = null, eqRaw = null;
+  function eqUpd() {
+    const H = chanH(+eqCh(), 0.3), seq = eqMod() === "pam4" ? SEQ.pam4 : SEQ.nrz;
+    const raw = pulse(H, 0), pu = pulse(H, eqCtle()), qe = ffe(pu.q, -eqPre(), -eqPost());
+    eqRaw = cursorsOf(raw.q); eqRaw.q = raw.q;
+    eqR = analyze(qe, seq, eqDfe(), EQ_SIG, pu.ng); eqR.q = qe;
+    NB.stat("eq-eh", eqR.eh > 0.003 ? (eqR.eh * 100).toFixed(0) + "<small>%</small>" : "<span style='color:var(--bad)'>닫힘</span>");
+    NB.stat("eq-ew", (eqR.ew * 100).toFixed(0) + "<small>% UI</small>");
+    NB.stat("eq-isi", eqR.isi.toFixed(2));
+    NB.stat("eq-h0", (eqR.h0 * 100).toFixed(1) + "<small>%</small>");
+    eqCv.redraw();
+  }
+  $("eq-auto").onclick = () => {
+    const H = chanH(+eqCh(), 0.3), seq = eqMod() === "pam4" ? SEQ.pam4 : SEQ.nrz, nd = Math.max(eqDfe(), 2);
+    let best = null;
+    for (let B = 0; B <= 24; B += 2) { const pu = pulse(H, B);
+      for (let pre = 0; pre >= -0.2001; pre -= 0.05) for (let post = 0; post >= -0.3001; post -= 0.05) { const s = quickEye(ffe(pu.q, pre, post), seq, nd, EQ_SIG, pu.ng); if (!best || s > best.s + 1e-4) best = { s, B, pre, post }; } }
+    eqDfe.set(nd); eqPre.set(+Math.abs(best.pre).toFixed(2)); eqPost.set(+Math.abs(best.post).toFixed(2)); eqCtle.set(best.B);
+  };
+  $("eq-reset").onclick = () => { eqPre.set(0); eqPost.set(0); eqCtle.set(0); eqDfe.set(0); };
+  const eqCv = NB.canvas($("cv-eq"), (ctx, w, h) => {
+    if (!eqR) return; const P = NB.palette(); const narrow = w < 600;
+    const pw = narrow ? w : w * 0.52, ph = narrow ? h * 0.5 : h;
+    const xr = [-3, 10], box = { x: 44, y: 22, w: pw - 44 - 12, h: ph - 22 - 34 };
+    const toData = (q, cu) => { const d = []; for (let n = Math.max(0, cu.n0 + xr[0] * SPU); n <= Math.min(NF - 1, cu.n0 + xr[1] * SPU); n += 2) d.push([(n - cu.n0) / SPU, q[n] / cu.h0]); return d; };
+    const cuE = { n0: eqR.n0, h0: eqR.h0 };
+    const pts = []; for (let j = xr[0]; j <= xr[1]; j++) { const v = eqR.hj(j) / eqR.h0; if (Math.abs(v) < 1e-6 && j < 0) continue; pts.push({ x: j, y: v, color: j === 0 ? P.ok : P.accent, r: j === 0 ? 5 : 3.5 }); }
+    const ch = NB.chart(ctx, box, { x: xr, y: [-0.5, 1.15], xLabel: "시간 (UI, 비트 간격)", xTicks: [-2, 0, 2, 4, 6, 8, 10], yTicks: [-0.5, 0, 0.5, 1], series: [{ data: toData(eqRaw.q, eqRaw), color: P.faint, width: 1.6, dash: [5, 4] }, { data: toData(eqR.q, cuE), color: P.accent, width: 2.2 }], points: pts });
+    for (let j = 1; j <= eqR.nd; j++) { if (j > xr[1]) break; ctx.strokeStyle = P.accent2; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ch.X(j), ch.Y(eqR.hj(j) / eqR.h0), 7, 0, 7); ctx.stroke(); }
+    NB.text(ctx, "펄스 응답 (메인 커서 = 1)", box.x, 11, { size: 12, bold: true, color: P.text });
+    const ex = narrow ? 12 : pw + 4, ey = narrow ? ph + 4 : 12, ew = narrow ? w - 24 : w - pw - 16, ehh = narrow ? h - ph - 14 : h - 24;
+    drawEye(ctx, ex, ey, ew, ehh, eqR, { title: "눈 그림", sub: (eqR.pam4 ? "PAM4" : "NRZ") + " · " + eqCh() + " dB" });
+  }, { aspect: 0.45, minHeight: 340, maxHeight: 420 });
+  eqUpd();
+
+  /* ================= 4. CDR ================= */
+  const cdPpm = NB.range("cd-ppm", (v) => v + " ppm", null);
+  const cdJit = NB.range("cd-jit", (v) => v.toFixed(3) + " UI", null);
+  const cdGain = NB.range("cd-gain", (v) => (v * 0.001).toFixed(3) + " UI/판정", null);
+  const cdEye = (() => { const H = chanH(12, 0.3), pu = pulse(H, 8); return analyze(pu.q, SEQ.nrz, 2, 0.003, pu.ng); })();
+  // 지터 없는 눈 폭 (UI): 열린 위상 구간의 절반 폭
+  const cdHalf = (() => { let lo = 0, hi = 0; const c = SPU / 2; for (let p = c; p < SPU && cdEye.open[p] > 0.05; p++) hi = (p - c + 0.5) / SPU; for (let p = c; p >= 0 && cdEye.open[p] > 0.05; p--) lo = (c - p + 0.5) / SPU; return Math.min(lo, hi); })();
+  let cdPh = 0, cdHist = [], cdErr = [], cdRng = NB.rng(77);
+  const gauss = () => { const u = Math.max(1e-9, cdRng()), v = cdRng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  const qfun = (x) => { if (x > 8) return 0; const t = 1 / (1 + 0.2316419 * Math.abs(x)); const d = 0.3989423 * Math.exp((-x * x) / 2); const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return x >= 0 ? p : 1 - p; };
+  $("cd-reset").onclick = () => { cdPh = 0; cdHist = []; cdErr = []; };
+  const cdCv = NB.canvas($("cv-cdr"), (ctx, w, h) => {
+    const P = NB.palette(), eh = Math.round(h * 0.55);
+    const ex = 12, ew = w - 24;
+    drawEye(ctx, ex, 8, ew, eh - 8, cdEye, { title: "받은 눈", traces: 120, alpha: 0.14 });
+    const xOf = (ph) => ex + ew / 2 + ph * (ew / 2);
+    // 지터 분포
+    const sj = cdJit(), wrapped0 = cdPh - Math.round(cdPh);
+    if (sj > 0.001) { ctx.fillStyle = P.warn; ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.moveTo(xOf(wrapped0 - 4 * sj), eh); for (let i = -40; i <= 40; i++) { const d = (i / 40) * 4 * sj; ctx.lineTo(xOf(wrapped0 + d), eh - 34 * Math.exp((-d * d) / (2 * sj * sj))); } ctx.lineTo(xOf(wrapped0 + 4 * sj), eh); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1; }
+    const wrapped = cdPh - Math.round(cdPh);
+    ctx.strokeStyle = P.warn; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(xOf(wrapped), 10); ctx.lineTo(xOf(wrapped), eh); ctx.stroke();
+    NB.text(ctx, "샘플링", xOf(wrapped) + 5, 26, { size: 11, bold: true, color: P.warn });
+    // 기록 띠
+    const top = eh + 14, bot = h - 10, mid = (top + bot) / 2, sy = (bot - top) / 2 / 0.75;
+    ctx.fillStyle = color_ok(P); ctx.fillRect(ex, mid - cdHalf * sy, ew, 2 * cdHalf * sy);
+    ctx.strokeStyle = P.ok; ctx.setLineDash([4, 4]); ctx.lineWidth = 1; [-1, 1].forEach((s) => { ctx.beginPath(); ctx.moveTo(ex, mid + s * cdHalf * sy); ctx.lineTo(ex + ew, mid + s * cdHalf * sy); ctx.stroke(); }); ctx.setLineDash([]);
+    ctx.strokeStyle = P.border; ctx.strokeRect(ex + 0.5, top + 0.5, ew - 1, bot - top - 1);
+    NB.text(ctx, "샘플링 위치 기록 (위아래 ±0.75 UI)", ex + 8, top + 12, { size: 11, color: P.dim });
+    ctx.save(); ctx.beginPath(); ctx.rect(ex, top, ew, bot - top); ctx.clip();
+    ctx.strokeStyle = P.warn; ctx.lineWidth = 1.6; ctx.beginPath();
+    cdHist.forEach((v, i) => { const x = ex + ew - (cdHist.length - 1 - i) * (ew / 300), yy = mid - v * sy; i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); }); ctx.stroke();
+    cdErr.forEach((e, i) => { if (e > 1e-3) { const x = ex + ew - (cdErr.length - 1 - i) * (ew / 300); ctx.fillStyle = P.bad; ctx.fillRect(x - 1, bot - 8, 2, 6); } });
+    ctx.restore();
+  }, { aspect: 0.55, minHeight: 330, maxHeight: 420 });
+  function color_ok(P) { return NB.isDark() ? "rgba(63,207,127,0.08)" : "rgba(31,157,85,0.07)"; }
+  let berAcc = [];
+  NB.loop($("cv-cdr"), () => {
+    const sub = 20, uiPer = 10, drift = cdPpm() * 1e-6 * uiPer, kp = cdGain() * 0.001, sj = cdJit(), on = $("cd-on").checked;
+    let pe = 0;
+    for (let i = 0; i < sub; i++) {
+      cdPh += drift;
+      const e = cdPh - Math.round(cdPh);
+      if (on && cdRng() < 0.5) cdPh -= kp * Math.sign(e + sj * gauss());
+      const a = cdHalf - Math.abs(e), b = cdHalf + Math.abs(e);
+      pe += sj > 1e-4 ? qfun(a / sj) + qfun(b / sj) : a > 0 ? 0 : 1;
+    }
+    const e = cdPh - Math.round(cdPh);
+    cdHist.push(e); if (cdHist.length > 300) cdHist.shift();
+    cdErr.push(pe / sub); if (cdErr.length > 300) cdErr.shift();
+    berAcc.push(pe / sub); if (berAcc.length > 90) berAcc.shift();
+    const ber = berAcc.reduce((s, v) => s + v, 0) / berAcc.length;
+    NB.stat("cd-ph", (e >= 0 ? "+" : "") + e.toFixed(3) + "<small>UI</small>");
+    NB.stat("cd-w", (2 * cdHalf).toFixed(2) + "<small>UI</small>");
+    NB.stat("cd-ber", ber < 1e-12 ? "10⁻¹² 미만" : ber.toExponential(1));
+    cdCv.redraw();
+  });
+
+  /* ================= 5. FEC ================= */
+  const LF = [0]; for (let i = 1; i <= 600; i++) LF[i] = LF[i - 1] + Math.log(i);
+  const CODES = { kr4: { n: 528, k: 514, t: 7, name: "KR4" }, kp4: { n: 544, k: 514, t: 15, name: "KP4" } };
+  function postBer(ber, c) {
+    const ps = 1 - Math.pow(1 - ber, 10); let ser = 0;
+    for (let i = c.t + 1; i <= c.n; i++) { const lp = LF[c.n] - LF[i] - LF[c.n - i] + i * Math.log(ps) + (c.n - i) * Math.log1p(-ps); const term = Math.exp(lp) * (i / c.n); ser += term; if (i > c.t + 5 && term < ser * 1e-12) break; }
+    return Math.min(ber, ser * (ber / ps));
+  }
+  const fcBer = NB.range("fc-ber", (v) => { const m = Math.pow(10, v - Math.floor(v)); return m.toFixed(1) + "×10" + sup(Math.floor(v)); }, () => fcUpd());
+  const fcCode = NB.seg("fc-code", () => fcUpd());
+  function sup(n) { const S = { "-": "⁻", 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" }; return String(n).split("").map((c) => S[c]).join(""); }
+  function sci(x) { if (x <= 0 || x < 1e-30) return "10⁻³⁰ 미만"; const e = Math.floor(Math.log10(x)), m = x / Math.pow(10, e); return m.toFixed(1) + "×10" + sup(e); }
+  function fcUpd() {
+    const ber = Math.pow(10, fcBer()), c = CODES[fcCode()], post = postBer(ber, c);
+    NB.stat("fc-t", c.t + "<small>심볼</small>");
+    NB.stat("fc-oh", ((100 * (c.n - c.k)) / c.k).toFixed(1) + "<small>%</small>");
+    NB.stat("fc-post", sci(post));
+    const gap = 1 / (post * 400e9);
+    NB.stat("fc-gap", gap < 1e-3 ? "<span style='color:var(--bad)'>" + NB.si(gap, "s", 2) + "</span>" : gap < 3600 ? NB.si(gap, "s", 2) : gap < 86400 * 365 * 2 ? (gap / 3600).toFixed(gap < 36000 ? 1 : 0) + "<small>시간</small>" : gap > 3e9 * 31536000 ? "우주 나이 이상" : NB.kn(Math.round(gap / 31536000)) + "<small>년</small>");
+    NB.stat("fc-lat", ((c.n * 10) / 106.25).toFixed(0) + "<small>ns</small>");
+    fcCv.redraw();
+  }
+  const fcCv = NB.canvas($("cv-fec"), (ctx, w, h) => {
+    const P = NB.palette(), mk = (c) => { const d = []; for (let e = -7; e <= -2.5; e += 0.05) d.push([Math.pow(10, e), Math.max(1e-30, c ? postBer(Math.pow(10, e), c) : Math.pow(10, e))]); return d; };
+    const ber = Math.pow(10, fcBer()), c = CODES[fcCode()];
+    NB.chart(ctx, null, { x: [1e-7, 10 ** -2.5], y: [1e-30, 1e-2], logX: true, logY: true, xLabel: "FEC 전 BER", yLabel: "FEC 후 BER", yTicks: [1e-30, 1e-25, 1e-20, 1e-15, 1e-10, 1e-5], xFmt: (v) => "1e" + Math.round(Math.log10(v)), yFmt: (v) => "1e" + Math.round(Math.log10(v)),
+      series: [{ data: mk(null), color: P.faint, width: 1.5, dash: [5, 4] }, { data: mk(CODES.kr4), color: c.name === "KR4" ? P.accent : P.dim, width: c.name === "KR4" ? 2.5 : 1.5 }, { data: mk(CODES.kp4), color: c.name === "KP4" ? P.accent : P.dim, width: c.name === "KP4" ? 2.5 : 1.5 }],
+      hlines: [{ y: 1e-15, color: P.ok, label: "10⁻¹⁵ 수준" }], vlines: [{ x: 2.4e-4, color: P.warn, label: "2.4e-4" }], points: [{ x: ber, y: Math.max(1e-30, postBer(ber, c)), color: P.bad, r: 5, label: c.name }] });
+    NB.text(ctx, "점선: FEC 없음 · 굵은 선: 선택한 부호", w - 22, h - 70, { size: 11, align: "right", color: P.dim });
+  }, { aspect: 0.5, minHeight: 280, maxHeight: 360 });
+  fcUpd();
+
+  /* ================= 6. 반사 ================= */
+  const Z0 = 50;
+  const rfR = NB.range("rf-r", (v) => v + " Ω", () => rfUpd());
+  const rfSrc = NB.seg("rf-src", () => rfUpd());
+  $("rf-open").addEventListener("change", () => rfUpd());
+  let rfT = 0, rfG = 0, rfGs = 0, rfVi = 0.5, rfTrace = [];
+  const TMAX = 9, PW = 0.3;
+  function rfUpd() {
+    const open = $("rf-open").checked, R = rfR(), Rs = +rfSrc();
+    rfG = open ? 1 : (R - Z0) / (R + Z0); rfGs = (Rs - Z0) / (Rs + Z0); rfVi = Z0 / (Rs + Z0);
+    NB.stat("rf-g", (rfG >= 0 ? "+" : "") + rfG.toFixed(3));
+    NB.stat("rf-pct", (Math.abs(rfG) * 100).toFixed(0) + "<small>%" + (rfG < -0.005 ? " (뒤집힘)" : "") + "</small>");
+    NB.stat("rf-rl", Math.abs(rfG) < 1e-3 ? "∞ <small>dB</small>" : (-20 * Math.log10(Math.abs(rfG))).toFixed(1) + "<small>dB</small>");
+    NB.stat("rf-vl", ((1 + rfG) * 100).toFixed(0) + "<small>% (정합 대비)</small>");
+    rfT = 0; rfTrace = [];
+  }
+  const pshape = (t) => (t < 0 || t > PW ? 0 : 0.5 - 0.5 * Math.cos((2 * Math.PI * t) / PW));
+  function vAt(x, t) { // x: 0(송신)~1(수신), t: 선로 지연 T 단위
+    let v = 0, a = rfVi;
+    for (let m = 0; m < 8; m++) {
+      v += a * pshape(t - (2 * m + x));            // 오른쪽 진행파
+      v += a * rfG * pshape(t - (2 * m + 2 - x));  // 반사파
+      a *= rfG * rfGs; if (Math.abs(a) < 1e-4) break;
+    }
+    return v;
+  }
+  $("rf-go").onclick = () => { rfT = 0; rfTrace = []; };
+  const rfCv = NB.canvas($("cv-refl"), (ctx, w, h) => {
+    const P = NB.palette(), x0 = 70, x1 = w - 70, ly = h * 0.36, amp = h * 0.2;
+    // 소스와 부하
+    NB.box(ctx, 8, ly - 22, 54, 44, { fill: P.surface, text: "TX\n" + rfSrc() + "Ω", size: 11 });
+    NB.box(ctx, w - 62, ly - 22, 54, 44, { fill: P.surface, text: "RX\n" + ($("rf-open").checked ? "∞" : rfR() + "Ω"), size: 11 });
+    ctx.strokeStyle = P.border; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(x0 - 8, ly + 26); ctx.lineTo(x1 + 8, ly + 26); ctx.stroke();
+    NB.text(ctx, "선로 Z₀ = 50 Ω", (x0 + x1) / 2, ly + 42, { align: "center", size: 11, color: P.dim });
+    ctx.strokeStyle = P.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, ly); ctx.lineTo(x1, ly); ctx.stroke();
+    ctx.strokeStyle = P.accent; ctx.lineWidth = 2.5; ctx.beginPath();
+    for (let i = 0; i <= 200; i++) { const x = i / 200, v = vAt(x, rfT); const px = x0 + x * (x1 - x0), py = ly - v * amp * 1.6; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    ctx.stroke();
+    // 수신단 파형
+    const top = h * 0.6, bot = h - 14, mid = bot - (bot - top) * 0.4, sy = (bot - top) * 0.38;
+    ctx.strokeStyle = P.border; ctx.lineWidth = 1; ctx.strokeRect(x0 - 50.5, top - 6.5, x1 - x0 + 101, bot - top + 12);
+    NB.text(ctx, "수신단에서 본 전압 (시간 →)", x0 - 42, top + 6, { size: 11, color: P.dim });
+    ctx.strokeStyle = P.grid; ctx.beginPath(); ctx.moveTo(x0 - 50, mid); ctx.lineTo(x1 + 50, mid); ctx.stroke();
+    ctx.strokeStyle = P.accent2; ctx.lineWidth = 2; ctx.beginPath();
+    rfTrace.forEach(([t, v], i) => { const px = x0 - 50 + (t / TMAX) * (x1 - x0 + 100), py = mid - v * sy; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
+    ctx.stroke();
+  }, { aspect: 0.5, minHeight: 300, maxHeight: 380 });
+  NB.loop($("cv-refl"), (dt) => {
+    if (rfT > TMAX) return;
+    const step = dt * 0.9; const n = 6;
+    for (let i = 0; i < n; i++) { rfT += step / n; rfTrace.push([rfT, vAt(1, rfT)]); }
+    rfCv.redraw();
+  });
+  rfUpd();
+})();
+</script>
+</body>
+</html>

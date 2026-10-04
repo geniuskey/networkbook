@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>프로토콜과 계층 · NetworkBook</title>
+<meta name="description" content="프로토콜은 통신의 약속이다. 왜 네트워크를 계층으로 나누는지, OSI 7계층과 TCP/IP, 캡슐화와 헤더 오버헤드, 실제 HTTP 요청 패킷을 바이트 단위로 해부하고, 표준 기구와 종단 간 원칙까지 살펴본다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .ly-l7 { --lc: var(--accent-2); } .ly-l4 { --lc: var(--warn); } .ly-l3 { --lc: var(--accent); } .ly-l2 { --lc: var(--ok); } .ly-l1 { --lc: var(--text-dim); }
+  .layer-tbl td.lyc { font-weight: 700; white-space: nowrap; color: var(--lc); }
+  /* 패킷 해부 */
+  .dx-wrap { display: grid; grid-template-columns: minmax(0, 1fr); border-top: 1px solid var(--border); }
+  @media (min-width: 860px) { .dx-wrap { grid-template-columns: minmax(0, 290px) minmax(0, 1fr); } .dx-tree { border-right: 1px solid var(--border); } }
+  .dx-tree { max-height: 420px; overflow: auto; font-size: 13px; padding: 8px 0; }
+  .dx-tree .grp { font-weight: 700; padding: 6px 14px 4px; color: var(--lc); font-size: 12.5px; }
+  .dx-tree .fld { padding: 3px 14px 3px 26px; cursor: pointer; font-family: var(--mono); font-size: 12px; line-height: 1.45; border-left: 3px solid transparent; }
+  .dx-tree .fld:hover { background: var(--surface); }
+  .dx-tree .fld.sel { background: color-mix(in srgb, var(--lc) 16%, transparent); border-left-color: var(--lc); }
+  .dx-hex { padding: 12px 14px; font-family: var(--mono); font-size: 12.5px; line-height: 1.7; white-space: nowrap; }
+  .dx-row { display: flex; gap: 14px; }
+  .dx-off { color: var(--text-faint); }
+  .dx-bytes span, .dx-asc span { display: inline-block; text-align: center; cursor: pointer; border-radius: 3px; }
+  .dx-bytes span { width: 2.6ch; }
+  .dx-asc span { width: 1.05ch; }
+  .dx-bytes span { background: color-mix(in srgb, var(--lc) 10%, transparent); }
+  .dx-bytes span:hover, .dx-asc span:hover { outline: 1px solid var(--lc); }
+  .dx-bytes span.hi, .dx-asc span.hi { background: var(--lc); color: var(--bg-elev); }
+  .dx-desc { border-top: 1px solid var(--border); padding: 12px 18px; font-size: 14.5px; min-height: 96px; }
+  .dx-desc .nm { font-weight: 700; color: var(--lc); }
+  .dx-desc code { font-size: 12.5px; }
+  .dx-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 18px; font-size: 12.5px; color: var(--text-dim); border-top: 1px solid var(--border); }
+  .dx-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: var(--lc); margin-right: 5px; vertical-align: -1px; }
+  /* 분류 게임 */
+  .sort-card { margin: 18px auto 6px; max-width: 420px; text-align: center; padding: 16px; border: 2px dashed var(--border); border-radius: 12px; }
+  .sort-card .nm { font-size: 22px; font-weight: 800; font-family: var(--mono); }
+  .sort-card .ds { color: var(--text-dim); font-size: 13.5px; margin-top: 4px; }
+  .sort-bins { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; padding: 10px 18px 16px; }
+  .sort-bins button { border: 2px solid var(--lc); color: var(--text); background: color-mix(in srgb, var(--lc) 10%, transparent); border-radius: 10px; padding: 10px 6px; font: inherit; font-weight: 700; cursor: pointer; }
+  .sort-bins button:hover { background: color-mix(in srgb, var(--lc) 22%, transparent); }
+  .sort-fb { padding: 0 18px 14px; font-size: 14.5px; min-height: 48px; }
+  /* 중간 장비 */
+  .mb-pkt { display: flex; flex-wrap: wrap; gap: 4px; padding: 16px 18px; }
+  .mb-f { border: 2px solid color-mix(in srgb, var(--lc) 45%, transparent); border-radius: 8px; padding: 5px 8px; font-size: 12.5px; background: color-mix(in srgb, var(--lc) 7%, transparent); opacity: .45; transition: all .2s; }
+  .mb-f b { display: block; font-size: 11px; color: var(--lc); }
+  .mb-f span { font-family: var(--mono); }
+  .mb-f.rd { opacity: 1; border-color: var(--lc); box-shadow: 0 0 0 2px color-mix(in srgb, var(--lc) 25%, transparent); }
+  .mb-f.wr { opacity: 1; border-color: var(--bad); border-style: dashed; background: color-mix(in srgb, var(--bad) 10%, transparent); }
+  .mb-f.wr span { color: var(--bad); font-weight: 700; }
+  .mb-desc { padding: 0 18px 14px; font-size: 14.5px; min-height: 70px; }
+</style>
+</head>
+<body data-chapter="layers">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 03</div>
+    <h1>프로토콜과 계층</h1>
+    <p class="lead">브라우저 주소창에 주소를 치고 엔터를 누르면 노트북은 수십 바이트짜리 “머리말”을 겹겹이 붙인 데이터 덩어리를 내보낸다. 그 머리말 하나하나에는 누가 읽고 무엇을 해야 하는지가 정확히 정해져 있다. 공유기는 바깥 몇 겹만 보고, 서버는 끝까지 벗겨 읽는다. 세계 수십억 대의 장비가 서로 다른 회사에서 만들어졌는데도 이렇게 말이 통하는 이유는 무엇일까? 이 장은 그 약속(프로토콜)과 약속을 쌓는 방법(계층)을 다루고, 실제 패킷 하나를 바이트 단위로 해부한다.</p>
+    <ul class="objectives">
+      <li>프로토콜이 정하는 세 가지(형식·순서·오류 시 행동)를 일상의 예로 설명한다.</li>
+      <li>통신을 계층으로 나누는 이유와 IP가 “모래시계의 허리”인 까닭을 이해한다.</li>
+      <li>OSI 7계층과 TCP/IP 계층을 대응시키고, 계층별 데이터 단위와 장비를 구분한다.</li>
+      <li>캡슐화로 붙는 헤더의 크기를 계산하고, 작은 패킷일수록 오버헤드가 커지는 이유를 안다.</li>
+      <li>실제 HTTP 요청 프레임의 16진 덤프에서 MAC 주소, TTL, 포트, 순서 번호 같은 필드를 찾아 읽는다.</li>
+      <li>IETF·IEEE·3GPP·ITU 같은 표준 기구의 역할을 구분한다.</li>
+      <li>종단 간 원칙과, 라우터·방화벽·프록시가 패킷을 어디까지 열어 보는지 설명한다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="protocol">
+    <h2>프로토콜: 통신의 약속</h2>
+    <p>전화를 걸면 우리는 자연스럽게 정해진 순서를 따른다. 신호가 가고, 상대가 “여보세요?” 하고, 내가 누구인지 밝히고, 용건을 말하고, “끊을게요” 하고 끊는다. 상대가 아무 말이 없으면 “여보세요? 들리세요?” 하고 다시 묻는다. 이런 약속이 없다면 두 사람이 동시에 말을 시작하거나, 상대가 끊은 줄도 모르고 혼자 이야기하게 된다.</p>
+    <p>컴퓨터끼리의 약속을 <span class="term">프로토콜</span><span class="en">(protocol)</span>이라 한다. 사람과 달리 컴퓨터는 눈치가 없으므로 약속을 아주 엄밀하게 정해야 한다. 모든 프로토콜은 세 가지를 정한다.</p>
+    <ul>
+      <li><b>형식(syntax)</b>: 메시지의 몇 번째 바이트에 무엇을 적는가. “앞 2바이트는 받는 쪽 포트 번호, 큰 자리부터.”</li>
+      <li><b>순서(timing·sequence)</b>: 누가 먼저 무엇을 보내고, 무엇을 받은 뒤에야 다음으로 넘어가는가. “연결 요청 → 수락 → 확인을 주고받은 뒤에만 데이터를 보낸다.”</li>
+      <li><b>오류 시 행동(semantics)</b>: 답이 안 오거나 이상한 값이 오면 어떻게 하는가. “1초 안에 확인이 없으면 다시 보낸다. 체크섬이 틀리면 버린다.”</li>
+    </ul>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 300" style="min-width:560px" role="img" aria-label="전화 예절과 TCP·HTTP 대화의 비교">
+        <defs><marker id="ly-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+        <marker id="ly-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"/></marker></defs>
+        <text x="200" y="22" text-anchor="middle" class="t" style="font-weight:700">사람: 전화 예절</text>
+        <text x="600" y="22" text-anchor="middle" class="t" style="font-weight:700">컴퓨터: TCP + HTTP</text>
+        <g class="t" style="font-size:12px">
+          <text x="70" y="46" text-anchor="middle">거는 사람</text><text x="330" y="46" text-anchor="middle">받는 사람</text>
+          <path d="M70 54 V285 M330 54 V285" class="s-axis" stroke-dasharray="3 4"/>
+          <path d="M70 72 L330 92" class="s-acc" marker-end="url(#ly-a)"/><text x="200" y="74" text-anchor="middle" class="t-dim">따르릉 (연결 요청)</text>
+          <path d="M330 110 L70 130" stroke="var(--accent-2)" stroke-width="2" marker-end="url(#ly-b)"/><text x="200" y="112" text-anchor="middle" class="t-dim">“여보세요?” (수락)</text>
+          <path d="M70 148 L330 168" class="s-acc" marker-end="url(#ly-a)"/><text x="200" y="150" text-anchor="middle" class="t-dim">“저 민수예요” (확인)</text>
+          <path d="M70 186 L330 206" class="s-acc" marker-end="url(#ly-a)"/><text x="200" y="188" text-anchor="middle" class="t-dim">“내일 몇 시에 만나?” (요청)</text>
+          <path d="M330 224 L70 244" stroke="var(--accent-2)" stroke-width="2" marker-end="url(#ly-b)"/><text x="200" y="226" text-anchor="middle" class="t-dim">“7시!” (응답)</text>
+          <path d="M70 262 L330 282" class="s-acc" marker-end="url(#ly-a)"/><text x="200" y="264" text-anchor="middle" class="t-dim">“끊을게요” (종료)</text>
+        </g>
+        <g class="t" style="font-size:12px">
+          <text x="470" y="46" text-anchor="middle">브라우저</text><text x="730" y="46" text-anchor="middle">웹 서버</text>
+          <path d="M470 54 V285 M730 54 V285" class="s-axis" stroke-dasharray="3 4"/>
+          <path d="M470 72 L730 92" class="s-acc" marker-end="url(#ly-a)"/><text x="600" y="74" text-anchor="middle" class="t-mono">SYN</text>
+          <path d="M730 110 L470 130" stroke="var(--accent-2)" stroke-width="2" marker-end="url(#ly-b)"/><text x="600" y="112" text-anchor="middle" class="t-mono">SYN + ACK</text>
+          <path d="M470 148 L730 168" class="s-acc" marker-end="url(#ly-a)"/><text x="600" y="150" text-anchor="middle" class="t-mono">ACK</text>
+          <path d="M470 186 L730 206" class="s-acc" marker-end="url(#ly-a)"/><text x="600" y="188" text-anchor="middle" class="t-mono">GET / HTTP/1.1</text>
+          <path d="M730 224 L470 244" stroke="var(--accent-2)" stroke-width="2" marker-end="url(#ly-b)"/><text x="600" y="226" text-anchor="middle" class="t-mono">HTTP/1.1 200 OK</text>
+          <path d="M470 262 L730 282" class="s-acc" marker-end="url(#ly-a)"/><text x="600" y="264" text-anchor="middle" class="t-mono">FIN</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 3-1.</b> 사람의 전화 예절과 컴퓨터의 대화는 구조가 같다. 연결을 맺고(TCP의 3방향 악수, 9장), 요청하고 응답하고(HTTP, 10장), 끝낸다. 차이는 컴퓨터의 약속이 바이트 단위까지 문서로 정해져 있다는 점이다.</figcaption>
+    </figure>
+    <div class="callout analogy"><strong>택배 송장</strong><p>택배 상자에 붙는 송장에는 칸이 정해져 있다. 받는 사람 주소, 보내는 사람, 무게, 운송장 번호, “취급 주의”. 칸의 위치와 의미가 약속되어 있으니 처음 보는 분류 센터 직원도 바로 읽는다. 패킷의 <span class="term">헤더</span><span class="en">(header)</span>가 바로 이 송장이다. 정해진 자리에 정해진 길이로 주소와 번호가 적혀 있어서, 처음 만나는 라우터도 몇 나노초 만에 읽고 처리한다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="why-layers">
+    <h2>왜 계층으로 나누나</h2>
+    <p>웹 페이지 하나를 받는 데 풀어야 할 문제를 늘어놓아 보자. 전선 위에서 0과 1을 어떤 전압으로 표현할까? 같은 선을 쓰는 여러 장치 중 누구에게 줄까? 지구 반대편까지 어느 길로 갈까? 중간에 잃어버린 조각은 누가 다시 보내나? 받은 바이트가 웹 페이지인지 메일인지 어떻게 아나? 이걸 프로그램 하나가 전부 처리한다면 Wi-Fi가 새로 나올 때마다 세상의 모든 브라우저를 고쳐야 한다.</p>
+    <p>그래서 통신은 일을 <span class="term">계층</span><span class="en">(layer)</span>으로 나눈다. 각 계층은 바로 아래 계층이 주는 서비스만 믿고 자기 문제 하나를 푼다. 이것이 <b>관심사의 분리</b>다. 브라우저는 “이 바이트들을 저 서버의 443번 포트로 믿을 수 있게 보내 줘”라고 TCP에 부탁할 뿐, 그 바이트가 구리선을 타는지(4장), 빛이 되는지(5장), 전파가 되는지(11장) 모른다. 그래서 집 공유기를 Wi-Fi 7로 바꿔도, 회사 회선을 광으로 바꿔도 HTTP는 한 글자도 바뀌지 않는다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 340" style="min-width:600px" role="img" aria-label="인터넷 프로토콜의 모래시계 모델">
+        <path d="M120 20 H680 L470 150 V190 L680 320 H120 L330 190 V150 Z" class="f-surface" stroke="var(--border)"/>
+        <g class="t" style="font-size:13px" text-anchor="middle">
+          <text x="400" y="42" style="font-weight:700;fill:var(--accent-2)">응용</text>
+          <text x="400" y="62" class="t-mono" style="font-size:12px">HTTP · DNS · SMTP · SSH · WebRTC · 게임 · 메신저 …</text>
+          <text x="400" y="98" style="font-weight:700;fill:var(--warn)">전송</text>
+          <text x="400" y="118" class="t-mono" style="font-size:12px">TCP · UDP · QUIC</text>
+          <rect x="340" y="152" width="120" height="36" rx="8" class="f-acc"/>
+          <text x="400" y="175" style="font-weight:800;fill:#fff;font-size:15px">IP</text>
+          <text x="400" y="230" style="font-weight:700;fill:var(--ok)">링크</text>
+          <text x="400" y="250" class="t-mono" style="font-size:12px">이더넷 · Wi-Fi · LTE/5G · PPP · DOCSIS</text>
+          <text x="400" y="282" style="font-weight:700;fill:var(--text-dim)">물리</text>
+          <text x="400" y="302" class="t-mono" style="font-size:12px">구리선 · 광섬유 · 전파 · 동축 · 위성</text>
+        </g>
+        <g class="t-dim" style="font-size:12px">
+          <text x="490" y="166">허리: 모두가 지키는 단 하나의 약속</text>
+          <text x="490" y="182">“IP 패킷이면 배달한다”</text>
+          <text x="20" y="80">위로: 새 앱은</text><text x="20" y="96">IP만 믿고 만든다</text>
+          <text x="20" y="262">아래로: 새 매체는</text><text x="20" y="278">IP만 실어 나르면 된다</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 3-2.</b> 인터넷의 <span class="term">모래시계 모델</span><span class="en">(hourglass model)</span>. 위아래는 넓게 퍼져 계속 새것이 생기지만 가운데 허리인 IP는 거의 하나다. 위의 어떤 앱도 아래의 어떤 매체 위에서 돌 수 있는 비결이다. 그 대신 허리를 바꾸기는 무척 어렵다. IPv4에서 IPv6로의 이사가 수십 년째 진행 중인 이유다(7장).</figcaption>
+    </figure>
+    <div class="callout deep"><strong>계층의 대가</strong><p>계층은 공짜가 아니다. 계층마다 헤더가 붙어 바이트가 늘고(다음 절에서 계산한다), 아래 계층이 무슨 일을 하는지 모르니 최적화 기회를 놓치기도 한다. 예를 들어 TCP는 무선 구간의 일시적 손실을 혼잡으로 오해해 속도를 줄이곤 한다(9장). 그래서 실제 시스템은 가끔 계층을 넘나드는 “반칙”을 한다. 그래도 수십억 대가 함께 쓰는 망을 쪼개서 발전시킬 수 있게 해 준 이득이 훨씬 크다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="models">
+    <h2>OSI 7계층과 TCP/IP</h2>
+    <p>계층을 나누는 방법에는 두 가지 유명한 지도가 있다. 국제표준화기구(ISO)가 1984년에 정리한 <span class="term">OSI 7계층</span><span class="en">(OSI reference model)</span>은 꼼꼼한 교과서용 지도이고, 실제 인터넷이 쓰는 것은 그보다 단순한 <span class="term">TCP/IP 모델</span><span class="en">(Internet protocol suite)</span>이다. OSI 방식의 프로토콜은 시장에서 졌지만 “L2 스위치”, “L4 로드밸런서”, “L7 방화벽”처럼 계층 번호는 OSI 것을 그대로 쓴다. 그래서 둘 다 알아야 한다.</p>
+    <div class="table-wrap"><table class="layer-tbl">
+      <thead><tr><th>OSI</th><th>TCP/IP</th><th>하는 일</th><th>데이터 단위</th><th>대표 프로토콜</th><th>대표 장비</th></tr></thead>
+      <tbody>
+        <tr class="ly-l7"><td class="lyc">L7 응용</td><td class="lyc" rowspan="3">응용</td><td>앱끼리의 대화 규칙</td><td rowspan="3">메시지</td><td>HTTP, DNS, SMTP, SSH</td><td rowspan="3">L7 로드밸런서, 프록시, WAF</td></tr>
+        <tr class="ly-l7"><td class="lyc">L6 표현</td><td>문자 인코딩, 압축, 암호화</td><td>TLS(일부), UTF-8, JPEG</td></tr>
+        <tr class="ly-l7"><td class="lyc">L5 세션</td><td>대화의 시작·재개</td><td>(대부분 앱·TLS가 맡음)</td></tr>
+        <tr class="ly-l4"><td class="lyc">L4 전송</td><td class="lyc">전송</td><td>프로그램 구분(포트), 신뢰성, 혼잡 제어</td><td>세그먼트 / 데이터그램</td><td>TCP, UDP, QUIC</td><td>L4 로드밸런서, 방화벽, NAT</td></tr>
+        <tr class="ly-l3"><td class="lyc">L3 네트워크</td><td class="lyc">인터넷</td><td>전 세계 주소와 길 찾기</td><td>패킷</td><td>IPv4, IPv6, ICMP</td><td>라우터</td></tr>
+        <tr class="ly-l2"><td class="lyc">L2 데이터 링크</td><td class="lyc" rowspan="2">링크<br><small style="font-weight:400;color:var(--text-dim)">(5계층 모델은 링크·물리로 나눔)</small></td><td>한 구간(옆 장치까지) 전달, 오류 검출</td><td>프레임</td><td>이더넷, Wi-Fi(802.11), PPP</td><td>스위치, 브리지, 무선 AP</td></tr>
+        <tr class="ly-l1"><td class="lyc">L1 물리</td><td>비트를 전압·빛·전파로</td><td>비트(심볼)</td><td>1000BASE-T, 광 트랜시버</td><td>리피터, 허브, 케이블, 모뎀</td></tr>
+      </tbody>
+    </table></div>
+    <p>이 책은 실무에서 가장 흔한 <b>5계층 모델</b>(응용·전송·네트워크·링크·물리)로 설명한다. 단위 이름도 기억해 두자. 같은 바이트 덩어리라도 TCP 입장에서는 <span class="term">세그먼트</span><span class="en">(segment)</span>, IP 입장에서는 <b>패킷</b><span class="en">(packet)</span>, 이더넷 입장에서는 <b>프레임</b><span class="en">(frame)</span>이라 부른다. 무엇을 기준으로 보느냐에 따라 이름이 달라질 뿐이다.</p>
+    <div class="sim" id="sim-sort">
+      <div class="sim-head"><span class="sim-tag">GAME</span><h3>이 프로토콜은 몇 층에 살까?</h3></div>
+      <div class="sort-card"><div class="nm" id="sort-nm">—</div><div class="ds" id="sort-ds"></div></div>
+      <div class="sort-bins" id="sort-bins">
+        <button class="ly-l7" data-v="7">응용</button><button class="ly-l4" data-v="4">전송</button><button class="ly-l3" data-v="3">네트워크</button><button class="ly-l2" data-v="2">링크</button><button class="ly-l1" data-v="1">물리</button>
+      </div>
+      <div class="sort-fb" id="sort-fb">카드에 적힌 프로토콜이 5계층 중 어디에 속하는지 골라 보자.</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">맞힌 개수</span><span class="v" id="o-sort-ok">0</span></div>
+        <div class="stat"><span class="k">푼 카드</span><span class="v" id="o-sort-n">0 / 14</span></div>
+        <div class="stat"><span class="k">정답률</span><span class="v" id="o-sort-pct">—</span></div>
+      </div>
+      <div class="sim-controls"><div class="btn-row"><button class="btn" id="sort-reset">처음부터</button></div></div>
+      <div class="sim-note">ARP, ICMP, QUIC, TLS처럼 경계에 걸친 프로토콜도 섞여 있다. 계층 모델은 자연법칙이 아니라 정리용 지도라서 깔끔하게 안 맞는 경우가 있다. 해설에서 “왜 여기로 보는가”를 확인하자.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="encap">
+    <h2>캡슐화: 상자 속 상자</h2>
+    <p>보내는 쪽에서는 데이터가 위에서 아래로 내려가며 계층마다 자기 헤더(때로는 꼬리말, <span class="term">트레일러</span><span class="en">(trailer)</span>)를 붙인다. 이를 <span class="term">캡슐화</span><span class="en">(encapsulation)</span>라 한다. 받는 쪽은 아래에서 위로 한 겹씩 벗기며 각 계층이 자기 헤더만 읽는다(역캡슐화). 각 계층에게 위 계층의 헤더와 데이터는 그냥 내용물, 즉 <span class="term">페이로드</span><span class="en">(payload)</span>다.</p>
+    <p>헤더 크기는 프로토콜마다 정해져 있다. TCP 20바이트(옵션이 붙으면 최대 60), UDP 8바이트, IPv4 20바이트(최대 60), IPv6 40바이트, 이더넷 헤더 14바이트에 끝의 오류 검사값 <span class="term">FCS</span><span class="en">(frame check sequence)</span> 4바이트. 선로 위에서는 프레임 앞에 동기용 프리앰블 8바이트가 붙고, 프레임 사이에 최소 12바이트만큼 쉬는 간격(IFG)을 둔다. 또 이더넷 프레임은 최소 64바이트여야 해서, 내용이 짧으면 0으로 채운다(패딩). 이렇게 실제 데이터가 아닌데 함께 실려 가는 바이트의 비율을 <span class="term">오버헤드</span><span class="en">(overhead)</span>라 한다.</p>
+    <div class="sim" id="sim-enc">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>캡슐화와 헤더 오버헤드</h3></div>
+      <div class="sim-view"><canvas id="cv-enc"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>보낼 메시지 (입력하면 바이트 수가 바뀐다)</span><input type="text" id="enc-text" value="안녕!" maxlength="60"></label>
+        <label class="ctrl"><span>응용 데이터 크기 <output id="enc-size-out"></output></span><input type="range" id="enc-size" min="1" max="1460" value="7"></label>
+        <div class="ctrl"><span>전송 계층</span><div class="seg" id="enc-l4"><button data-value="tcp" class="on">TCP (20B)</button><button data-value="udp">UDP (8B)</button></div></div>
+        <div class="ctrl"><span>네트워크 계층</span><div class="seg" id="enc-l3"><button data-value="4" class="on">IPv4 (20B)</button><button data-value="6">IPv6 (40B)</button></div></div>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn primary" id="enc-go">▼ 캡슐화</button><button class="btn" id="enc-back">▲ 역캡슐화</button></div></div>
+      </div>
+      <div class="sim-view"><canvas id="cv-eff"></canvas></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">응용 데이터</span><span class="v" id="o-enc-app">—</span></div>
+        <div class="stat"><span class="k">이더넷 프레임</span><span class="v" id="o-enc-frame">—</span></div>
+        <div class="stat"><span class="k">선로 위 전체 (프리앰블·IFG 포함)</span><span class="v" id="o-enc-wire">—</span></div>
+        <div class="stat"><span class="k">오버헤드</span><span class="v" id="o-enc-ovh">—</span></div>
+        <div class="stat"><span class="k">1 Gbps 회선의 실제 응용 속도</span><span class="v" id="o-enc-good">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 메시지를 한 글자로 줄여 보고, 슬라이더를 1460까지 올려 보자. 1460바이트는 IPv4+TCP에서 표준 이더넷(MTU 1500바이트)에 꽉 차는 최대 크기다. 아래 그래프는 응용 데이터 크기에 따른 선로 효율이다. 단순화: TCP·IP 옵션은 없다고 가정했다(실제 TCP는 타임스탬프 옵션으로 보통 12바이트가 더 붙는다). 한글은 UTF-8에서 한 글자에 3바이트다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">게임이 TCP/IPv4로 1바이트짜리 “키 눌림” 신호를 보낸다. 이더넷 선로 위에서 이 1바이트가 차지하는 비율(효율)은 대략 얼마일까?</p><p class="wi-hint">위 시뮬레이터에서 데이터 크기를 1로 줄여 확인해 보자.</p><div class="opts">
+      <button class="opt">약 50% — 헤더가 데이터만큼 붙는다</button>
+      <button class="opt">약 12%</button>
+      <button class="opt" data-correct>약 1% — 84바이트 중 1바이트</button>
+    </div><div class="quiz-exp">TCP 20 + IPv4 20 = 40바이트에 데이터 1바이트를 더해도 이더넷 최소 크기를 못 채워 5바이트를 패딩한다. 여기에 이더넷 헤더·FCS 18바이트로 64바이트 프레임, 프리앰블·IFG 20바이트를 더하면 84바이트다. 1/84 ≈ 1.2%. 그래서 작은 메시지를 많이 보내는 프로그램은 여러 개를 모아 보내거나(네이글 알고리즘, 9장) 헤더를 압축한다(이동통신의 ROHC, 14장).</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="dissect">
+    <h2>패킷 해부: 바이트 하나하나 읽기</h2>
+    <p>이제 진짜 패킷을 열어 보자. 아래는 노트북(192.168.0.7)이 웹 서버(203.0.113.10)의 80번 포트로 보내는 HTTP 요청 프레임이다. 와이어샤크(Wireshark) 같은 패킷 분석기가 보여 주는 화면을 본떴다. 왼쪽은 계층별 필드 목록, 오른쪽은 실제로 선을 타는 바이트의 16진 덤프다. 바이트나 필드에 마우스를 올리거나 눌러 보자. 특히 두 가지를 눈여겨보자. 라우터를 지날 때마다 1씩 줄어드는 <span class="term">TTL</span><span class="en">(time to live)</span>, 그리고 헤더가 깨지지 않았는지 검사하는 <span class="term">체크섬</span><span class="en">(checksum)</span>이다. 체크섬은 바이트들을 정해진 방식으로 더한 값으로, 한 비트만 바뀌어도 값이 달라진다.</p>
+    <div class="sim" id="sim-dx">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>HTTP GET 프레임 해부 (이더넷 + IPv4 + TCP + HTTP)</h3></div>
+      <div class="sim-controls" style="border-top:0">
+        <label class="ctrl"><span>요청 경로 (영문·숫자)</span><input type="text" id="dx-path" value="/index.html" maxlength="40"></label>
+        <label class="ctrl"><span>TTL (남은 수명) <output id="dx-ttl-out"></output></span><input type="range" id="dx-ttl" min="1" max="255" value="64"></label>
+      </div>
+      <div class="dx-legend"><span class="ly-l2"><i></i>이더넷 (L2)</span><span class="ly-l3"><i></i>IPv4 (L3)</span><span class="ly-l4"><i></i>TCP (L4)</span><span class="ly-l7"><i></i>HTTP (L7)</span></div>
+      <div class="dx-wrap">
+        <div class="dx-tree" id="dx-tree"></div>
+        <div style="overflow-x:auto"><div class="dx-hex" id="dx-hex"></div></div>
+      </div>
+      <div class="dx-desc" id="dx-desc"></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">프레임 길이</span><span class="v" id="o-dx-len">—</span></div>
+        <div class="stat"><span class="k">IP 전체 길이 필드</span><span class="v" id="o-dx-tot">—</span></div>
+        <div class="stat"><span class="k">IP 헤더 체크섬</span><span class="v" id="o-dx-ipck">—</span></div>
+        <div class="stat"><span class="k">TCP 체크섬</span><span class="v" id="o-dx-tcpck">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 경로를 바꾸면 IP 전체 길이와 두 체크섬이 다시 계산된다. TTL만 바꿔도 IP 체크섬이 바뀌지만 TCP 체크섬은 그대로다(TCP 체크섬은 TTL을 포함하지 않는다). 주소는 예시용 대역(RFC 5737의 203.0.113.0/24)이다. 분석기 화면처럼 선로의 프리앰블과 끝의 FCS 4바이트는 빼고 보여 준다. 실제 웹은 대부분 HTTPS(443번)라 HTTP 부분이 암호문으로 보인다.</div>
+    </div>
+    <div class="callout tip"><strong>16진수로 읽는 요령</strong><p>16진수 두 자리가 1바이트다. <code>0x0800</code>(이더넷 타입: 다음은 IPv4), <code>0x45</code>(IPv4, 헤더 20바이트), <code>0x06</code>(다음은 TCP), <code>0x0050</code>(포트 80), <code>0x01BB</code>(포트 443)처럼 자주 보는 값을 외워 두면 덤프만 보고도 구조가 보인다. 네트워크의 여러 바이트 숫자는 큰 자리부터 적는다(빅 엔디언, “네트워크 바이트 순서”).</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="standards">
+    <h2>표준은 누가 만드나</h2>
+    <p>서로 다른 회사의 칩·장비·소프트웨어가 말이 통하려면 약속을 문서로 남기고 모두 따라야 한다. 이 문서를 <span class="term">표준</span><span class="en">(standard)</span>이라 하고, 분야마다 표준을 만드는 기구가 다르다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>기구</th><th>성격</th><th>주로 만드는 것</th><th>예</th></tr></thead>
+      <tbody>
+        <tr><td><b>IETF</b><br><small>Internet Engineering Task Force</small></td><td>누구나 메일링 리스트로 참여하는 개방형 모임. “대략적 합의와 돌아가는 코드”</td><td>인터넷 계층 이상: IP, TCP, DNS, HTTP, TLS, QUIC</td><td>RFC 791(IPv4), RFC 8200(IPv6), RFC 9293(TCP), RFC 9000(QUIC), RFC 9110(HTTP)</td></tr>
+        <tr><td><b>IEEE 802</b></td><td>전기전자공학자협회의 표준 위원회</td><td>LAN의 링크·물리 계층</td><td>802.3(이더넷), 802.11(Wi-Fi), 802.1Q(VLAN), 802.15.1(블루투스 원형)</td></tr>
+        <tr><td><b>3GPP</b></td><td>세계 이동통신 표준 단체들의 연합. 릴리스(Release) 단위로 발표</td><td>이동통신 무선·코어망</td><td>LTE(Rel-8), 5G NR(Rel-15), 5G-Advanced(Rel-18~)</td></tr>
+        <tr><td><b>ITU</b><br><small>국제전기통신연합(UN 산하)</small></td><td>국가 단위 회원. ITU-T(유선), ITU-R(전파)</td><td>전화망, DSL, 광 전송, 영상 코덱, 주파수 분배, 이동통신 요구 조건</td><td>G.992(ADSL), G.993.2(VDSL2), G.652(광섬유), H.264, IMT-2020(5G 요건)</td></tr>
+        <tr><td><b>W3C · WHATWG</b></td><td>웹 기술 표준 단체</td><td>HTML, CSS, 웹 API</td><td>HTML Living Standard, WebRTC API</td></tr>
+        <tr><td><b>IANA / ICANN</b></td><td>번호와 이름의 등록소</td><td>IP 주소 블록, 포트 번호, 프로토콜 번호, 최상위 도메인</td><td>포트 80 = HTTP, 프로토콜 번호 6 = TCP</td></tr>
+      </tbody>
+    </table></div>
+    <p>IETF의 문서 이름 <span class="term">RFC</span><span class="en">(Request for Comments)</span>는 1969년 아파넷 시절 “의견을 구합니다”라는 겸손한 메모에서 시작했다. 지금은 9,000번이 넘었고, 한번 번호가 붙으면 고치지 않고 새 번호의 문서로 대체한다. 예를 들어 1981년의 TCP 명세 RFC 793은 2022년 RFC 9293으로 대체되었다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="e2e">
+    <h2>종단 간 원칙: 중간은 단순하게</h2>
+    <p>인터넷 설계의 중요한 철학이 <span class="term">종단 간 원칙</span><span class="en">(end-to-end principle)</span>이다(Saltzer·Reed·Clark, 1981). 신뢰성, 암호화, 순서 맞추기 같은 기능은 결국 양 끝의 컴퓨터만 완벽하게 해낼 수 있으니, 망 중간은 “최선을 다해 패킷을 나를 뿐(best effort)” 단순하게 두고 똑똑한 일은 끝에서 하자는 생각이다. 덕분에 라우터는 빠르고 값싸게 만들 수 있었고, 새 앱을 내놓을 때 망 사업자의 허락이 필요 없었다. 웹, 스카이프, 비트토렌트가 모두 이렇게 태어났다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 300" style="min-width:600px" role="img" aria-label="중간 장비가 열어 보는 계층의 깊이">
+        <g class="t" style="font-size:12px" text-anchor="middle">
+          <text x="70" y="22" style="font-weight:700">내 PC</text><text x="190" y="22">스위치</text><text x="310" y="22">라우터</text><text x="430" y="22">방화벽·NAT</text><text x="550" y="22">L7 프록시</text><text x="680" y="22" style="font-weight:700">서버</text>
+        </g>
+        <g>
+          <rect x="30" y="34" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--accent-2) 22%, transparent)" stroke="var(--accent-2)"/>
+          <rect x="30" y="84" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--warn) 22%, transparent)" stroke="var(--warn)"/>
+          <rect x="30" y="134" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--accent) 22%, transparent)" stroke="var(--accent)"/>
+          <rect x="30" y="184" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--ok) 22%, transparent)" stroke="var(--ok)"/>
+          <rect x="30" y="234" width="80" height="44" rx="6" class="f-surface" stroke="var(--border)"/>
+          <rect x="640" y="34" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--accent-2) 22%, transparent)" stroke="var(--accent-2)"/>
+          <rect x="640" y="84" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--warn) 22%, transparent)" stroke="var(--warn)"/>
+          <rect x="640" y="134" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--accent) 22%, transparent)" stroke="var(--accent)"/>
+          <rect x="640" y="184" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--ok) 22%, transparent)" stroke="var(--ok)"/>
+          <rect x="640" y="234" width="80" height="44" rx="6" class="f-surface" stroke="var(--border)"/>
+          <rect x="150" y="184" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--ok) 22%, transparent)" stroke="var(--ok)"/>
+          <rect x="150" y="234" width="80" height="44" rx="6" class="f-surface" stroke="var(--border)"/>
+          <rect x="270" y="134" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--accent) 22%, transparent)" stroke="var(--accent)"/>
+          <rect x="270" y="184" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--ok) 22%, transparent)" stroke="var(--ok)"/>
+          <rect x="270" y="234" width="80" height="44" rx="6" class="f-surface" stroke="var(--border)"/>
+          <rect x="390" y="84" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--warn) 22%, transparent)" stroke="var(--warn)"/>
+          <rect x="390" y="134" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--accent) 22%, transparent)" stroke="var(--accent)"/>
+          <rect x="390" y="184" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--ok) 22%, transparent)" stroke="var(--ok)"/>
+          <rect x="390" y="234" width="80" height="44" rx="6" class="f-surface" stroke="var(--border)"/>
+          <rect x="510" y="34" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--accent-2) 22%, transparent)" stroke="var(--accent-2)"/>
+          <rect x="510" y="84" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--warn) 22%, transparent)" stroke="var(--warn)"/>
+          <rect x="510" y="134" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--accent) 22%, transparent)" stroke="var(--accent)"/>
+          <rect x="510" y="184" width="80" height="44" rx="6" fill="color-mix(in srgb, var(--ok) 22%, transparent)" stroke="var(--ok)"/>
+          <rect x="510" y="234" width="80" height="44" rx="6" class="f-surface" stroke="var(--border)"/>
+        </g>
+        <g class="t" style="font-size:12px" text-anchor="middle">
+          <text x="70" y="61">응용</text><text x="70" y="111">전송</text><text x="70" y="161">네트워크</text><text x="70" y="211">링크</text><text x="70" y="261">물리</text>
+          <text x="680" y="61">응용</text><text x="680" y="111">전송</text><text x="680" y="161">네트워크</text><text x="680" y="211">링크</text><text x="680" y="261">물리</text>
+          <text x="190" y="211">MAC 보기</text><text x="310" y="161">IP·TTL</text><text x="430" y="111">포트·연결</text><text x="550" y="61">URL·쿠키</text>
+        </g>
+        <path d="M70 278 V290 H680 V278" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+        <path d="M110 256 H150 M230 256 H270 M350 256 H390 M470 256 H510 M590 256 H640" class="s-acc"/>
+        <path d="M110 56 C 300 0, 460 0, 640 56" fill="none" stroke="var(--accent-2)" stroke-width="1.6" stroke-dasharray="5 4"/>
+        <text x="375" y="14" text-anchor="middle" class="t-dim" style="font-size:11.5px;fill:var(--accent-2)">종단 간 대화 (원칙상 중간은 안 본다)</text>
+      </svg></div>
+      <figcaption><b>그림 3-3.</b> 중간 장비가 패킷을 어디까지 열어 보는가. 스위치는 링크 헤더(L2), 라우터는 IP 헤더(L3), 방화벽·NAT은 포트와 연결 상태(L4)까지, 프록시·L7 로드밸런서는 HTTP 내용(L7)까지 본다. 깊이 볼수록 할 수 있는 일은 많지만 느려지고, 새 프로토콜을 막기 쉬워진다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-mb">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>중간 장비는 무엇을 읽고, 무엇을 고쳐 쓰나</h3></div>
+      <div class="sim-controls" style="border-top:0">
+        <div class="ctrl"><span>패킷이 지나는 장비</span><div class="seg" id="mb-dev"><button data-value="hub">허브</button><button data-value="sw" class="on">스위치</button><button data-value="rt">라우터</button><button data-value="nat">공유기(NAT)</button><button data-value="fw">방화벽</button><button data-value="l4">L4 LB</button><button data-value="l7">L7 프록시</button></div></div>
+      </div>
+      <div class="mb-pkt" id="mb-pkt"></div>
+      <div class="mb-desc" id="mb-desc"></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">열어 보는 깊이</span><span class="v" id="o-mb-depth">—</span></div>
+        <div class="stat"><span class="k">읽는 필드</span><span class="v" id="o-mb-rd">—</span></div>
+        <div class="stat"><span class="k">고쳐 쓰는 필드</span><span class="v" id="o-mb-wr">—</span></div>
+      </div>
+      <div class="sim-note">테두리가 진한 칸은 장비가 읽는 필드, 빨간 점선 칸은 고쳐 쓰는 필드다. 흐린 칸은 그냥 통과시킨다. 실제 장비는 설정에 따라 더 깊이 보기도 한다(예: 라우터의 ACL은 포트까지 본다). L7 프록시가 HTTPS 내용을 보려면 TLS를 중간에서 풀어야 하므로 인증서 설정이 필요하다(22장).</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">패킷이 평범한 라우터 하나를 지나갈 때 바뀌는 것은 무엇일까?</p><p class="wi-hint">위 시뮬레이터에서 “라우터”를 골라 빨간 칸을 확인해 보자.</p><div class="opts">
+      <button class="opt">아무것도 바뀌지 않는다 — 그대로 전달만 한다</button>
+      <button class="opt">출발지·목적지 IP 주소가 바뀐다</button>
+      <button class="opt" data-correct>TTL이 1 줄고, 그래서 IP 체크섬을 다시 계산하며, 이더넷 MAC 주소가 다음 구간 것으로 바뀐다</button>
+      <button class="opt">TCP 순서 번호가 1 늘어난다</button>
+    </div><div class="quiz-exp">라우터는 링크 헤더를 벗기고 IP 헤더를 읽은 다음, TTL을 1 줄이고(0이 되면 버리고 ICMP로 알린다) 체크섬을 갱신해 새 링크 헤더를 씌운다. IP 주소는 끝에서 끝까지 그대로이고(NAT은 예외), TCP 헤더는 건드리지 않는다. “IP 주소는 최종 목적지, MAC 주소는 바로 다음 구간”이라는 구분이 핵심이다(6·7장).</div></div>
+    <p>현실의 인터넷에는 NAT, 방화벽, 캐시, 통신사의 트래픽 관리 장비처럼 원칙을 어기고 깊이 들여다보는 중간 장비(<span class="term">미들박스</span><span class="en">(middlebox)</span>)가 많다. 이들은 자기가 모르는 TCP 옵션이나 새 프로토콜을 버리기 일쑤라서, 새 전송 프로토콜을 만들기가 매우 어려워졌다(“프로토콜 경직화”). QUIC(9장)이 UDP 위에 올라타고 헤더 대부분을 암호화한 이유가 바로 이것이다. 중간 장비가 볼 수 없으니 간섭할 수도 없다.</p>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li><b>프로토콜</b>은 형식(바이트 배치), 순서(누가 먼저 무엇을), 오류 시 행동(재전송·폐기)을 정한 약속이다. 헤더는 택배 송장처럼 정해진 칸에 정보를 적는다.</li>
+      <li>통신을 <b>계층</b>으로 나누면 각 계층이 자기 문제만 풀고, 아래(매체)가 바뀌어도 위(앱)는 그대로다. 그 중심에 모래시계의 허리인 <b>IP</b>가 있다.</li>
+      <li>OSI는 7계층, 실제 인터넷은 TCP/IP(4~5계층). 단위는 메시지 → 세그먼트 → 패킷 → 프레임 → 비트, 장비는 허브(L1), 스위치(L2), 라우터(L3), 방화벽·L4 LB, 프록시·L7 LB.</li>
+      <li><b>캡슐화</b>로 TCP 20 + IPv4 20 + 이더넷 18바이트(선로에선 +20)가 붙는다. 작은 메시지일수록 오버헤드 비율이 커져, 1바이트는 효율이 약 1%에 그친다.</li>
+      <li>실제 프레임은 목적지 MAC → 출발지 MAC → EtherType(0x0800) → IPv4 헤더(TTL, 프로토콜 6, 체크섬, 주소) → TCP 헤더(포트, 순서 번호, 플래그) → HTTP 순서로 놓인다.</li>
+      <li>표준은 IETF(RFC, 인터넷), IEEE 802(이더넷·Wi-Fi), 3GPP(이동통신), ITU(전화망·DSL·주파수)가 나눠 만든다.</li>
+      <li><b>종단 간 원칙</b>: 똑똑한 기능은 양 끝에, 망 중간은 단순하게. 깊이 들여다보는 미들박스는 새 프로토콜의 발목을 잡는다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>집 공유기를 유선에서 Wi-Fi 7로 바꿨다. 브라우저의 HTTP 프로그램은 어떻게 해야 할까?</p><div class="opts">
+        <button class="opt" data-correct>아무것도 고칠 필요 없다 — 링크·물리 계층만 바뀌었다</button>
+        <button class="opt">HTTP를 Wi-Fi용 버전으로 바꿔야 한다</button>
+        <button class="opt">TCP를 UDP로 바꿔야 한다</button>
+        <button class="opt">IP 주소 체계를 바꿔야 한다</button>
+      </div><div class="quiz-exp">계층 구조의 핵심 이점이다. 각 계층은 바로 아래 계층의 서비스만 이용하므로, 아래가 바뀌어도 위는 그대로다.</div></div>
+      <div class="quiz-q"><p>OSI 계층과 데이터 단위·장비의 짝이 <b>틀린</b> 것은?</p><div class="opts">
+        <button class="opt">L2 — 프레임 — 스위치</button>
+        <button class="opt">L3 — 패킷 — 라우터</button>
+        <button class="opt" data-correct>L1 — 세그먼트 — 로드밸런서</button>
+        <button class="opt">L4 — 세그먼트 — 방화벽(포트 기준)</button>
+      </div><div class="quiz-exp">L1(물리)의 단위는 비트(심볼)이고 장비는 리피터·허브·케이블이다. 세그먼트는 L4(TCP)의 단위다.</div></div>
+      <div class="quiz-q"><p>이더넷 프레임의 EtherType 필드가 <code>0x0800</code>이고, IPv4 헤더의 프로토콜 필드가 <code>6</code>이다. 무슨 뜻일까?</p><div class="opts">
+        <button class="opt">프레임이 800바이트이고 6번 재전송되었다</button>
+        <button class="opt">VLAN 8번, 포트 6번이다</button>
+        <button class="opt">IPv6 패킷 안에 UDP가 들어 있다</button>
+        <button class="opt" data-correct>프레임 안에 IPv4 패킷이, 그 안에 TCP 세그먼트가 들어 있다</button>
+      </div><div class="quiz-exp">각 헤더는 “다음 껍질이 무엇인지”를 알려 주는 칸을 가진다. EtherType 0x0800 = IPv4(0x86DD = IPv6), IP 프로토콜 6 = TCP(17 = UDP). 이 사슬 덕분에 받는 쪽이 올바른 프로그램에게 데이터를 넘긴다.</div></div>
+      <div class="quiz-q"><p>같은 데이터 1,000바이트를 보낼 때 오버헤드 비율이 가장 큰 방법은?</p><div class="opts">
+        <button class="opt">1,000바이트 패킷 1개</button>
+        <button class="opt">500바이트 패킷 2개</button>
+        <button class="opt">100바이트 패킷 10개</button>
+        <button class="opt" data-correct>10바이트 패킷 100개</button>
+      </div><div class="quiz-exp">헤더는 패킷마다 붙으므로 패킷이 작고 많을수록 헤더가 차지하는 비율이 커진다. 10바이트 패킷은 이더넷 최소 크기 때문에 패딩까지 붙는다.</div></div>
+      <div class="quiz-q"><p>Wi-Fi(802.11)의 표준을 만드는 곳과 TCP의 표준(RFC)을 만드는 곳을 바르게 짝지은 것은?</p><div class="opts">
+        <button class="opt">3GPP — ITU</button>
+        <button class="opt" data-correct>IEEE — IETF</button>
+        <button class="opt">IETF — IEEE</button>
+        <button class="opt">W3C — 3GPP</button>
+      </div><div class="quiz-exp">LAN의 링크·물리 계층(이더넷 802.3, Wi-Fi 802.11)은 IEEE 802 위원회가, IP·TCP·HTTP 같은 인터넷 프로토콜은 IETF가 RFC로 만든다.</div></div>
+      <div class="quiz-q"><p>종단 간 원칙에 가장 가까운 설계는?</p><div class="opts">
+        <button class="opt">라우터마다 패킷을 저장했다가 받는 쪽 확인을 받은 뒤 지운다</button>
+        <button class="opt">통신사 장비가 영상 패킷을 보고 화질을 조절한다</button>
+        <button class="opt" data-correct>망은 최선을 다해 나르기만 하고, 분실 복구와 암호화는 양 끝의 TCP·TLS가 맡는다</button>
+        <button class="opt">모든 앱은 망 사업자의 승인을 받아야 새 프로토콜을 쓸 수 있다</button>
+      </div><div class="quiz-exp">신뢰성·보안처럼 끝에서만 완전히 보장할 수 있는 기능은 끝에 두고, 망 중간은 단순하게 유지한다는 것이 종단 간 원칙이다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  /* ================= 1. 프로토콜 분류 게임 ================= */
+  const CARDS = [
+    ["HTTP", "웹 페이지를 요청하고 받는 규칙", 7, "브라우저와 웹 서버, 즉 앱끼리의 대화 규칙이므로 응용 계층이다(10장)."],
+    ["TCP", "순서 보장·재전송·혼잡 제어", 4, "포트로 프로그램을 구분하고 신뢰성을 책임지는 대표적인 전송 계층 프로토콜이다(9장)."],
+    ["IPv6", "128비트 주소로 지구 어디든 찾아가기", 3, "전 세계 주소 체계와 패킷 전달을 맡는 네트워크(인터넷) 계층이다(7장)."],
+    ["이더넷 프레임", "MAC 주소로 같은 망의 옆 장치에 전달", 2, "한 구간 안의 전달과 오류 검출(FCS)을 맡는 링크 계층이다(6장)."],
+    ["PAM-5 전압 신호", "1000BASE-T가 구리선에 싣는 5단계 전압", 1, "비트를 전압 모양으로 바꾸는 일은 물리 계층의 일이다(4장)."],
+    ["DNS", "도메인 이름을 IP 주소로 바꾸기", 7, "DNS는 UDP(또는 TCP) 위에서 도는 응용 프로그램 간 프로토콜이다. 인터넷의 기반 서비스이지만 계층은 응용이다(10장)."],
+    ["UDP", "포트만 붙여 바로 보내는 가벼운 배달", 4, "신뢰성은 없지만 포트로 프로그램을 구분하므로 전송 계층이다(9장)."],
+    ["Wi-Fi (802.11)", "공유기와 노트북 사이 무선 구간", 2, "802.11은 무선 링크 계층(MAC)과 물리 계층(OFDM 등)을 함께 정한다. 프레임과 MAC 주소를 다루는 부분을 보면 링크 계층이다(13장)."],
+    ["ICMP", "ping, ‘목적지 도달 불가’ 알림", 3, "ICMP는 IP 패킷 안에 실려 가지만 IP의 동작(오류 보고, 진단)을 돕는 짝꿍이라 네트워크 계층으로 분류한다(23장)."],
+    ["ARP", "IP 주소로 같은 망의 MAC 주소 묻기", 2, "ARP는 IP 패킷이 아니라 이더넷 프레임에 직접 실린다. IP와 MAC을 잇는 ‘2.5계층’이라 부르기도 하지만 보통 링크 계층으로 본다(7장)."],
+    ["QUIC", "UDP 위의 암호화된 빠른 연결 (HTTP/3)", 4, "QUIC은 UDP 위에서 돌지만 하는 일(연결, 순서, 재전송, 혼잡 제어)은 TCP와 같은 전송 계층의 일이다(9장)."],
+    ["SMTP", "메일 서버끼리 편지 전달", 7, "메일 프로그램 간의 대화 규칙이므로 응용 계층이다."],
+    ["광섬유의 빛 펄스", "레이저를 켜고 끄며 비트 보내기", 1, "빛의 세기나 위상으로 비트를 표현하는 것은 물리 계층이다(5장)."],
+    ["BGP", "통신사들이 서로 경로 정보 교환", 3, "BGP 메시지 자체는 TCP 179번 포트로 오가는 응용 형태지만, 하는 일은 IP 라우팅 경로 결정이라 보통 네트워크 계층의 제어 프로토콜로 분류한다(8장)."],
+  ];
+  const LN = { 7: "응용", 4: "전송", 3: "네트워크", 2: "링크", 1: "물리" };
+  let sOrder = [], sIdx = 0, sOk = 0, sAns = false;
+  function sortReset() {
+    const r = NB.rng(Date.now() % 100000 + 7);
+    sOrder = CARDS.map((_, i) => i).sort(() => r() - 0.5);
+    sIdx = 0; sOk = 0; sAns = false; sortShow();
+    $("sort-fb").textContent = "카드에 적힌 프로토콜이 5계층 중 어디에 속하는지 골라 보자.";
+  }
+  function sortShow() {
+    if (sIdx >= sOrder.length) { $("sort-nm").textContent = "끝!"; $("sort-ds").textContent = `${CARDS.length}장 중 ${sOk}장을 맞혔다.`; }
+    else { const c = CARDS[sOrder[sIdx]]; $("sort-nm").textContent = c[0]; $("sort-ds").textContent = c[1]; }
+    NB.stat("o-sort-ok", sOk);
+    NB.stat("o-sort-n", Math.min(sIdx, CARDS.length) + " / " + CARDS.length);
+    NB.stat("o-sort-pct", sIdx ? Math.round((sOk / sIdx) * 100) + "%" : "—");
+  }
+  $("sort-bins").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b || sIdx >= sOrder.length) return;
+    const c = CARDS[sOrder[sIdx]], v = Number(b.dataset.v);
+    const ok = v === c[2]; if (ok) sOk++;
+    $("sort-fb").innerHTML = (ok ? '<b style="color:var(--ok)">정답!</b> ' : `<b style="color:var(--bad)">아깝다.</b> <b>${esc(c[0])}</b>은(는) <b>${LN[c[2]]}</b> 계층. `) + esc(c[3]);
+    sIdx++; sortShow();
+  });
+  $("sort-reset").onclick = sortReset;
+  sortReset();
+
+  /* ================= 2. 캡슐화 ================= */
+  const encSize = NB.range("enc-size", (v) => v + " B", () => { encT = 4; encDir = 0; encUpd(); });
+  const encL4 = NB.seg("enc-l4", () => encUpd());
+  const encL3 = NB.seg("enc-l3", () => encUpd());
+  const utf8len = (s) => new TextEncoder().encode(s).length;
+  $("enc-text").addEventListener("input", () => { const n = NB.clamp(utf8len($("enc-text").value), 1, 1460); encSize.set(n); });
+  let encT = 4, encDir = 0; // encT: 0..4 몇 층까지 쌓였나 (연속값)
+  function encCalc(app, l4, l3) {
+    const h4 = l4 === "tcp" ? 20 : 8, h3 = l3 === "6" ? 40 : 20;
+    const ip = app + h4 + h3;
+    const pad = Math.max(0, 46 - ip);
+    const frame = 14 + ip + pad + 4;
+    const wire = frame + 8 + 12;
+    return { h4, h3, ip, pad, frame, wire };
+  }
+  const encCv = NB.canvas($("cv-enc"), (ctx, w, h) => {
+    const P = NB.palette();
+    const app = encSize(), c = encCalc(app, encL4(), encL3());
+    const narrow = w < 520, lx = narrow ? 8 : 12, lw = narrow ? 0 : 84;
+    const x0 = lx + lw, W = w - x0 - 10;
+    const rows = [
+      { n: "응용", col: P.accent2, parts: [["데이터", app, "app"]] },
+      { n: "전송", col: P.warn, parts: [[encL4().toUpperCase(), c.h4, "h"], ["", app, "in"]] },
+      { n: "네트워크", col: P.accent, parts: [["IPv" + encL3(), c.h3, "h"], ["", app + c.h4, "in"]] },
+      { n: "링크", col: P.ok, parts: [["Eth", 14, "h"], ["", c.ip, "in"], ...(c.pad ? [["pad", c.pad, "pad"]] : []), ["FCS", 4, "h"]] },
+      { n: "물리", col: P.dim, parts: [["프리앰블", 8, "h"], ["", c.frame, "in"], ["IFG", 12, "h"]] },
+    ];
+    // 공통 축척: 선로 전체 바이트가 W. 너무 작은 칸은 최소 폭.
+    const minW = narrow ? 18 : 26;
+    const rh = Math.min(34, (h - 30) / 5 - 8), gap = (h - 20 - rh * 5) / 4;
+    const scale = (b) => b * W / c.wire;
+    // 각 행: 가운데 정렬, 내부(in) 칸은 위 행 전체 폭과 일치하도록 계산
+    const widths = rows.map((r) => r.parts.map((p) => Math.max(p[2] === "in" ? 0 : minW, scale(p[1]))));
+    // 안쪽 칸 폭 = 위 행의 총폭
+    for (let k = 1; k < rows.length; k++) { const inner = widths[k - 1].reduce((a, b) => a + b, 0); rows[k].parts.forEach((p, i) => { if (p[2] === "in") widths[k][i] = inner; }); }
+    const tot = widths.map((ws) => ws.reduce((a, b) => a + b, 0));
+    const maxT = Math.max(...tot), sc = maxT > W ? W / maxT : 1;
+    // 맨 아래 행을 가운데 두고, 위 행은 아래 행의 "in" 칸 위치에 맞춘다
+    const xs = new Array(rows.length);
+    xs[4] = x0 + (W - tot[4] * sc) / 2;
+    for (let k = 3; k >= 0; k--) { const r = rows[k + 1]; let x = xs[k + 1]; for (let i = 0; i < r.parts.length; i++) { if (r.parts[i][2] === "in") break; x += widths[k + 1][i] * sc; } xs[k] = x; }
+    rows.forEach((r, k) => {
+      const vis = NB.clamp(encT - k + 1, 0, 1); // 0..1
+      const y = 10 + k * (rh + gap);
+      if (!narrow) NB.text(ctx, r.n, lx, y + rh / 2, { size: 12.5, bold: true, color: vis > 0 ? r.col : P.faint });
+      else if (vis > 0) NB.text(ctx, r.n, x0 + 2, y - 1, { size: 10, color: r.col, base: "bottom" });
+      if (vis <= 0) { ctx.strokeStyle = P.grid; ctx.setLineDash([4, 4]); ctx.strokeRect(x0, y, W, rh); ctx.setLineDash([]); return; }
+      let x = xs[k];
+      r.parts.forEach((p, i) => {
+        const pw = widths[k][i] * sc;
+        let px = x;
+        if (p[2] === "h" || p[2] === "pad") {
+          const slide = (1 - vis) * (i === 0 ? -40 : 40);
+          px += slide; ctx.globalAlpha = vis;
+          NB.box(ctx, px, y, pw, rh, { fill: p[2] === "pad" ? P.surface : r.col, stroke: r.col, r: 4 });
+          ctx.globalAlpha = 1;
+          const lab = p[0] + (pw > 60 ? " " + p[1] + "B" : "");
+          ctx.font = "600 11px " + NB.font();
+          if (ctx.measureText(lab).width < pw - 4) NB.text(ctx, lab, px + pw / 2, y + rh / 2, { align: "center", size: 11, bold: true, color: p[2] === "pad" ? P.dim : "#fff" });
+        } else if (p[2] === "app") {
+          NB.box(ctx, px, y, pw, rh, { fill: P.surface, stroke: r.col, r: 4 });
+          const lab = pw > 70 ? "데이터 " + p[1] + "B" : p[1] + "B";
+          ctx.font = "11px " + NB.font();
+          if (ctx.measureText(lab).width < pw - 4) NB.text(ctx, lab, px + pw / 2, y + rh / 2, { align: "center", size: 11, color: P.text });
+        } else {
+          ctx.fillStyle = P.grid; ctx.fillRect(px, y + 3, pw, rh - 6);
+          ctx.strokeStyle = P.faint; ctx.setLineDash([3, 3]); ctx.strokeRect(px + 0.5, y + 3.5, pw - 1, rh - 7); ctx.setLineDash([]);
+        }
+        x += pw;
+      });
+    });
+  }, { aspect: 0.42, minHeight: 250, maxHeight: 320 });
+  const effCv = NB.canvas($("cv-eff"), (ctx, w, h) => {
+    const P = NB.palette(), app = encSize();
+    const mk = (l4, l3) => { const d = []; for (let i = 0; i <= 120; i++) { const a = Math.round(Math.pow(1460, i / 120)); d.push([a, (a / encCalc(a, l4, l3).wire) * 100]); } return d; };
+    const cur = encCalc(app, encL4(), encL3());
+    NB.chart(ctx, { x: 52, y: 14, w: w - 52 - 16, h: h - 14 - 44 }, {
+      x: [1, 1460], y: [0, 100], logX: true, xLabel: "응용 데이터 크기 (바이트, 로그 눈금)", yLabel: "선로 효율 %",
+      xTicks: [1, 10, 100, 1000], xFmt: (v) => String(v),
+      series: [{ data: mk("tcp", "4"), color: P.accent, width: 2 }, { data: mk("udp", "4"), color: P.warn, width: 1.6, dash: [5, 4] }, { data: mk("tcp", "6"), color: P.accent2, width: 1.6, dash: [2, 3] }],
+      points: [{ x: app, y: (app / cur.wire) * 100, color: P.bad, r: 5, label: ((app / cur.wire) * 100).toFixed(1) + "%" }],
+    });
+    ctx.font = "11px " + NB.font();
+    const lg = [["TCP/IPv4", P.accent], ["UDP/IPv4", P.warn], ["TCP/IPv6", P.accent2]];
+    lg.forEach(([t, c], i) => { const x = 60 + i * (w < 420 ? 80 : 92), y = 22; ctx.fillStyle = c; ctx.fillRect(x, y - 1, 14, 3); NB.text(ctx, t, x + 18, y, { size: 11, color: P.dim }); });
+  }, { aspect: 0.32, minHeight: 200, maxHeight: 260 });
+  function encUpd() {
+    const app = encSize(), c = encCalc(app, encL4(), encL3());
+    NB.stat("o-enc-app", app + " B");
+    NB.stat("o-enc-frame", c.frame + " B" + (c.pad ? ` <small>(패딩 ${c.pad})</small>` : ""));
+    NB.stat("o-enc-wire", c.wire + " B");
+    NB.stat("o-enc-ovh", ((1 - app / c.wire) * 100).toFixed(1) + "%");
+    NB.stat("o-enc-good", NB.si((app / c.wire) * 1e9, "bps"));
+    encCv.redraw(); effCv.redraw();
+  }
+  $("enc-go").onclick = () => { encT = 0; encDir = 1; };
+  $("enc-back").onclick = () => { encT = 4; encDir = -1; };
+  NB.loop($("cv-enc"), (dt) => { if (!encDir) return; encT += encDir * dt * 1.4; if (encT >= 4) { encT = 4; encDir = 0; } if (encT <= 0) { encT = 0; encDir = 0; } encCv.redraw(); });
+  encUpd();
+
+  /* ================= 3. 패킷 해부 ================= */
+  const dxTtl = NB.range("dx-ttl", (v) => String(v), () => dxBuild());
+  $("dx-path").addEventListener("input", () => dxBuild());
+  const MAC_DST = [0x88, 0x36, 0x6c, 0x5a, 0x21, 0x0e], MAC_SRC = [0x3c, 0x22, 0xfb, 0x91, 0x4e, 0x7d];
+  const IP_SRC = [192, 168, 0, 7], IP_DST = [203, 0, 113, 10];
+  const SPORT = 51234, DPORT = 80, SEQ = 0x9a3b7c21, ACK = 0x3f2e1d0c, WIN = 502, IPID = 0x1c46;
+  const macS = (m) => m.map((b) => NB.hex(b).toLowerCase()).join(":");
+  const u16 = (v) => [(v >> 8) & 255, v & 255], u32 = (v) => [(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255];
+  function csum(bytes) { let s = 0; for (let i = 0; i < bytes.length; i += 2) s += (bytes[i] << 8) + (bytes[i + 1] || 0); while (s >> 16) s = (s & 0xffff) + (s >> 16); return ~s & 0xffff; }
+  let DX = { bytes: [], fields: [] }, dxSel = 0, dxPinned = false;
+  function dxBuild() {
+    let path = $("dx-path").value.replace(/[^A-Za-z0-9/._\-~?=&%]/g, "");
+    if (!path.startsWith("/")) path = "/" + path;
+    const lines = [`GET ${path} HTTP/1.1\r\n`, "Host: www.example.com\r\n", "User-Agent: curl/8.5.0\r\n", "Accept: */*\r\n", "\r\n"];
+    const http = []; lines.forEach((l) => { for (const ch of l) http.push(ch.charCodeAt(0)); });
+    const ttl = dxTtl(), tot = 20 + 20 + http.length;
+    const ipH = [0x45, 0x00, ...u16(tot), ...u16(IPID), 0x40, 0x00, ttl, 6, 0, 0, ...IP_SRC, ...IP_DST];
+    const ipck = csum(ipH); ipH[10] = ipck >> 8; ipH[11] = ipck & 255;
+    const tcpH = [...u16(SPORT), ...u16(DPORT), ...u32(SEQ), ...u32(ACK), 0x50, 0x18, ...u16(WIN), 0, 0, 0, 0];
+    const pseudo = [...IP_SRC, ...IP_DST, 0, 6, ...u16(20 + http.length)];
+    const tck = csum([...pseudo, ...tcpH, ...http]); tcpH[16] = tck >> 8; tcpH[17] = tck & 255;
+    const bytes = [...MAC_DST, ...MAC_SRC, 0x08, 0x00, ...ipH, ...tcpH, ...http];
+    const F = [];
+    const f = (L, name, s, n, val, ex) => F.push({ L, name, s, n, val, ex });
+    f(2, "목적지 MAC", 0, 6, macS(MAC_DST), "이 프레임을 받을 <b>바로 다음 장치</b>의 하드웨어 주소. 서버가 아니라 <b>공유기(기본 게이트웨이)</b>의 MAC이다. 노트북은 ARP로 공유기의 MAC을 알아냈다(7장). 앞 3바이트(<code>88:36:6c</code>)는 제조사 번호(OUI)다.");
+    f(2, "출발지 MAC", 6, 6, macS(MAC_SRC), "보내는 노트북 네트워크 카드의 MAC 주소. 스위치는 이 값을 보고 “이 주소는 이 포트에 있구나”를 배운다(6장).");
+    f(2, "EtherType", 12, 2, "0x0800 (IPv4)", "다음 껍질이 무엇인지 알려 준다. <code>0x0800</code> = IPv4, <code>0x86DD</code> = IPv6, <code>0x0806</code> = ARP. 받는 쪽 운영체제는 이 값을 보고 IPv4 처리 코드에 넘긴다.");
+    f(3, "버전 · 헤더 길이", 14, 1, "4 · 5×4 = 20 B", "한 바이트를 반씩 나눠 쓴다. 앞 4비트 <code>4</code> = IPv4, 뒤 4비트 <code>5</code> = 헤더 길이가 32비트 단어 5개(20바이트). 옵션이 있으면 더 커진다.");
+    f(3, "DSCP · ECN", 15, 1, "0x00 (일반)", "서비스 품질 표시(DSCP 6비트)와 혼잡 알림(ECN 2비트). 영상 통화 같은 급한 트래픽은 여기에 높은 우선순위를 적는다(23장).");
+    f(3, "전체 길이", 16, 2, tot + " B", `IP 헤더 + 그 안의 모든 내용의 길이: 20 + 20 + ${http.length} = <b>${tot}</b>바이트. 경로를 바꾸면 이 값이 바뀐다. 최대 65,535.`);
+    f(3, "식별자", 18, 2, "0x" + NB.hex(IPID, 4), "패킷이 조각(fragment)으로 나뉠 때 같은 패킷의 조각끼리 묶는 번호.");
+    f(3, "플래그 · 조각 위치", 20, 2, "0x4000 (DF)", "<code>0x4000</code> = DF(Don't Fragment) 비트. “중간에 쪼개지 마라. 너무 크면 버리고 알려 달라.” 경로의 최대 크기(MTU)를 알아내는 데 쓴다(7장).");
+    f(3, "TTL", 22, 1, String(ttl), `Time To Live. 라우터를 하나 지날 때마다 1씩 줄고, 0이 되면 버려진다. 길을 잃고 영원히 도는 패킷을 막는 안전장치. 리눅스·맥은 보통 64, 윈도우는 128에서 시작한다. traceroute는 이 값을 1, 2, 3…으로 보내 경로를 알아낸다(23장).`);
+    f(3, "프로토콜", 23, 1, "6 (TCP)", "IP 안에 든 내용물이 무엇인가. <code>6</code> = TCP, <code>17</code> = UDP, <code>1</code> = ICMP. 번호는 IANA가 관리한다.");
+    f(3, "헤더 체크섬", 24, 2, "0x" + NB.hex(ipck, 4), "IP 헤더 20바이트를 16비트씩 더해(1의 보수 합) 뒤집은 값. 받는 쪽이 같은 계산을 해서 0xFFFF가 나오면 정상. 라우터는 TTL을 줄일 때마다 이 값을 다시 계산한다. 아래 수치는 실제로 계산한 값이다.");
+    f(3, "출발지 IP", 26, 4, IP_SRC.join("."), "노트북의 (사설) IP 주소. 집 공유기를 나갈 때 NAT이 공인 IP로 바꿔 적는다(7장).");
+    f(3, "목적지 IP", 30, 4, IP_DST.join("."), "최종 목적지 서버의 IP 주소. 라우터들은 이 값만 보고 길을 정한다(8장). MAC 주소와 달리 끝까지 바뀌지 않는다.");
+    f(4, "출발지 포트", 34, 2, String(SPORT), "노트북 운영체제가 이 연결을 위해 임시로 고른 포트(49152~65535 범위의 ‘임시 포트’). 응답은 이 포트로 돌아온다.");
+    f(4, "목적지 포트", 36, 2, "80 (HTTP)", "서버 안에서 어느 프로그램에게 줄지. <code>0x0050</code> = 80 = HTTP. HTTPS는 443(<code>0x01BB</code>). 같은 컴퓨터의 여러 프로그램을 구분하는 ‘호수’다.");
+    f(4, "순서 번호", 38, 4, String(SEQ >>> 0), "이 세그먼트의 첫 바이트가 전체 바이트 흐름에서 몇 번째인가. 연결을 맺을 때 무작위로 시작한다. 받는 쪽은 이 번호로 순서를 맞추고 빠진 곳을 찾는다(9장).");
+    f(4, "확인 번호", 42, 4, String(ACK >>> 0), "“상대에게서 여기 직전까지 잘 받았고, 이 번호 바이트를 기다린다.” ACK 플래그가 켜져 있을 때 의미가 있다.");
+    f(4, "헤더 길이", 46, 1, "5×4 = 20 B", "위 4비트 <code>5</code> = TCP 헤더가 20바이트. 옵션이 붙으면 최대 60바이트까지.");
+    f(4, "플래그", 47, 1, "0x18 (PSH, ACK)", "비트마다 의미가 있다: CWR·ECE·URG·<b>ACK</b>·<b>PSH</b>·RST·SYN·FIN. <code>0x18</code> = ACK(0x10) + PSH(0x08). 연결 시작은 SYN(0x02), 끝은 FIN(0x01), 강제 종료는 RST(0x04).");
+    f(4, "윈도우 크기", 48, 2, WIN + " (×128 = " + WIN * 128 + " B)", "받는 쪽이 지금 더 받을 수 있는 양. 16비트로는 64KB가 한계라, 연결 시작 때 ‘확대 계수’를 협상해 곱한다(여기서는 ×128 가정). 흐름 제어의 핵심이다(9장).");
+    f(4, "TCP 체크섬", 50, 2, "0x" + NB.hex(tck, 4), "TCP 헤더 + 데이터 + ‘가상 헤더’(출발·목적 IP, 프로토콜, 길이)를 합해 계산한다. IP 주소까지 검사에 넣어 엉뚱한 곳에 배달된 세그먼트를 걸러낸다. 실제로 계산한 값이다.");
+    f(4, "긴급 포인터", 52, 2, "0", "URG 플래그와 함께 쓰는 옛 기능. 지금은 거의 쓰지 않는다.");
+    let off = 54;
+    const names = ["요청 줄", "Host 헤더", "User-Agent 헤더", "Accept 헤더", "빈 줄 (헤더 끝)"];
+    const exs = [
+      "메서드(GET) + 경로 + 버전. “이 경로의 문서를 주세요.” HTTP/1.1은 사람이 읽을 수 있는 글자(ASCII)로 되어 있다. 줄 끝은 <code>0D 0A</code>(CR LF).",
+      "어느 사이트를 원하는지. 서버 한 대(IP 하나)가 여러 사이트를 운영할 수 있게 해 준다. L7 로드밸런서는 이 값을 보고 서버를 고른다.",
+      "요청을 보낸 프로그램 이름.",
+      "받을 수 있는 응답 형식. <code>*/*</code> = 무엇이든.",
+      "<code>0D 0A</code>만 있는 빈 줄은 “헤더 끝”이라는 약속이다. GET 요청은 본문이 없으므로 여기서 메시지가 끝난다.",
+    ];
+    lines.forEach((l, i) => { f(7, names[i], off, l.length, i === 4 ? "\\r\\n" : l.replace(/\r\n$/, ""), exs[i]); off += l.length; });
+    DX = { bytes, fields: F, ipck, tck, tot, ipH };
+    if (dxSel >= F.length) dxSel = 0;
+    dxRender();
+    NB.stat("o-dx-len", bytes.length + " B");
+    NB.stat("o-dx-tot", tot + " B");
+    NB.stat("o-dx-ipck", "0x" + NB.hex(ipck, 4) + ` <small style="color:var(--ok)">${csum(ipH) === 0 ? "검증 OK" : "오류"}</small>`);
+    NB.stat("o-dx-tcpck", "0x" + NB.hex(tck, 4));
+  }
+  const LC = { 2: "ly-l2", 3: "ly-l3", 4: "ly-l4", 7: "ly-l7" };
+  const GN = { 2: "Ethernet II — 링크 계층 (14 B)", 3: "IPv4 — 네트워크 계층 (20 B)", 4: "TCP — 전송 계층 (20 B)", 7: "HTTP — 응용 계층" };
+  function fieldAt(i) { return DX.fields.findIndex((f) => i >= f.s && i < f.s + f.n); }
+  function dxRender() {
+    const { bytes, fields } = DX;
+    let t = "", lastL = 0;
+    fields.forEach((f, i) => {
+      if (f.L !== lastL) { t += `<div class="grp ${LC[f.L]}">▾ ${GN[f.L]}${f.L === 7 ? " (" + (bytes.length - 54) + " B)" : ""}</div>`; lastL = f.L; }
+      t += `<div class="fld ${LC[f.L]}" data-f="${i}">${esc(f.name)}: ${esc(f.val)}</div>`;
+    });
+    $("dx-tree").innerHTML = t;
+    let hx = "";
+    for (let r = 0; r < bytes.length; r += 16) {
+      let hb = "", as = "";
+      for (let i = r; i < Math.min(r + 16, bytes.length); i++) {
+        const fi = fieldAt(i), L = fields[fi].L, b = bytes[i];
+        hb += `<span class="${LC[L]}" data-b="${i}">${NB.hex(b).toLowerCase()}</span>` + (i - r === 7 ? " " : "");
+        as += `<span class="${LC[L]}" data-b="${i}">${b >= 32 && b < 127 ? esc(String.fromCharCode(b)) : "·"}</span>`;
+      }
+      hx += `<div class="dx-row"><span class="dx-off">${NB.hex(r, 4).toLowerCase()}</span><span class="dx-bytes">${hb}</span><span class="dx-asc">${as}</span></div>`;
+    }
+    $("dx-hex").innerHTML = hx;
+    dxHi();
+  }
+  function dxHi() {
+    const f = DX.fields[dxSel]; if (!f) return;
+    document.querySelectorAll("#dx-tree .fld").forEach((el) => el.classList.toggle("sel", Number(el.dataset.f) === dxSel));
+    document.querySelectorAll("#dx-hex [data-b]").forEach((el) => { const b = Number(el.dataset.b); el.classList.toggle("hi", b >= f.s && b < f.s + f.n); });
+    const raw = DX.bytes.slice(f.s, f.s + Math.min(f.n, 12)).map((b) => NB.hex(b)).join(" ") + (f.n > 12 ? " …" : "");
+    $("dx-desc").className = "dx-desc " + LC[f.L];
+    $("dx-desc").innerHTML = `<span class="nm">${esc(f.name)}</span> <span style="color:var(--text-dim);font-size:13px">· 바이트 ${f.s}${f.n > 1 ? "–" + (f.s + f.n - 1) : ""} (${f.n} B) · <code>${raw}</code> → <b>${esc(f.val)}</b></span><br>${f.ex}`;
+  }
+  $("dx-tree").addEventListener("click", (e) => { const el = e.target.closest(".fld"); if (el) { dxSel = Number(el.dataset.f); dxPinned = true; dxHi(); } });
+  $("dx-hex").addEventListener("mouseover", (e) => { const el = e.target.closest("[data-b]"); if (el && !dxPinned) { const fi = fieldAt(Number(el.dataset.b)); if (fi >= 0 && fi !== dxSel) { dxSel = fi; dxHi(); } } });
+  $("dx-hex").addEventListener("click", (e) => { const el = e.target.closest("[data-b]"); if (el) { dxSel = fieldAt(Number(el.dataset.b)); dxPinned = false; dxHi(); } });
+  $("dx-hex").addEventListener("mouseleave", () => { dxPinned = false; });
+  dxSel = 0; dxBuild();
+
+  /* ================= 4. 중간 장비 ================= */
+  const MBF = [
+    ["l2", "dmac", "목적지 MAC", "공유기 MAC"], ["l2", "smac", "출발지 MAC", "노트북 MAC"],
+    ["l3", "ttl", "TTL", "64"], ["l3", "ipck", "IP 체크섬", "0x…"], ["l3", "sip", "출발 IP", "192.168.0.7"], ["l3", "dip", "목적 IP", "203.0.113.10"],
+    ["l4", "sport", "출발 포트", "51234"], ["l4", "dport", "목적 포트", "80"], ["l4", "seq", "순서·플래그", "SYN/ACK…"], ["l4", "tck", "TCP 체크섬", "0x…"],
+    ["l7", "host", "Host", "www.example.com"], ["l7", "path", "경로·쿠키", "GET /cart"],
+  ];
+  const DEV = {
+    hub: { d: "L1 (물리)", rd: [], wr: [], ex: {}, t: "<b>허브·리피터</b>는 아무것도 읽지 않는다. 들어온 전기 신호를 증폭해 모든 포트로 똑같이 내보낼 뿐이다. 그래서 같은 허브에 붙은 모든 장치가 서로의 프레임을 본다(6장)." },
+    sw: { d: "L2 (링크)", rd: ["dmac", "smac"], wr: [], ex: {}, t: "<b>스위치</b>는 목적지 MAC을 보고 해당 포트로만 보내고, 출발지 MAC으로 주소표를 배운다. IP 이하 내용은 열지 않고 고치지도 않는다(6장)." },
+    rt: { d: "L3 (네트워크)", rd: ["dmac", "dip", "ttl"], wr: ["dmac", "smac", "ttl", "ipck"], ex: { dmac: "다음 라우터 MAC", smac: "라우터 MAC", ttl: "63", ipck: "재계산" }, t: "<b>라우터</b>는 목적지 IP로 다음 길을 정한다. TTL을 1 줄이고 체크섬을 다시 계산하며, 링크 헤더는 다음 구간용으로 새로 쓴다. IP 주소와 TCP는 그대로다(8장)." },
+    nat: { d: "L4 (전송)", rd: ["dmac", "sip", "dip", "ttl", "sport", "dport"], wr: ["dmac", "smac", "ttl", "ipck", "sip", "sport", "tck"], ex: { dmac: "통신사 장비 MAC", smac: "공유기 WAN MAC", ttl: "63", ipck: "재계산", sip: "공인 IP", sport: "40001", tck: "재계산" }, t: "<b>공유기(NAT)</b>는 라우터 일에 더해 출발 IP를 공인 IP로, 출발 포트를 자기가 고른 번호로 바꾼다. TCP 체크섬에 IP 주소가 들어가므로 TCP 체크섬도 다시 계산해야 한다. 종단 간 원칙을 가장 흔하게 어기는 장비다(7장)." },
+    fw: { d: "L4 (전송)", rd: ["sip", "dip", "sport", "dport", "seq"], wr: [], ex: {}, t: "<b>상태 기반 방화벽</b>은 IP 주소·포트·프로토콜(5-튜플)과 TCP 연결 상태(SYN을 먼저 보냈는가)를 보고 통과/차단을 정한다. 허용된 패킷은 고치지 않고 내보낸다(22장)." },
+    l4: { d: "L4 (전송)", rd: ["dip", "dport", "sip", "sport"], wr: ["dmac", "dip", "ipck", "tck"], ex: { dmac: "서버 3 MAC", dip: "10.0.2.13", ipck: "재계산", tck: "재계산" }, t: "<b>L4 로드밸런서</b>는 같은 연결(IP·포트 묶음)의 패킷을 늘 같은 서버로 보내도록 목적지를 실제 서버 주소로 바꾼다. HTTP 내용은 보지 않으므로 아주 빠르다(21장)." },
+    l7: { d: "L7 (응용)", rd: ["dip", "dport", "seq", "host", "path"], wr: ["dmac", "smac", "sip", "dip", "sport", "seq", "ttl", "ipck", "tck"], ex: { sip: "프록시 IP", dip: "서버 IP", sport: "새 포트", seq: "새 연결", ttl: "64", dmac: "서버 MAC", smac: "프록시 MAC", ipck: "재계산", tck: "재계산" }, t: "<b>L7 프록시·로드밸런서</b>는 TCP 연결을 끝까지 받아(종단) HTTP를 읽고, Host와 경로를 보고 어느 서버에 줄지 정한 뒤 <b>새 TCP 연결</b>로 다시 보낸다. 사실상 새 패킷을 만드는 셈이라 IP·TCP 헤더가 전부 새것이다. 캐시, 압축, 공격 차단(WAF)도 여기서 한다(21장)." },
+  };
+  const mbDev = NB.seg("mb-dev", () => mbRender());
+  function mbRender() {
+    const d = DEV[mbDev()];
+    $("mb-pkt").innerHTML = MBF.map(([L, id, n, v]) => {
+      const rd = d.rd.includes(id), wr = d.wr.includes(id);
+      return `<div class="mb-f ly-${L} ${wr ? "wr" : rd ? "rd" : ""}"><b>${n}</b><span>${esc(wr && d.ex[id] ? d.ex[id] : v)}</span></div>`;
+    }).join("");
+    $("mb-desc").innerHTML = d.t;
+    NB.stat("o-mb-depth", d.d);
+    NB.stat("o-mb-rd", d.rd.length + "개");
+    NB.stat("o-mb-wr", d.wr.length + "개");
+  }
+  mbRender();
+})();
+</script>
+</body>
+</html>

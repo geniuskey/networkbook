@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>전파의 기초 · NetworkBook</title>
+<meta name="description" content="전파는 보이지 않는 빛이다. 주파수와 파장, 안테나와 방사 패턴, 자유 공간 경로 손실과 링크 버짓, 반사·회절·흡수, 다중 경로 페이딩과 도플러 효과, 공공 자원인 주파수까지 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .formula .big { font-family: var(--mono); font-size: 17px; font-weight: 600; }
+  .svc-list { padding: 10px 18px 14px; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-dim); min-height: 46px; line-height: 1.7; }
+  .svc-list .pill { margin: 2px 4px 2px 0; }
+</style>
+</head>
+<body data-chapter="radio">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 11</div>
+    <h1>전파의 기초</h1>
+    <p class="lead">휴대폰은 선 하나 없이 수 km 떨어진 기지국과 1초에 수억 비트를 주고받는다. 그 사이의 하늘에는 아무것도 보이지 않는다. 그런데 공유기 옆방에서는 잘 되던 Wi-Fi가 두 방 건너면 끊기고, 같은 방에서도 한 걸음 옮기면 막대가 하나 줄어든다. 보이지 않는 이 “하늘길”은 어떤 규칙으로 움직일까? 이 장에서는 무선 통신의 바탕인 전파의 물리를 숫자와 시뮬레이터로 따라간다.</p>
+    <ul class="objectives">
+      <li>전파가 빛과 같은 전자기파이며 주파수만 다르다는 것을 알고, 전자기 스펙트럼에서 통신 대역의 위치를 짚는다.</li>
+      <li>λ = c / f로 주파수와 파장을 바꾸고, 주파수가 안테나 크기를 정하는 이유를 설명한다.</li>
+      <li>다이폴·패치·배열 안테나의 방사 패턴과 이득(dBi)의 의미를 이해한다.</li>
+      <li>자유 공간 경로 손실과 링크 버짓으로 수신 전력과 여유를 직접 계산한다.</li>
+      <li>반사·회절·산란·흡수, 다중 경로 페이딩과 도플러 효과가 통신에 주는 영향을 안다.</li>
+      <li>주파수가 왜 국가가 관리하는 공공 자원인지, 면허·비면허 대역과 전자파 안전 기준을 안다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="wave">
+    <h2>전파는 보이지 않는 빛</h2>
+    <p>1865년 영국의 물리학자 <b>맥스웰</b>은 전기와 자기를 하나의 방정식으로 묶었다. 그 식을 풀자 놀라운 결론이 나왔다. 전기장이 흔들리면 자기장이 생기고, 자기장이 흔들리면 다시 전기장이 생겨, 두 장이 서로를 밀어주며 빈 공간을 날아가는 파동이 있어야 했다. 계산한 속도는 초속 약 30만 km, 이미 알려진 <b>빛의 속도</b>와 같았다. 맥스웰은 빛이 바로 이 파동이라고 결론지었다.</p>
+    <p>1887~1888년 독일의 <b>헤르츠</b>는 실험실에서 불꽃 방전으로 이 파동을 만들고 몇 m 떨어진 고리에서 작은 불꽃으로 검출해, 눈에 보이지 않는 빛이 실제로 있음을 증명했다. 주파수의 단위 Hz(헤르츠)가 그의 이름이다. 몇 년 뒤 이탈리아의 <b>마르코니</b>는 이것을 통신에 썼다. 1895년 무선 전신을 시연했고, 1901년에는 대서양 건너편으로 모스 부호 “S”를 보냈다. 이렇게 <span class="term">전자기파</span><span class="en">(electromagnetic wave)</span> 가운데 통신에 쓰는 낮은 주파수 쪽을 우리는 <b>전파</b>(radio wave)라 부른다.</p>
+    <p>전파, 적외선, 가시광선, X선, 감마선은 모두 같은 전자기파이고 <b>진동수(주파수)만 다르다</b>. 진공에서는 모두 같은 빛의 속도 c ≈ 3×10⁸ m/s로 달린다. 주파수가 낮으면 파장이 길고 광자 하나의 에너지가 작으며, 높으면 파장이 짧고 에너지가 크다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto">
+      <svg viewBox="0 -6 800 386" style="min-width:640px" role="img" aria-label="전자기 스펙트럼과 통신 대역">
+        <defs><linearGradient id="rd-vis" x1="0" x2="1"><stop offset="0" stop-color="#d9302c"/><stop offset=".25" stop-color="#f0a020"/><stop offset=".45" stop-color="#e8e030"/><stop offset=".62" stop-color="#3fb34f"/><stop offset=".8" stop-color="#2f6fe0"/><stop offset="1" stop-color="#7a3fd0"/></linearGradient></defs>
+<rect x="40.0" y="40" width="246.7" height="34" class="f-acc-soft"/>
+<text x="163.3" y="62" text-anchor="middle" class="t" style="font-size:12px">라디오파</text>
+<rect x="286.7" y="40" width="101.9" height="34" class="f-acc2-soft"/>
+<text x="337.6" y="62" text-anchor="middle" class="t" style="font-size:12px">마이크로파</text>
+<rect x="388.6" y="40" width="128.3" height="34" class="f-surface"/>
+<text x="452.8" y="62" text-anchor="middle" class="t" style="font-size:12px">적외선</text>
+<rect x="516.9" y="40" width="12.3" height="34" fill="url(#rd-vis)"/>
+<rect x="529.2" y="40" width="65.0" height="34" class="f-surface"/>
+<text x="561.7" y="62" text-anchor="middle" class="t" style="font-size:12px">자외선</text>
+<rect x="594.2" y="40" width="123.3" height="34" class="f-surface"/>
+<text x="655.9" y="62" text-anchor="middle" class="t" style="font-size:12px">X선</text>
+<rect x="717.5" y="40" width="62.5" height="34" class="f-surface"/>
+<text x="748.8" y="62" text-anchor="middle" class="t" style="font-size:12px">감마선</text>
+<text x="523.1" y="32" text-anchor="middle" class="t-acc" style="font-size:11px">가시광</text>
+<path d="M40.0 74 v6" class="s-axis"/><text x="40.0" y="92" text-anchor="middle" class="t-mono">10^3</text>
+<path d="M163.3 74 v6" class="s-axis"/><text x="163.3" y="92" text-anchor="middle" class="t-mono">10^6</text>
+<path d="M286.7 74 v6" class="s-axis"/><text x="286.7" y="92" text-anchor="middle" class="t-mono">10^9</text>
+<path d="M410.0 74 v6" class="s-axis"/><text x="410.0" y="92" text-anchor="middle" class="t-mono">10^12</text>
+<path d="M533.3 74 v6" class="s-axis"/><text x="533.3" y="92" text-anchor="middle" class="t-mono">10^15</text>
+<path d="M656.7 74 v6" class="s-axis"/><text x="656.7" y="92" text-anchor="middle" class="t-mono">10^18</text>
+<path d="M780.0 74 v6" class="s-axis"/><text x="780.0" y="92" text-anchor="middle" class="t-mono">10^21</text>
+<text x="20" y="92" text-anchor="end" class="t-mono">Hz</text>
+<text x="40.0" y="106" text-anchor="middle" class="t-mono" style="font-size:10px">λ 100 km</text>
+<text x="163.3" y="106" text-anchor="middle" class="t-mono" style="font-size:10px">λ 300 m</text>
+<text x="286.7" y="106" text-anchor="middle" class="t-mono" style="font-size:10px">λ 30 cm</text>
+<text x="410.0" y="106" text-anchor="middle" class="t-mono" style="font-size:10px">λ 0.3 mm</text>
+<text x="533.3" y="106" text-anchor="middle" class="t-mono" style="font-size:10px">λ 300 nm</text>
+<text x="656.7" y="106" text-anchor="middle" class="t-mono" style="font-size:10px">λ 0.3 nm</text>
+<text x="780.0" y="106" text-anchor="end" class="t-mono" style="font-size:10px">λ 0.3 pm</text>
+<text x="40" y="14" class="t" style="font-weight:700">전자기 스펙트럼 전체 (로그 눈금)</text>
+<text x="780" y="14" text-anchor="end" class="t-dim">← 낮은 에너지 · 긴 파장 &#160;&#160; 높은 에너지 · 짧은 파장 →</text>
+<path d="M122.2 74 L40 150 M368.9 74 L780 150" class="s-line" stroke-dasharray="4 4"/>
+<rect x="40" y="150" width="740" height="8" class="f-acc-soft"/>
+<path d="M40.0 158 V330" stroke="var(--grid)" /><text x="40.0" y="346" text-anchor="middle" class="t-mono">100 kHz</text>
+<path d="M163.3 158 V330" stroke="var(--grid)" /><text x="163.3" y="346" text-anchor="middle" class="t-mono">1 MHz</text>
+<path d="M286.7 158 V330" stroke="var(--grid)" /><text x="286.7" y="346" text-anchor="middle" class="t-mono">10 MHz</text>
+<path d="M410.0 158 V330" stroke="var(--grid)" /><text x="410.0" y="346" text-anchor="middle" class="t-mono">100 MHz</text>
+<path d="M533.3 158 V330" stroke="var(--grid)" /><text x="533.3" y="346" text-anchor="middle" class="t-mono">1 GHz</text>
+<path d="M656.7 158 V330" stroke="var(--grid)" /><text x="656.7" y="346" text-anchor="middle" class="t-mono">10 GHz</text>
+<path d="M780.0 158 V330" stroke="var(--grid)" /><text x="780.0" y="346" text-anchor="end" class="t-mono">100 GHz</text>
+<text x="36" y="186" text-anchor="end" class="t-dim" style="font-size:11px">방송</text>
+<text x="36" y="226" text-anchor="end" class="t-dim" style="font-size:11px">이동통신</text>
+<text x="36" y="266" text-anchor="end" class="t-dim" style="font-size:11px">Wi-Fi</text>
+<text x="36" y="304" text-anchor="end" class="t-dim" style="font-size:11px">위성·기타</text>
+<rect x="129.4" y="174" width="59.2" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="159.0" y="170" text-anchor="middle" class="t" style="font-size:11px">AM</text>
+<rect x="222.2" y="174" width="123.3" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="283.9" y="170" text-anchor="middle" class="t" style="font-size:11px">단파</text>
+<rect x="403.2" y="174" width="10.9" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="408.6" y="170" text-anchor="middle" class="t" style="font-size:11px">FM</text>
+<rect x="492.9" y="174" width="21.2" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="503.5" y="170" text-anchor="middle" class="t" style="font-size:11px">TV</text>
+<rect x="514.2" y="214" width="72.3" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="550.4" y="210" text-anchor="middle" class="t" style="font-size:11px">LTE</text>
+<rect x="598.9" y="214" width="4.5" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="601.1" y="210" text-anchor="middle" class="t" style="font-size:11px">5G 3.5</text>
+<rect x="708.9" y="214" width="5.7" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="711.8" y="210" text-anchor="middle" class="t" style="font-size:11px">28G</text>
+<rect x="726.7" y="214" width="4.2" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="728.8" y="242" text-anchor="middle" class="t" style="font-size:11px">39G</text>
+<rect x="580.2" y="254" width="3.0" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="581.7" y="250" text-anchor="middle" class="t" style="font-size:11px">2.4</text>
+<rect x="621.1" y="254" width="6.8" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="624.5" y="250" text-anchor="middle" class="t" style="font-size:11px">5</text>
+<rect x="628.6" y="254" width="9.9" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="633.5" y="282" text-anchor="middle" class="t" style="font-size:11px">6</text>
+<rect x="749.9" y="254" width="11.8" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="755.8" y="250" text-anchor="middle" class="t" style="font-size:11px">60G</text>
+<rect x="557.1" y="292" width="3.0" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="558.6" y="288" text-anchor="middle" class="t" style="font-size:11px">GPS</text>
+<rect x="666.4" y="292" width="21.8" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="677.3" y="288" text-anchor="middle" class="t" style="font-size:11px">Ku</text>
+<rect x="708.9" y="292" width="22.0" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="719.9" y="320" text-anchor="middle" class="t" style="font-size:11px">Ka</text>
+<rect x="765.3" y="292" width="3.4" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="767.0" y="288" text-anchor="middle" class="t" style="font-size:11px">레이더</text>
+<rect x="302.7" y="292" width="3.0" height="16" rx="3" fill="var(--accent)" opacity=".85"/>
+<text x="304.2" y="288" text-anchor="middle" class="t" style="font-size:11px">NFC</text>
+<text x="410" y="372" text-anchor="middle" class="t-dim">통신은 대부분 100 kHz ~ 100 GHz 사이, 스펙트럼 전체로 보면 아주 좁은 구간에 몰려 있다</text>
+
+      </svg>
+      </div>
+      <figcaption><b>그림 11-1.</b> 전자기 스펙트럼. 위는 전체를 로그 눈금으로 펼친 것이고, 아래는 통신에 쓰는 100 kHz ~ 100 GHz 구간을 확대한 것이다. AM 라디오에서 5G 밀리미터파까지 모두 “라디오파·마이크로파”라는 좁은 띠 안에 들어 있고, 가시광선은 그보다 수천~수백만 배 높은 주파수다. (대역은 한국 기준 대략값)</figcaption>
+    </figure>
+    <div class="callout analogy"><strong>호수 위의 물결</strong><p>잔잔한 호수에 손가락을 넣고 위아래로 흔들면 둥근 물결이 퍼져 나간다. 천천히 흔들면(낮은 주파수) 물결 사이 간격(파장)이 넓고, 빨리 흔들면 간격이 좁아진다. 물결이 퍼지는 속도는 흔드는 빠르기와 상관없이 일정하다. 송신 안테나는 전자를 1초에 수십억 번 흔들어 이런 물결을 공간에 만들고, 멀리 있는 수신 안테나 속 전자는 그 물결에 살짝 흔들린다. 이 책의 비유로는 전파가 <b>하늘길</b>이다. 도로(케이블)를 깔 필요는 없지만, 모두가 같은 하늘을 나눠 써야 한다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="wavelength">
+    <h2>주파수와 파장: λ = c / f</h2>
+    <p>파동이 1초에 몇 번 진동하는지가 <b>주파수</b> f(2장), 한 번 진동하는 동안 나아간 거리가 <span class="term">파장</span><span class="en">(wavelength, λ)</span>이다. 1초 동안 f번 진동하며 c만큼 나아가므로 둘의 곱은 언제나 빛의 속도다.</p>
+    <div class="formula"><div class="big">λ = c / f &nbsp;&nbsp;→&nbsp;&nbsp; λ[m] ≈ 300 / f[MHz]</div><div class="where">FM 100 MHz → 3 m, Wi-Fi 2.4 GHz → 12.5 cm, 5G 3.5 GHz → 8.6 cm, 28 GHz → 1.07 cm</div></div>
+    <p>파장이 중요한 첫째 이유는 <b>안테나 크기</b>다. 가장 기본적인 안테나인 <span class="term">반파장 다이폴</span><span class="en">(half-wave dipole)</span>은 이름 그대로 길이가 파장의 절반일 때 전파를 가장 잘 내보내고 받는다(공진). 파장이 3 m인 FM 라디오는 1.5 m짜리 막대가 필요하지만, 파장이 12.5 cm인 Wi-Fi는 6 cm면 되어 휴대폰 안에 쏙 들어간다. 반대로 사람 목소리(약 3 kHz)를 그대로 전파로 보내려면 파장이 100 km, 안테나가 50 km여야 한다. 그래서 목소리와 데이터는 높은 주파수의 반송파에 실어 보낸다(12장).</p>
+    <p>둘째 이유는 <b>장애물과의 관계</b>다. 파동은 자기 파장보다 작은 물체는 별로 신경 쓰지 않고 돌아 지나가지만, 파장보다 큰 물체 앞에서는 그림자를 만든다. 파장이 수백 m인 AM 방송은 건물과 언덕을 넘어가고, 파장이 1 cm인 밀리미터파는 손바닥 하나에도 가려진다.</p>
+    <div class="sim" id="sim-wl">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>주파수 → 파장 변환기</h3></div>
+      <div class="sim-view"><canvas id="cv-wl"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>주파수 (로그 눈금) <output id="wl-f-out"></output></span><input type="range" id="wl-f" min="5" max="11.4" step="0.005" value="9.38"></label>
+        <div class="ctrl"><span>바로 가기</span><div class="seg" id="wl-pre"><button data-value="6.0">AM 1 MHz</button><button data-value="8.0">FM 100 MHz</button><button data-value="9.38" class="on">Wi-Fi 2.4G</button><button data-value="9.544">5G 3.5G</button><button data-value="10.447">28 GHz</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">파장 λ</span><span class="v" id="wl-lam">—</span></div>
+        <div class="stat"><span class="k">반파장 다이폴 길이</span><span class="v" id="wl-half">—</span></div>
+        <div class="stat"><span class="k">ITU 대역 이름</span><span class="v" id="wl-band">—</span></div>
+        <div class="stat"><span class="k">광자 하나의 에너지</span><span class="v" id="wl-ev">—</span></div>
+      </div>
+      <div class="svc-list" id="wl-svc"></div>
+      <div class="sim-note">위 막대는 100 kHz ~ 250 GHz를 로그 눈금으로 펼친 것이고, 아래는 현재 주파수의 파동을 실제 크기 비율로 그린 것이다(눈금 막대 참고). 해볼 것: 주파수를 10배 올릴 때마다 파장과 안테나가 정확히 10분의 1로 줄어드는 것을 확인하자. 실제 다이폴은 끝부분 효과 때문에 반파장보다 5% 정도 짧게 만든다.</div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>ITU 이름</th><th>주파수</th><th>파장</th><th>대표 용도</th></tr></thead>
+      <tbody>
+        <tr><td>LF (장파)</td><td>30 ~ 300 kHz</td><td>10 ~ 1 km</td><td>표준 시각 방송, 항법 비콘</td></tr>
+        <tr><td>MF (중파)</td><td>300 kHz ~ 3 MHz</td><td>1 km ~ 100 m</td><td>AM 라디오</td></tr>
+        <tr><td>HF (단파)</td><td>3 ~ 30 MHz</td><td>100 ~ 10 m</td><td>국제 단파 방송, 아마추어 무선, 원양 통신</td></tr>
+        <tr><td>VHF (초단파)</td><td>30 ~ 300 MHz</td><td>10 ~ 1 m</td><td>FM 라디오, 항공 무선, 무전기</td></tr>
+        <tr><td>UHF (극초단파)</td><td>300 MHz ~ 3 GHz</td><td>1 m ~ 10 cm</td><td>디지털 TV, LTE, GPS, Wi-Fi 2.4 GHz, 블루투스</td></tr>
+        <tr><td>SHF (센티미터파)</td><td>3 ~ 30 GHz</td><td>10 ~ 1 cm</td><td>5G 3.5 GHz, Wi-Fi 5·6 GHz, 위성 방송(Ku), 레이더</td></tr>
+        <tr><td>EHF (밀리미터파)</td><td>30 ~ 300 GHz</td><td>10 ~ 1 mm</td><td>5G 39 GHz, 60 GHz 근거리 링크, 자동차 레이더(77 GHz)</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="antenna">
+    <h2>안테나: 전기를 전파로, 전파를 전기로</h2>
+    <p><span class="term">안테나</span><span class="en">(antenna)</span>는 도선 속을 흐르는 교류 전류를 공간을 날아가는 전자기파로 바꾸고(송신), 거꾸로 날아온 전자기파를 다시 도선 속 전류로 바꾸는(수신) 변환기다. 같은 안테나가 송신과 수신에서 똑같은 성질을 보이는데, 이를 <b>가역성</b>이라 한다.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 285" role="img" aria-label="반파장 다이폴 안테나와 전류 분포, 방사 패턴">
+        <defs><marker id="rd-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-dim)"/></marker></defs>
+        <text x="20" y="26" class="t" style="font-weight:700">① 반파장 다이폴</text>
+        <path d="M120 40 V128 M120 142 V230" stroke="var(--accent)" stroke-width="6" stroke-linecap="round"/>
+        <circle cx="120" cy="135" r="5" class="f-surface"/>
+        <path d="M125 135 H200" class="s-line"/><rect x="200" y="122" width="58" height="26" rx="6" class="f-elev"/><text x="229" y="139" text-anchor="middle" class="t-mono">송신기</text>
+        <path d="M130 40 Q175 135 130 230" fill="none" stroke="var(--accent-2)" stroke-width="2" stroke-dasharray="5 4"/>
+        <text x="160" y="80" class="t-dim" style="fill:var(--accent-2)">전류 세기</text>
+        <path d="M86 40 V230" class="s-line" marker-start="url(#rd-ar)" marker-end="url(#rd-ar)"/>
+        <text x="80" y="140" text-anchor="end" class="t-mono">λ/2</text>
+        <text x="20" y="258" class="t-dim">가운데 급전점에서 전류가 가장 크고 끝은 0</text>
+        <text x="300" y="26" class="t" style="font-weight:700">② 옆에서 본 방사 패턴</text>
+        <g transform="translate(440,145)">
+          <path d="M0 -100 V100" stroke="var(--accent)" stroke-width="5"/>
+          <circle r="100" fill="none" stroke="var(--grid)"/><circle r="50" fill="none" stroke="var(--grid)"/>
+          <path d="M0 0 C 35 -70, 105 -38, 100 0 C 105 38, 35 70, 0 0 C -35 -70, -105 -38, -100 0 C -105 38, -35 70, 0 0 Z" class="f-acc-soft"/>
+          <text x="8" y="-92" class="t-mono">끝 방향: 0</text>
+          <text x="104" y="-6" class="t-mono">최대</text>
+        </g>
+        <text x="440" y="258" text-anchor="middle" class="t-dim">8자 모양: 막대 옆(수평)으로 가장 세게,</text><text x="440" y="274" text-anchor="middle" class="t-dim">끝 방향으로는 나가지 않는다</text>
+        <text x="600" y="26" class="t" style="font-weight:700">③ 위에서 보면</text>
+        <g transform="translate(690,140)">
+          <circle r="80" class="f-acc-soft"/><circle r="6" fill="var(--accent)"/>
+          <text x="0" y="-88" text-anchor="middle" class="t-mono">모든 방향 같다</text>
+        </g>
+        <text x="690" y="258" text-anchor="middle" class="t-dim">수평면에서는 무지향성</text>
+      </svg>
+      <figcaption><b>그림 11-2.</b> 반파장 다이폴. 길이가 λ/2이면 막대 위 전류가 반 주기 사인 모양으로 서서 공진한다. 에너지는 도넛 모양으로 퍼져, 수직으로 세운 다이폴은 지평선 방향(사람들이 있는 쪽)으로 고르게 보내고 하늘과 땅으로는 보내지 않는다.</figcaption>
+    </figure>
+    <p>모든 방향으로 똑같이 내보내는 가상의 점 안테나를 <b>등방성 안테나</b>라 한다. 실제 안테나는 어떤 방향으로 더 많이, 어떤 방향으로는 덜 보낸다. 이 방향별 세기 분포가 <span class="term">방사 패턴</span><span class="en">(radiation pattern)</span>이고, 가장 센 방향의 세기가 등방성 안테나보다 몇 배인지를 데시벨로 나타낸 것이 <span class="term">안테나 이득</span><span class="en">(antenna gain, dBi)</span>이다. 반파장 다이폴은 2.15 dBi, 휴대폰 안테나는 0 dBi 안팎, 공유기 막대 안테나는 2~5 dBi, 기지국 섹터 안테나는 15~18 dBi 정도다.</p>
+    <div class="callout analogy"><strong>전구와 손전등</strong><p>같은 1 W 전구라도 맨전구는 방 전체를 은은하게 비추고, 반사갓을 씌운 손전등은 한쪽만 아주 밝게 비춘다. 손전등이 빛을 새로 만든 것이 아니라 <b>다른 방향으로 갈 빛을 한쪽으로 모았을 뿐</b>이다. 안테나 이득도 같다. 이득이 높은 안테나는 전력을 만들어 내지 않는다. 대신 빔이 좁아져서, 그 방향을 벗어난 곳에는 오히려 더 약하게 간다.</p></div>
+    <div class="sim" id="sim-pat">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>안테나 방사 패턴 (극좌표)</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cv-pat"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>안테나 종류</span><div class="seg" id="pat-type"><button data-value="dipole" class="on">다이폴</button><button data-value="patch">패치</button><button data-value="array">배열</button></div></div>
+          <label class="ctrl"><span>배열 소자 수 (배열일 때) <output id="pat-n-out"></output></span><input type="range" id="pat-n" min="2" max="16" step="1" value="4"></label>
+          <label class="ctrl"><span>소자 간격 <output id="pat-d-out"></output></span><input type="range" id="pat-d" min="0.25" max="2" step="0.05" value="0.5"></label>
+          <label class="check"><input type="checkbox" id="pat-db" checked> dB 눈금으로 보기 (끄면 선형 전력)</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대 이득 (계산)</span><span class="v" id="pat-g">—</span></div>
+        <div class="stat"><span class="k">반전력 빔폭 (−3 dB)</span><span class="v" id="pat-bw">—</span></div>
+        <div class="stat"><span class="k">앞뒤 비</span><span class="v" id="pat-fb">—</span></div>
+      </div>
+      <div class="sim-note">다이폴은 막대를 세로로 세웠을 때 옆에서 본 단면, 패치와 배열은 위에서 본 수평 단면이다(오른쪽이 정면). 이득은 3차원 전체 방향으로 적분해 계산한 지향성(손실 없음 가정)이다. 패치는 금속판 하나로 앞쪽 반구만 비추고, 배열은 패치 여러 개를 가로로 늘어놓은 것이다. 해볼 것: 소자 수를 두 배로 늘리면 이득이 약 3 dB 오르고 빔폭이 절반이 된다. 간격을 λ보다 넓히면 엉뚱한 방향에 큰 빔(그레이팅 로브)이 생긴다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="budget">
+    <h2>얼마나 멀리 갈까: 경로 손실과 링크 버짓</h2>
+    <p>안테나를 떠난 전파는 거리가 멀어질수록 넓은 구면으로 퍼진다. 같은 에너지가 넓은 면적에 나뉘므로 단위 면적당 세기는 거리의 제곱에 반비례해 줄어든다. 거리가 2배면 1/4(−6 dB), 10배면 1/100(−20 dB)이다. 여기에 수신 안테나가 받아 내는 면적이 파장의 제곱에 비례한다는 사실을 더하면, 아무 장애물 없는 공간에서 두 등방성 안테나 사이의 <span class="term">자유 공간 경로 손실</span><span class="en">(free-space path loss, FSPL)</span>이 나온다.</p>
+    <div class="formula"><div class="big">FSPL[dB] = 20·log₁₀(d[km]) + 20·log₁₀(f[MHz]) + 32.45</div><div class="where">예: 2.4 GHz, 100 m → 20·log(0.1) + 20·log(2400) + 32.45 = −20 + 67.6 + 32.45 ≈ 80 dB (전력이 1억분의 1로)</div></div>
+    <div class="callout deep"><strong>높은 주파수는 정말 “멀리 못 가나”?</strong><p>식에서 주파수가 2배가 되면 손실이 6 dB 커진다. 그러나 진공에서 전파 자체가 더 빨리 약해지는 것은 아니다. 손실이 커지는 이유는 같은 이득(예: 0 dBi)의 수신 안테나가 높은 주파수에서는 그만큼 <b>작아져서</b> 받아 내는 전력이 줄기 때문이다. 그래서 안테나 크기를 그대로 두고 소자를 더 촘촘히 넣어 이득을 높이면(배열 안테나) 이 손해를 되찾을 수 있다. 5G 밀리미터파가 수십~수백 개 소자의 배열 안테나를 쓰는 이유다. 다만 벽·비·나뭇잎에 의한 추가 손실은 실제로 주파수가 높을수록 크다(다음 절).</p></div>
+    <p>무선 링크가 되는지 안 되는지는 <span class="term">링크 버짓</span><span class="en">(link budget)</span>이라는 가계부로 따진다. 데시벨(2장)은 곱셈을 덧셈으로 바꿔 주므로 계산이 아주 간단하다. 전력은 1 mW를 기준으로 한 <b>dBm</b>으로 적는다(0 dBm = 1 mW, 20 dBm = 100 mW, −90 dBm = 1 pW).</p>
+    <div class="formula"><div class="big">수신 전력 = 송신 출력 + 송신 안테나 이득 − 경로 손실 − 벽 손실 + 수신 안테나 이득</div><div class="where">수신 전력이 <span class="term">수신 감도</span>(그 속도로 받아 내는 데 필요한 최소 세기)보다 크면 연결된다. 차이를 링크 여유(margin)라 한다.</div></div>
+    <div class="sim" id="sim-lb">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>링크 버짓 계산기</h3></div>
+      <div class="sim-view"><canvas id="cv-lb"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>주파수</span><div class="seg" id="lb-f"><button data-value="0.9">900 MHz</button><button data-value="2.4" class="on">2.4 GHz</button><button data-value="5">5 GHz</button><button data-value="6">6 GHz</button><button data-value="28">28 GHz</button></div></div>
+        <label class="ctrl"><span>거리 <output id="lb-d-out"></output></span><input type="range" id="lb-d" min="0" max="4" step="0.01" value="1.3"></label>
+        <label class="ctrl"><span>송신 출력 <output id="lb-p-out"></output></span><input type="range" id="lb-p" min="0" max="30" step="1" value="20"></label>
+        <label class="ctrl"><span>송신 안테나 이득 <output id="lb-gt-out"></output></span><input type="range" id="lb-gt" min="0" max="25" step="1" value="3"></label>
+        <label class="ctrl"><span>수신 안테나 이득 <output id="lb-gr-out"></output></span><input type="range" id="lb-gr" min="0" max="25" step="1" value="0"></label>
+        <label class="ctrl"><span>사이의 벽 개수 <output id="lb-w-out"></output></span><input type="range" id="lb-w" min="0" max="6" step="1" value="1"></label>
+        <div class="ctrl"><span>벽 재질</span><div class="seg" id="lb-wt"><button data-value="0">석고보드</button><button data-value="1">벽돌</button><button data-value="2" class="on">콘크리트</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">자유 공간 손실</span><span class="v" id="lb-fspl">—</span></div>
+        <div class="stat"><span class="k">벽 손실 (합)</span><span class="v" id="lb-wl">—</span></div>
+        <div class="stat"><span class="k">수신 전력</span><span class="v" id="lb-rx">—</span></div>
+        <div class="stat"><span class="k">링크 여유 (최저 속도 기준)</span><span class="v" id="lb-mg">—</span></div>
+        <div class="stat"><span class="k">가능한 변조 · 속도</span><span class="v" id="lb-rate" style="font-size:15px">—</span></div>
+      </div>
+      <div class="sim-note">그래프는 거리에 따른 수신 전력(벽 포함)이고 점이 현재 거리다. 잡음 바닥은 80 MHz 채널, 수신기 잡음 지수 6 dB로 약 −89 dBm로 두었고, 속도는 Wi-Fi 6 방식의 변조 단계(12장)와 안테나 1개 기준의 대략값이다. 벽 한 장의 손실은 측정 문헌의 대표값(콘크리트 2.4 GHz 약 12 dB, 28 GHz 약 45 dB 등)이며 두께와 재질에 따라 크게 달라진다. 다중 경로·간섭은 넣지 않았다. 해볼 것: 2.4 GHz에서 콘크리트 벽 1장, 30 m로 두고 5 GHz, 28 GHz로 바꿔 보자.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">벽 없이 공유기에서 10 m 떨어진 곳의 수신 전력이 −50 dBm이었다. 40 m로 물러나면 수신 전력은 얼마가 될까?</p><p class="wi-hint">링크 버짓 계산기에서 벽을 0개로 두고 거리를 10 m → 40 m로 옮겨 보자.</p><div class="opts">
+      <button class="opt">−200 dBm (4배 멀어졌으니 4배)</button><button class="opt">−56 dBm</button><button class="opt" data-correct>−62 dBm</button><button class="opt">−90 dBm</button>
+    </div><div class="quiz-exp">자유 공간에서는 거리가 2배가 될 때마다 6 dB(전력 1/4)씩 줄어든다. 10 → 20 → 40 m는 두 번 두 배가 되었으므로 −12 dB, 즉 −62 dBm이다. 데시벨 덕분에 “1/16로 줄었다”는 곱셈을 “12를 뺀다”는 덧셈으로 계산할 수 있다.</div></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>장치·신호</th><th>대표 전력</th><th>dBm</th></tr></thead>
+      <tbody>
+        <tr><td>이동통신 기지국 (안테나 단자당)</td><td>수십 W</td><td>약 43 ~ 49</td></tr>
+        <tr><td>휴대폰 최대 송신 (LTE·5G 일반 등급)</td><td>200 mW</td><td>23</td></tr>
+        <tr><td>Wi-Fi 공유기</td><td>100 mW 안팎</td><td>약 20</td></tr>
+        <tr><td>블루투스 이어폰</td><td>1 ~ 2.5 mW</td><td>0 ~ 4</td></tr>
+        <tr><td>Wi-Fi “막대 가득”</td><td>—</td><td>−30 ~ −50</td></tr>
+        <tr><td>Wi-Fi 최저 속도로 겨우 연결</td><td>—</td><td>약 −80 ~ −90</td></tr>
+        <tr><td>지상에 도착한 GPS 위성 신호</td><td>1조분의 1 mW 미만</td><td>약 −130 (잡음보다 약하다)</td></tr>
+      </tbody>
+    </table></div>
+    <p>송신 23 dBm과 수신 −90 dBm의 차이는 113 dB, 전력으로 2×10¹¹배다. 무선 수신기는 공기 중에 흩어진 에너지 가운데 수천억분의 1만 붙잡아 비트를 되살린다. GPS는 아예 잡음보다 약한 신호를 받는데, 이는 12장의 확산 스펙트럼 덕분이다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="propagation">
+    <h2>전파의 성질: 반사, 회절, 산란, 흡수</h2>
+    <p>실제 세상은 빈 공간이 아니다. 전파는 빛처럼 행동한다. 매끈한 큰 면에서는 <b>반사</b>하고, 건물 모서리에서는 그림자 속으로 휘어 들어가는 <span class="term">회절</span><span class="en">(diffraction)</span>을 하며, 파장과 비슷하거나 작은 울퉁불퉁한 물체(나뭇잎, 가로등, 빗방울)를 만나면 사방으로 흩어지는 <b>산란</b>을 하고, 물질을 지나면서 에너지를 열로 빼앗기는 <b>흡수</b>를 겪는다.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 260" role="img" aria-label="반사, 회절, 산란, 흡수">
+        <defs><marker id="rd-pa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <g>
+          <text x="100" y="24" text-anchor="middle" class="t" style="font-weight:700">반사</text>
+          <rect x="20" y="180" width="160" height="14" class="f-surface"/><text x="100" y="214" text-anchor="middle" class="t-dim">금속·물·큰 벽</text>
+          <path d="M30 60 L100 180 L170 60" class="s-acc" marker-end="url(#rd-pa)"/>
+          <text x="100" y="240" text-anchor="middle" class="t-dim">입사각 = 반사각</text>
+        </g>
+        <g>
+          <text x="300" y="24" text-anchor="middle" class="t" style="font-weight:700">회절</text>
+          <rect x="280" y="100" width="40" height="120" class="f-surface"/>
+          <path d="M210 70 H300" class="s-acc"/>
+          <path d="M300 70 H390" class="s-acc" marker-end="url(#rd-pa)"/>
+          <path d="M320 100 Q345 105 360 170" class="s-acc" stroke-dasharray="5 4" marker-end="url(#rd-pa)"/>
+          <path d="M320 100 Q350 100 380 135" class="s-acc" stroke-dasharray="5 4" marker-end="url(#rd-pa)"/>
+          <text x="300" y="240" text-anchor="middle" class="t-dim">모서리를 돌아 그림자 속으로</text>
+          <text x="300" y="256" text-anchor="middle" class="t-dim">파장이 길수록 잘 된다</text>
+        </g>
+        <g>
+          <text x="500" y="24" text-anchor="middle" class="t" style="font-weight:700">산란</text>
+          <path d="M420 130 H480" class="s-acc" marker-end="url(#rd-pa)"/>
+          <g fill="var(--ok)"><circle cx="500" cy="120" r="7"/><circle cx="512" cy="138" r="6"/><circle cx="494" cy="146" r="5"/><circle cx="518" cy="116" r="5"/></g>
+          <g class="s-acc" stroke-width="1.5"><path d="M520 128 L570 90" marker-end="url(#rd-pa)"/><path d="M522 134 L578 140" marker-end="url(#rd-pa)"/><path d="M515 145 L560 190" marker-end="url(#rd-pa)"/><path d="M500 110 L505 62" marker-end="url(#rd-pa)"/><path d="M490 150 L460 195" marker-end="url(#rd-pa)"/></g>
+          <text x="500" y="240" text-anchor="middle" class="t-dim">나뭇잎·빗방울이 사방으로 흩뜨림</text>
+        </g>
+        <g>
+          <text x="700" y="24" text-anchor="middle" class="t" style="font-weight:700">흡수 · 투과</text>
+          <rect x="690" y="60" width="26" height="150" class="f-surface"/>
+          <path d="M610 100 H688" stroke="var(--accent)" stroke-width="5" marker-end="url(#rd-pa)"/><path d="M718 100 H790" stroke="var(--accent)" stroke-width="3.5" marker-end="url(#rd-pa)"/>
+          <text x="612" y="90" class="t-mono">0.9 GHz</text>
+          <path d="M610 170 H688" stroke="var(--accent-2)" stroke-width="5" marker-end="url(#rd-pa)"/><path d="M718 170 H740" stroke="var(--accent-2)" stroke-width="1" marker-end="url(#rd-pa)"/>
+          <text x="612" y="160" class="t-mono">28 GHz</text>
+          <text x="700" y="240" text-anchor="middle" class="t-dim">높은 주파수일수록 벽에 약하다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 11-3.</b> 전파가 장애물을 만났을 때의 네 가지 행동. 도심에서 휴대폰이 기지국을 직접 보지 못해도 통화가 되는 것은 반사와 회절 덕분이다. 낮은 주파수는 회절과 투과가 잘 되어 “멀리, 깊이” 가고, 높은 주파수는 대역폭이 넓어 “빠르지만 가까이” 간다.</figcaption>
+    </figure>
+    <p>주파수가 높아질수록 흡수가 심해진다. 콘크리트 벽 한 장은 900 MHz에서 10 dB 안팎이지만 28 GHz에서는 40 dB를 넘기도 한다. 단열을 위해 금속 막을 입힌 로이(Low-E) 유리는 밀리미터파를 거의 막는다. 비도 문제다. 빗방울 크기(수 mm)가 밀리미터파 파장과 비슷해 폭우 때 위성 Ka 대역 신호가 크게 약해지는 <b>강우 감쇠</b>가 생긴다. 사람의 몸(대부분 물)도 수 GHz 이상에서는 좋은 흡수체라서, 손으로 휴대폰을 감싸 쥐면 밀리미터파 연결이 끊길 수 있다.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 250" role="img" aria-label="주파수에 따른 대기 흡수, 60 GHz 산소 흡수 봉우리">
+        <text x="20" y="22" class="t" style="font-weight:700">해수면 공기의 흡수 (dB/km, 양축 로그 눈금, 대략)</text>
+        <g stroke="var(--grid)"><path d="M70 60 H600 M70 106.7 H600 M70 153.3 H600 M284 40 V200 M357.3 40 V200 M450.5 40 V200 M513.4 40 V200 M554.2 40 V200"/></g>
+        <g class="s-axis"><path d="M70 40 V200 H600"/></g>
+        <g class="t-mono" text-anchor="end"><text x="64" y="64">10</text><text x="64" y="111">1</text><text x="64" y="157">0.1</text><text x="64" y="204">0.01</text></g>
+        <g class="t-mono" text-anchor="middle"><text x="70" y="218">1</text><text x="284" y="218">10</text><text x="357.3" y="218">22</text><text x="450.5" y="218">60</text><text x="513.4" y="218">118</text><text x="554.2" y="218">183</text><text x="600" y="218">300</text></g>
+        <text x="335" y="238" text-anchor="middle" class="t-dim">주파수 (GHz)</text>
+        <path d="M70.0 199.0 C94.9 198.6, 183.9 198.5, 219.6 196.3 C255.2 194.1, 267.0 190.8, 284.0 185.9 C301.0 181.1, 310.9 174.2, 321.7 167.4 C332.4 160.5, 342.3 149.8, 348.4 145.1 C354.5 140.4, 354.7 139.2, 358.1 139.2 C361.6 139.2, 364.5 143.1, 369.2 145.1 C373.8 147.1, 378.8 151.4, 386.1 151.4 C393.4 151.4, 404.9 150.8, 412.8 145.1 C420.8 139.3, 428.6 128.1, 433.6 117.0 C438.5 105.9, 439.6 89.4, 442.4 78.5 C445.3 67.6, 447.9 51.7, 450.5 51.7 C453.1 51.7, 455.6 67.6, 458.0 78.5 C460.4 89.4, 461.6 108.7, 464.9 117.0 C468.1 125.2, 472.5 126.5, 477.3 127.9 C482.0 129.3, 488.3 128.4, 493.2 125.2 C498.2 122.0, 503.4 114.9, 506.9 108.7 C510.3 102.5, 512.0 88.0, 514.0 88.0 C516.0 88.0, 516.2 105.3, 518.7 108.7 C521.3 112.2, 525.4 110.7, 529.3 108.7 C533.1 106.8, 538.2 103.5, 541.7 97.1 C545.1 90.7, 547.9 79.9, 550.0 70.3 C552.1 60.6, 552.9 40.0, 554.2 39.0 C555.4 38.0, 554.8 57.4, 557.7 64.4 C560.5 71.5, 566.4 79.6, 571.3 81.2 C576.1 82.8, 582.0 76.8, 586.8 74.0 C591.6 71.2, 597.9 66.0, 600.1 64.4" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+        <text x="357" y="128" text-anchor="middle" class="t-dim">수증기 22 GHz</text>
+        <text x="440" y="44" text-anchor="end" class="t-acc" style="font-size:12px">산소 60 GHz ≈ 15 dB/km</text>
+        <text x="514" y="80" text-anchor="middle" class="t-dim">산소 118</text>
+        <text x="560" y="34" class="t-dim">수증기 183</text>
+        <rect x="616" y="62" width="176" height="104" rx="10" class="f-surface"/>
+        <text x="628" y="84" class="t-dim">60 GHz는 공기만으로도</text>
+        <text x="628" y="102" class="t-dim">1 km에 신호가 약 1/30.</text>
+        <text x="628" y="124" class="t-dim">대신 옆방과 간섭이</text>
+        <text x="628" y="142" class="t-dim">적어 실내 근거리용으로</text>
+        <text x="628" y="158" class="t-dim">쓴다.</text>
+      </svg>
+      <figcaption><b>그림 11-4.</b> 맑은 날 공기 자체의 흡수. 수증기와 산소 분자가 특정 주파수에서 공명하며 에너지를 빨아들인다. 60 GHz 근처의 산소 흡수 봉우리 때문에 이 대역은 장거리에는 못 쓰지만, 방 하나 안에서 수 Gbps를 내는 무선 링크(WiGig, 802.11ad/ay)에는 오히려 장점이 된다.</figcaption>
+    </figure>
+    <p>낮은 주파수에는 다른 길도 있다. 수백 kHz의 장파·중파는 땅의 표면을 따라 휘어 가는 <b>지표파</b>로 지평선 너머 수백 km까지 간다. 3~30 MHz의 단파는 고도 약 60~400 km의 <span class="term">전리층</span><span class="en">(ionosphere)</span>, 즉 햇빛에 이온화된 대기층에서 거울처럼 반사되고, 땅과 전리층 사이를 몇 번 튀며 대륙을 건넌다. 그래서 위성이 없던 시절에도 단파 라디오로 지구 반대편 방송을 들을 수 있었다. 전리층은 낮과 밤, 태양 활동에 따라 바뀌어서 단파 통신은 시간대에 따라 잘 되기도 안 되기도 한다. VHF 이상은 전리층을 그냥 뚫고 나가므로 위성 통신에는 이런 높은 주파수를 쓴다(15장).</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="multipath">
+    <h2>다중 경로와 페이딩: 한 걸음에 출렁이는 신호</h2>
+    <p>방 안의 공유기가 보낸 전파는 직접 날아오는 길 말고도 벽, 바닥, 가구에 반사된 여러 길로 수신기에 도착한다. 이것을 <span class="term">다중 경로</span><span class="en">(multipath)</span>라 한다. 경로마다 길이가 다르므로 파동의 마루와 골이 도착하는 시점이 다르다. 두 파동이 마루끼리 만나면 세지고(보강 간섭), 마루와 골이 만나면 서로 지워진다(상쇄 간섭). 길이 차이가 반파장(2.4 GHz에서 6 cm)만 바뀌어도 결과가 정반대가 되므로, 수신기를 몇 cm만 옮겨도 신호가 크게 출렁인다. 이 현상이 <span class="term">페이딩</span><span class="en">(fading)</span>이다.</p>
+    <div class="sim" id="sim-mp">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>다중 경로 페이딩: 수신기를 옮겨 보세요</h3></div>
+      <div class="sim-view"><canvas id="cv-mp"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>수신기 위치 x <output id="mp-x-out"></output></span><input type="range" id="mp-x" min="8" max="11" step="0.002" value="9.2"></label>
+        <div class="ctrl"><span>경로</span><div class="seg" id="mp-n"><button data-value="1">직접파만</button><button data-value="2" class="on">+ 반사 1</button><button data-value="3">+ 반사 2</button><button data-value="4">+ 반사 3</button><button data-value="20">산란 많이</button></div></div>
+        <div class="ctrl"><span>주파수</span><div class="seg" id="mp-f"><button data-value="0.9">900 MHz</button><button data-value="2.4" class="on">2.4 GHz</button><button data-value="5">5 GHz</button></div></div>
+        <label class="ctrl"><span>반사 세기 (반사 계수) <output id="mp-r-out"></output></span><input type="range" id="mp-r" min="0.1" max="1" step="0.05" value="0.7"></label>
+        <label class="check"><input type="checkbox" id="mp-los"> 직접파가 막힘 (벽 너머)</label>
+        <label class="check"><input type="checkbox" id="mp-div"> 다이버시티: λ/2 떨어진 안테나 2개 중 센 쪽</label>
+        <div class="btn-row"><button class="btn primary" id="mp-walk">걷기 ▶</button></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">현재 세기 (직접파 대비)</span><span class="v" id="mp-now">—</span></div>
+        <div class="stat"><span class="k">구간 최대 ~ 최소</span><span class="v" id="mp-rng">—</span></div>
+        <div class="stat"><span class="k">−10 dB 이하인 위치</span><span class="v" id="mp-deep">—</span></div>
+        <div class="stat"><span class="k">반파장</span><span class="v" id="mp-lam">—</span></div>
+      </div>
+      <div class="sim-note">위는 방을 위에서 본 그림(20 m × 8 m)으로, 송신기(Tx)에서 수신기(Rx)까지의 직접파와 벽 반사파를 그렸다(거울상 방법). 아래는 수신기가 x = 8~11 m를 움직일 때 합성 신호의 세기를, 직접파 하나만 있을 때를 0 dB로 두고 그린 것이다. 해볼 것: ‘산란 많이’와 ‘직접파 막힘’을 함께 켜면 깊은 골이 불규칙하게 나타나는 레일리 페이딩이 된다. 이때 다이버시티를 켜 보자. 반사는 위상이 뒤집히는 이상적인 거울로 단순화했다.</div>
+    </div>
+    <p>직접 보이는 길(LOS) 없이 비슷한 세기의 반사·산란파가 무수히 섞이면, 합성 신호의 크기는 <b>레일리 분포</b>라는 통계를 따른다. 이런 환경을 <span class="term">레일리 페이딩</span><span class="en">(Rayleigh fading)</span>이라 하며, 평균보다 10 dB 이상 약한 깊은 골에 빠지는 위치가 약 10%, 20 dB 이상은 약 1%나 된다. 도심의 휴대폰은 늘 이런 환경에 있다.</p>
+    <p>해결책은 “두 번 굴리기”다. 반파장쯤 떨어진 안테나 두 개는 서로 다른 출렁임을 겪으므로, 둘이 동시에 깊은 골에 빠질 확률은 훨씬 작다. 센 쪽을 고르거나 둘을 잘 합치면 된다. 이것을 <span class="term">다이버시티</span><span class="en">(diversity)</span>라 한다. 공간(안테나 여러 개), 주파수(여러 주파수에 나눠 싣기), 시간(나눠서 여러 번 보내기) 다이버시티가 있다. 다중 경로를 적이 아니라 자원으로 바꿔, 안테나 여러 개로 서로 다른 데이터를 동시에 보내는 기술이 12장의 <b>MIMO</b>다.</p>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">2.4 GHz에서 반사 경로 3개가 있는 방. 노트북을 책상 위에서 3 cm쯤 옮기면 신호 세기는 어떻게 될까?</p><p class="wi-hint">다중 경로 시뮬레이터에서 ‘+ 반사 3’을 고르고 수신기 위치를 아주 조금씩 옮겨 보자.</p><div class="opts">
+      <button class="opt">거의 그대로다. 3 cm는 송신기와의 거리에 비하면 아무것도 아니다</button><button class="opt" data-correct>10 dB 넘게 달라질 수도 있다. 반파장(6 cm)의 절반만 움직여도 간섭이 보강에서 상쇄로 바뀐다</button><button class="opt">정확히 3 dB 줄어든다</button><button class="opt">주파수가 바뀐다</button>
+    </div><div class="quiz-exp">경로 손실(거리)로는 3 cm 차이가 0.01 dB도 안 되지만, 다중 경로 간섭은 경로 길이 차이를 파장 단위로 잰다. 반파장 안에서 보강 간섭과 상쇄 간섭이 뒤바뀌므로 몇 cm 차이로 수십 배가 달라질 수 있다. 공유기 안테나가 2~4개씩 달린 이유다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="doppler">
+    <h2>움직이면 주파수가 바뀐다: 도플러 효과</h2>
+    <p>구급차가 다가올 때 사이렌이 높게, 멀어질 때 낮게 들리는 것은 <span class="term">도플러 효과</span><span class="en">(Doppler effect)</span> 때문이다. 다가오는 쪽은 파동의 마루를 더 촘촘히 받고, 멀어지는 쪽은 더 듬성듬성 받는다. 전파도 같다. 속도 v로 움직이는 수신기가 받는 주파수는 최대 다음만큼 어긋난다.</p>
+    <div class="formula"><div class="big">f_D = (v / c) · f</div><div class="where">KTX 300 km/h(83 m/s), 3.5 GHz → 83 / 3×10⁸ × 3.5×10⁹ ≈ 970 Hz</div></div>
+    <p>1 kHz가 3.5 GHz에 비하면 작아 보이지만 문제는 두 가지다. 첫째, 12장의 OFDM은 수십 kHz 간격으로 촘촘히 놓인 부반송파를 쓰므로 주파수가 조금만 어긋나도 이웃끼리 간섭한다. 둘째, 더 중요하게, 움직이면 앞 절의 다중 경로 골과 마루를 1초에 수백~수천 번 지나치게 된다. 채널이 거의 그대로라고 볼 수 있는 시간(<b>코히어런스 시간</b>)이 1 ms 안팎으로 짧아져서, 수신기는 채널을 아주 자주 다시 재야 한다.</p>
+    <div class="sim" id="sim-dop">
+      <div class="sim-head"><span class="sim-tag">CALCULATOR</span><h3>도플러 이동 계산기</h3></div>
+      <div class="sim-view"><canvas id="cv-dop"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>무엇을 타고</span><div class="seg" id="dop-v"><button data-value="5">걷기 5 km/h</button><button data-value="100" class="on">자동차 100 km/h</button><button data-value="300">KTX 300 km/h</button><button data-value="900">비행기 900 km/h</button><button data-value="27000">저궤도 위성 27,000 km/h</button></div></div>
+        <div class="ctrl"><span>주파수</span><div class="seg" id="dop-f"><button data-value="0.9">900 MHz</button><button data-value="3.5" class="on">3.5 GHz</button><button data-value="12">12 GHz</button><button data-value="28">28 GHz</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">최대 도플러 이동</span><span class="v" id="dop-fd">—</span></div>
+        <div class="stat"><span class="k">코히어런스 시간 (≈ 0.42 / f_D)</span><span class="v" id="dop-tc">—</span></div>
+        <div class="stat"><span class="k">1초에 지나치는 반파장 수</span><span class="v" id="dop-n">—</span></div>
+      </div>
+      <div class="sim-note">그림의 동심원은 송신기가 내보낸 파면이다. 실제 속도는 빛에 비해 너무 느려서 그림에서는 송신기 속도를 크게 과장했다. 저궤도 위성은 지상 단말에서 볼 때 시선 방향 속도가 위성의 속도보다 작으므로 실제 최대치는 이보다 약간 작다. 위성 통신에서는 위성 위치를 미리 알기 때문에 도플러를 계산해 미리 보정한다(15장).</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="spectrum">
+    <h2>스펙트럼은 공공 자원</h2>
+    <p>같은 장소에서 같은 주파수로 두 사람이 동시에 크게 말하면 서로의 신호를 망가뜨린다. 하늘길은 하나뿐이므로 누가 어느 주파수를 어디서 얼마나 세게 쓸지 정하는 규칙이 필요하다. 국제적으로는 ITU(국제전기통신연합)가 큰 틀의 분배를 정하고, 한국에서는 과학기술정보통신부가 주파수를 분배·할당한다. 주파수는 땅이나 물처럼 한정된 <b>공공 자원</b>이다.</p>
+    <ul>
+      <li><span class="term">면허 대역</span><span class="en">(licensed band)</span>: 이동통신사처럼 국가에서 특정 주파수를 일정 기간 독점해 쓸 권리를 받는다. 다른 사람이 쓸 수 없으므로 간섭 걱정 없이 품질을 보장할 수 있다. 대가로 큰돈을 내는데, 보통 <b>주파수 경매</b>로 정한다.</li>
+      <li><span class="term">비면허 대역</span><span class="en">(unlicensed band)</span>: 출력 제한 같은 기술 기준만 지키면 누구나 허가 없이 쓴다. Wi-Fi, 블루투스, 무선 마우스, 전자레인지가 함께 쓰는 2.4 GHz <span class="term">ISM 대역</span><span class="en">(Industrial, Scientific, Medical)</span>이 대표적이다. 공짜인 대신 이웃과 나눠 써야 해서, 서로 양보하는 규칙(13장의 CSMA/CA)이 필요하다.</li>
+    </ul>
+    <p>2018년 한국의 첫 5G 주파수 경매에서는 3.5 GHz 대역 280 MHz 폭과 28 GHz 대역 2.4 GHz 폭이 이동통신 3사에 할당되었고, 낙찰가는 합계 약 3.6조 원이었다. 3.5 GHz는 이후 전국 5G망의 주력 대역이 되었지만, 28 GHz는 전파가 너무 짧게 가고 쓸 단말도 적어 망 구축이 거의 이뤄지지 않았다. 결국 정부는 의무 구축 조건을 지키지 못한 3사의 28 GHz 할당을 2022~2023년에 취소했다. 좋은 주파수란 “높을수록”이 아니라 <b>멀리 가는 성질과 넓은 대역폭 사이의 균형</b>이 맞는 주파수라는 것을 보여 준 사례다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>용도</th><th>대표 주파수 (한국)</th><th>면허</th><th>성질</th></tr></thead>
+      <tbody>
+        <tr><td>AM 라디오</td><td>531 ~ 1602 kHz</td><td>방송 허가</td><td>지표파로 멀리, 음질은 낮음</td></tr>
+        <tr><td>FM 라디오</td><td>88 ~ 108 MHz</td><td>방송 허가</td><td>가시거리 수십 km</td></tr>
+        <tr><td>지상파 디지털 TV</td><td>470 ~ 698 MHz</td><td>방송 허가</td><td>건물 투과·회절 좋음</td></tr>
+        <tr><td>LTE</td><td>850 MHz, 900 MHz, 1.8 GHz, 2.1 GHz, 2.6 GHz</td><td>통신사 면허</td><td>낮은 대역은 넓게, 높은 대역은 용량</td></tr>
+        <tr><td>5G (sub-6)</td><td>3.4 ~ 3.7 GHz</td><td>통신사 면허</td><td>5G 주력, 셀 반경 수백 m~1 km 안팎</td></tr>
+        <tr><td>5G 밀리미터파</td><td>26.5 ~ 29.5 GHz (n257) 등</td><td>통신사 면허</td><td>초광대역, 수백 m 이내, 장애물에 약함</td></tr>
+        <tr><td>Wi-Fi·블루투스</td><td>2.4 GHz (2400 ~ 2483.5 MHz)</td><td>비면허 (ISM)</td><td>잘 퍼지지만 혼잡</td></tr>
+        <tr><td>Wi-Fi 5·6</td><td>5.15 ~ 5.85 GHz</td><td>비면허</td><td>채널 많음</td></tr>
+        <tr><td>Wi-Fi 6E·7</td><td>5.925 ~ 7.125 GHz (1.2 GHz 폭, 2020년 개방)</td><td>비면허</td><td>넓고 깨끗한 새 대역</td></tr>
+        <tr><td>GPS</td><td>1575.42 MHz (L1)</td><td>위성 항법 전용</td><td>잡음보다 약한 신호</td></tr>
+        <tr><td>위성 방송·인터넷</td><td>Ku 12 ~ 18 GHz, Ka 18 ~ 40 GHz</td><td>위성 면허</td><td>폭우 때 약해짐</td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout warn"><strong>전파는 몸에 해로울까?</strong><p>통신용 전파는 <b>비전리 방사선</b>이다. 3.5 GHz 광자 하나의 에너지는 약 0.00001 eV로, 원자에서 전자를 떼어 내거나 DNA 결합을 끊는 데 필요한 수 eV 이상에 비해 수십만 배 작다. 아무리 세게 쏘아도 광자 하나하나는 그 일을 할 수 없다는 점에서 X선·감마선 같은 전리 방사선과 다르다. 과학적으로 확립된 주된 영향은 조직을 <b>데우는 것</b>(전자레인지의 원리)이다. 그래서 각국은 몸에 흡수되는 전력인 <span class="term">SAR</span><span class="en">(Specific Absorption Rate, 전자파 흡수율)</span>에 한도를 둔다. 한국과 미국은 머리·몸통 기준 1 g 평균 1.6 W/kg, 유럽은 10 g 평균 2 W/kg이며, 이 기준은 실제 체온 상승이 생기는 수준보다 수십 배 낮게 잡은 것이다. 세계보건기구(WHO) 산하 국제암연구소는 2011년 무선 주파수 전자기장을 증거가 제한적이라는 뜻의 “2B군(발암 가능성 있음)”으로 분류했고, 이후 연구에서도 기준 이하 노출의 건강 영향은 확인되지 않았다. 다만 장기 영향 연구는 계속되고 있으므로, 통화할 때 이어폰을 쓰는 정도의 습관은 손해 볼 것 없는 선택이다.</p></div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>전파는 빛과 같은 <b>전자기파</b>이고 주파수만 낮다. 맥스웰이 예언하고 헤르츠가 증명했으며 마르코니가 통신에 썼다.</li>
+      <li><b>λ = c / f</b>. 주파수가 10배 높아지면 파장과 반파장 안테나가 10분의 1로 줄어든다.</li>
+      <li>안테나 <b>이득(dBi)</b>은 전력을 만드는 것이 아니라 한 방향으로 모으는 것이다. 배열 안테나는 소자 수가 두 배일 때 약 3 dB 이득이 오르고 빔이 좁아진다.</li>
+      <li><b>FSPL = 20log d + 20log f + 32.45</b>. 거리 2배마다 −6 dB. 링크 버짓은 송신 출력 + 이득 − 손실을 수신 감도와 비교하는 데시벨 가계부다.</li>
+      <li>높은 주파수일수록 벽·비·몸·산소에 흡수가 크다. 낮은 주파수는 회절·지표파·전리층 반사로 멀리 간다.</li>
+      <li><b>다중 경로</b> 간섭으로 신호는 반파장 간격으로 출렁이고(페이딩), 안테나 여러 개의 <b>다이버시티</b>로 극복한다. 움직이면 <b>도플러</b> 이동과 빠른 채널 변화가 생긴다.</li>
+      <li>주파수는 국가가 관리하는 <b>공공 자원</b>이다. 면허 대역은 경매로 독점 사용권을 사고, 비면허 대역(ISM 2.4 GHz 등)은 규칙만 지키면 누구나 쓴다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>5 GHz Wi-Fi용 반파장 다이폴 안테나의 길이는 대략 얼마인가?</p><div class="opts">
+        <button class="opt">60 cm</button><button class="opt">6 cm</button><button class="opt" data-correct>3 cm</button><button class="opt">3 mm</button>
+      </div><div class="quiz-exp">λ = 3×10⁸ / 5×10⁹ = 0.06 m = 6 cm. 반파장이므로 약 3 cm다.</div></div>
+      <div class="quiz-q"><p>송신 출력 20 dBm, 송신 안테나 3 dBi, 수신 안테나 0 dBi, 경로 손실 90 dB, 벽 손실 10 dB일 때 수신 전력은?</p><div class="opts">
+        <button class="opt" data-correct>−77 dBm</button><button class="opt">−67 dBm</button><button class="opt">−97 dBm</button><button class="opt">123 dBm</button>
+      </div><div class="quiz-exp">20 + 3 + 0 − 90 − 10 = −77 dBm. 데시벨이라 더하고 빼기만 하면 된다.</div></div>
+      <div class="quiz-q"><p>고이득(15 dBi) 안테나에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">입력 전력보다 더 큰 전력을 내보낸다</button>
+        <button class="opt">모든 방향으로 15 dB 더 세게 보낸다</button>
+        <button class="opt" data-correct>특정 방향으로 에너지를 모으므로 그 방향은 세지고 빔은 좁아진다</button>
+        <button class="opt">주파수를 높여 준다</button>
+      </div><div class="quiz-exp">이득은 지향성이다. 에너지 총량은 같고 분포만 바뀐다. 손전등 반사갓과 같다.</div></div>
+      <div class="quiz-q"><p>60 GHz 대역이 장거리 통신에 잘 쓰이지 않는 가장 큰 이유는?</p><div class="opts">
+        <button class="opt">법으로 금지되어 있어서</button><button class="opt">안테나를 만들 수 없어서</button><button class="opt">전리층에 반사되어 우주로 못 나가서</button><button class="opt" data-correct>공기 중 산소 분자가 이 주파수의 에너지를 강하게 흡수해서</button>
+      </div><div class="quiz-exp">60 GHz는 산소 흡수 봉우리(약 15 dB/km)에 있다. 대신 실내 근거리 링크에서는 이웃과 간섭이 적다는 장점이 된다.</div></div>
+      <div class="quiz-q"><p>다중 경로 환경에서 수신 안테나를 2개 반파장쯤 떨어뜨려 두는 이유는?</p><div class="opts">
+        <button class="opt">송신 출력을 두 배로 하려고</button><button class="opt" data-correct>두 안테나가 동시에 깊은 페이딩 골에 빠질 확률이 작아서(다이버시티)</button><button class="opt">도플러 효과를 없애려고</button><button class="opt">주파수를 두 개 쓰려고</button>
+      </div><div class="quiz-exp">반파장쯤 떨어지면 두 안테나가 겪는 간섭 패턴이 거의 독립이 된다. 센 쪽을 고르거나 합치면 깊은 골을 피할 수 있다.</div></div>
+      <div class="quiz-q"><p>Wi-Fi가 2.4 GHz에서 정부 허가 없이 동작할 수 있는 이유는?</p><div class="opts">
+        <button class="opt">2.4 GHz는 전파가 아니라서</button><button class="opt">통신사가 대신 면허를 사 주어서</button><button class="opt" data-correct>출력 제한 등 기술 기준만 지키면 누구나 쓸 수 있는 비면허(ISM) 대역이라서</button><button class="opt">Wi-Fi가 간섭을 전혀 받지 않아서</button>
+      </div><div class="quiz-exp">ISM 대역은 비면허다. 대신 전자레인지, 블루투스, 이웃 Wi-Fi와 함께 써야 해서 서로 양보하는 규칙이 필요하다.</div></div>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const C = 299792458;
+  const lg = Math.log10;
+  const fmtLen = (m) => (m >= 1000 ? NB.fmt(m / 1000, 3) + " km" : m >= 1 ? NB.fmt(m, 3) + " m" : m >= 0.01 ? NB.fmt(m * 100, 3) + " cm" : NB.fmt(m * 1000, 3) + " mm");
+  const fmtHz = (f) => (f >= 1e9 ? NB.fmt(f / 1e9, 3) + " GHz" : f >= 1e6 ? NB.fmt(f / 1e6, 3) + " MHz" : NB.fmt(f / 1e3, 3) + " kHz");
+
+  /* ============ 1. 주파수 → 파장 ============ */
+  const SVC = [
+    ["AM 라디오", 531e3, 1602e3], ["NFC·교통카드", 13.5e6, 13.6e6], ["단파 방송·아마추어", 3e6, 30e6], ["FM 라디오", 88e6, 108e6],
+    ["디지털 TV", 470e6, 698e6], ["LTE·3G", 700e6, 2.7e9], ["GPS", 1.559e9, 1.61e9], ["Wi-Fi 2.4 GHz·블루투스", 2.4e9, 2.4835e9],
+    ["5G 3.5 GHz", 3.4e9, 3.7e9], ["Wi-Fi 5 GHz", 5.15e9, 5.85e9], ["Wi-Fi 6 GHz (6E·7)", 5.925e9, 7.125e9], ["위성 Ku", 12e9, 18e9],
+    ["위성 Ka", 18e9, 40e9], ["5G 28 GHz", 26.5e9, 29.5e9], ["5G 39 GHz", 37e9, 40e9], ["60 GHz WiGig", 57e9, 71e9], ["자동차 레이더", 76e9, 81e9],
+  ];
+  const ITU = [[3e4, "LF (장파)"], [3e5, "MF (중파)"], [3e6, "HF (단파)"], [3e7, "VHF"], [3e8, "UHF"], [3e9, "SHF"], [3e10, "EHF"], [3e11, "THz"]];
+  const wlF = NB.range("wl-f", (v) => fmtHz(Math.pow(10, v)), () => { wlUpd(); });
+  const wlPre = NB.seg("wl-pre", (v) => wlF.set(Number(v)));
+  function wlUpd() {
+    const f = Math.pow(10, wlF()), lam = C / f;
+    NB.stat("wl-lam", fmtLen(lam));
+    NB.stat("wl-half", fmtLen(lam / 2));
+    let band = ITU[0][1]; ITU.forEach(([lo, n]) => { if (f >= lo) band = n; });
+    NB.stat("wl-band", band);
+    const ev = 4.1357e-15 * f;
+    NB.stat("wl-ev", ev.toExponential(1).replace("e", "×10^") + " eV");
+    const hits = SVC.filter((s) => f >= s[1] && f <= s[2]).map((s) => `<span class="pill acc">${s[0]}</span>`);
+    $("wl-svc").innerHTML = "이 주파수를 쓰는 곳: " + (hits.length ? hits.join("") : "<span>대표 통신 서비스 대역이 아니다 (다른 무선 업무·군용·과학용 등)</span>");
+    wlcv.redraw();
+  }
+  const wlcv = NB.canvas($("cv-wl"), (ctx, w, h) => {
+    const P = NB.palette();
+    const narrow = w < 520;
+    const L = 16, R = w - 16, top = 30, bh = 22;
+    const e0 = 5, e1 = 11.4, X = (f) => L + ((lg(f) - e0) / (e1 - e0)) * (R - L);
+    NB.text(ctx, "주파수 띠 (로그)", L, 14, { size: 11.5, color: P.dim });
+    ctx.fillStyle = P.surface; ctx.fillRect(L, top, R - L, bh);
+    const f = Math.pow(10, wlF());
+    SVC.forEach((s) => { const x0 = X(s[1]), x1 = X(s[2]); const on = f >= s[1] && f <= s[2]; ctx.fillStyle = on ? P.accent : P.faint; ctx.globalAlpha = on ? 0.9 : 0.35; ctx.fillRect(x0, top, Math.max(2, x1 - x0), bh); ctx.globalAlpha = 1; });
+    for (let e = 5; e <= 11; e++) { const x = X(Math.pow(10, e)); ctx.strokeStyle = P.border; ctx.beginPath(); ctx.moveTo(x, top + bh); ctx.lineTo(x, top + bh + 5); ctx.stroke(); if (!narrow || e % 2 === 1) NB.text(ctx, fmtHz(Math.pow(10, e)).replace(" ", ""), x, top + bh + 14, { align: "center", size: 10, mono: true, color: P.dim }); }
+    const xp = X(f);
+    ctx.fillStyle = P.bad; ctx.beginPath(); ctx.moveTo(xp, top - 2); ctx.lineTo(xp - 6, top - 11); ctx.lineTo(xp + 6, top - 11); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = P.bad; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(xp, top - 2); ctx.lineTo(xp, top + bh + 2); ctx.stroke();
+    // 파동 그리기: 화면에 1~3 파장 정도가 보이도록 눈금 선택
+    const lam = C / f, y0 = top + bh + 30, y1 = h - 10, mid = (y0 + y1) / 2 - 10, amp = Math.min(30, (y1 - y0) / 4.5);
+    const spanPx = R - L;
+    const nice = [1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 5e-2, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
+    // 화면 폭이 약 2.5 파장이 되게
+    const metersPerPx = (lam * 2.5) / spanPx;
+    let bar = nice[0]; nice.forEach((n) => { if (n / metersPerPx < spanPx * 0.4) bar = n; });
+    ctx.strokeStyle = P.accent; ctx.lineWidth = 2.2; ctx.beginPath();
+    for (let x = 0; x <= spanPx; x += 1) { const ph = (x * metersPerPx / lam) * Math.PI * 2; const y = mid - amp * Math.sin(ph); x ? ctx.lineTo(L + x, y) : ctx.moveTo(L + x, y); }
+    ctx.stroke();
+    ctx.strokeStyle = P.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L, mid); ctx.lineTo(R, mid); ctx.stroke();
+    // λ 표시
+    const lpx = lam / metersPerPx, x0 = L + lpx * 0.25;
+    NB.arrow(ctx, x0 + lpx / 2, mid - amp - 10, x0 + lpx, mid - amp - 10, { color: P.dim, head: 6, lw: 1.2 });
+    NB.arrow(ctx, x0 + lpx / 2, mid - amp - 10, x0, mid - amp - 10, { color: P.dim, head: 6, lw: 1.2 });
+    NB.text(ctx, "λ = " + fmtLen(lam), x0 + lpx / 2, mid - amp - 20, { align: "center", size: 12, bold: true, color: P.text });
+    // 반파장 다이폴
+    const dx = L + lpx * 1.75, half = lpx / 2;
+    ctx.strokeStyle = P.accent2; ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(dx - half / 2, mid + amp + 18); ctx.lineTo(dx - 3, mid + amp + 18); ctx.moveTo(dx + 3, mid + amp + 18); ctx.lineTo(dx + half / 2, mid + amp + 18); ctx.stroke(); ctx.lineCap = "butt";
+    NB.text(ctx, "반파장 다이폴 " + fmtLen(lam / 2), dx, mid + amp + 34, { align: "center", size: 11.5, color: P.accent2, bold: true });
+    // 눈금 막대
+    const bpx = bar / metersPerPx;
+    ctx.strokeStyle = P.text; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(R - bpx, y1 - 4); ctx.lineTo(R, y1 - 4); ctx.moveTo(R - bpx, y1 - 9); ctx.lineTo(R - bpx, y1); ctx.moveTo(R, y1 - 9); ctx.lineTo(R, y1); ctx.stroke();
+    NB.text(ctx, fmtLen(bar), R - bpx / 2, y1 - 16, { align: "center", size: 11, mono: true, color: P.text });
+    const refs = [[1e-3 * 1.0, "모래알"], [0.012, "손톱 너비"], [0.15, "휴대폰"], [1.7, "사람 키"], [30, "10층 건물"], [300, "축구장 3개"], [3000, "동네 하나"]];
+    let ref = refs[0]; refs.forEach((r) => { if (lam / 2 >= r[0] * 0.5) ref = r; });
+    NB.text(ctx, "안테나 크기 감각: " + ref[1] + " 정도", L, y1 - 4, { size: 11.5, color: P.dim });
+  }, { aspect: 0.36, minHeight: 270, maxHeight: 300 });
+  wlUpd();
+
+  /* ============ 2. 방사 패턴 ============ */
+  const patType = NB.seg("pat-type", () => patUpd());
+  const patN = NB.range("pat-n", (v) => v + "개", () => patUpd());
+  const patD = NB.range("pat-d", (v) => v.toFixed(2) + " λ", () => patUpd());
+  $("pat-db").addEventListener("change", () => patUpd());
+  // 3D 전력 패턴 U(θ,φ): 다이폴은 z축, 패치/배열은 x축이 정면, 배열은 y축 방향으로 소자 나열
+  function U3(type, ux, uy, uz) {
+    if (type === "dipole") { const ct = uz, st = Math.sqrt(Math.max(1e-9, 1 - ct * ct)); const e = Math.cos((Math.PI / 2) * ct) / st; return e * e; }
+    const elem = ux > 0 ? Math.pow(ux, 1.6) + 0.004 : 0.004 * (1 + ux) ** 2 + 0.0004;
+    if (type === "patch") return elem;
+    const N = patN(), d = patD();
+    const psi = 2 * Math.PI * d * uy;
+    const den = Math.sin(psi / 2);
+    const af = Math.abs(den) < 1e-6 ? 1 : Math.pow(Math.sin((N * psi) / 2) / (N * den), 2);
+    return elem * af;
+  }
+  function directivity(type) {
+    let sum = 0, mx = 0; const nt = 180, np = 360;
+    for (let i = 0; i < nt; i++) {
+      const th = ((i + 0.5) / nt) * Math.PI, st = Math.sin(th), ct = Math.cos(th);
+      for (let j = 0; j < np; j++) {
+        const ph = ((j + 0.5) / np) * 2 * Math.PI;
+        const u = U3(type, st * Math.cos(ph), st * Math.sin(ph), ct);
+        sum += u * st; if (u > mx) mx = u;
+      }
+    }
+    const avg = sum * (Math.PI / nt) * (2 * Math.PI / np) / (4 * Math.PI);
+    return mx / avg;
+  }
+  // 그릴 단면: 다이폴은 x-z 평면(각도 a: 0 = +x 오른쪽), 그 외는 x-y 평면
+  function cut(type, a) { const c = Math.cos(a), s = Math.sin(a); return type === "dipole" ? U3(type, c, 0, s) : U3(type, c, s, 0); }
+  let patCache = { key: "", D: 1 };
+  function patUpd() {
+    const type = patType();
+    patN.el.disabled = patD.el.disabled = type !== "array";
+    const key = type + patN() + patD();
+    if (patCache.key !== key) patCache = { key, D: directivity(type) };
+    const D = patCache.D;
+    // 빔폭
+    const M = 3600; let mx = 0, imx = 0; const arr = [];
+    for (let i = 0; i < M; i++) { const v = cut(type, (i / M) * 2 * Math.PI); arr.push(v); if (v > mx) { mx = v; imx = i; } }
+    let l = imx, r = imx; while (arr[(r + 1) % M] >= mx / 2 && r - imx < M / 2) r++; while (arr[(l - 1 + M) % M] >= mx / 2 && imx - l < M / 2) l--;
+    const bw = ((r - l) / M) * 360;
+    NB.stat("pat-g", (10 * lg(D)).toFixed(1) + " dBi");
+    NB.stat("pat-bw", bw > 300 ? "무지향(수평면)" : bw.toFixed(0) + "°");
+    const back = arr[(imx + M / 2) % M];
+    NB.stat("pat-fb", type === "dipole" ? "0 dB (대칭)" : (10 * lg(mx / Math.max(back, 1e-9))).toFixed(0) + " dB");
+    patcv.redraw();
+  }
+  const patcv = NB.canvas($("cv-pat"), (ctx, w, h) => {
+    const P = NB.palette(), type = patType(), useDb = $("pat-db").checked;
+    const cx = w / 2, cy = h / 2 + 6, R = Math.min(w, h) / 2 - 30;
+    const rng = 30;
+    let mx = 0; const M = 720, vals = [];
+    for (let i = 0; i <= M; i++) { const v = cut(type, (i / M) * 2 * Math.PI); vals.push(v); if (v > mx) mx = v; }
+    const rad = (v) => (useDb ? Math.max(0, (10 * lg(Math.max(v / mx, 1e-12)) + rng) / rng) : v / mx) * R;
+    ctx.strokeStyle = P.grid; ctx.lineWidth = 1;
+    for (let k = 1; k <= 3; k++) { ctx.beginPath(); ctx.arc(cx, cy, (R * k) / 3, 0, 7); ctx.stroke(); }
+    for (let a = 0; a < 360; a += 30) { const t = (a * Math.PI) / 180; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + R * Math.cos(t), cy - R * Math.sin(t)); ctx.stroke(); }
+    const lab = useDb ? ["−20 dB", "−10 dB", "0 dB"] : ["1/3", "2/3", "최대"];
+    for (let k = 1; k <= 3; k++) NB.text(ctx, lab[k - 1], cx - (R * k) / 3 * 0.707 - 4, cy + (R * k) / 3 * 0.707 + 4, { align: "right", size: 10, mono: true, color: P.faint });
+    ctx.beginPath();
+    vals.forEach((v, i) => { const a = (i / M) * 2 * Math.PI, r = rad(v); const x = cx + r * Math.cos(a), y = cy - r * Math.sin(a); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    ctx.closePath(); ctx.fillStyle = P.accent; ctx.globalAlpha = 0.18; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = P.accent; ctx.lineWidth = 2.2; ctx.stroke();
+    // 안테나 모양
+    ctx.fillStyle = P.accent2; ctx.strokeStyle = P.accent2;
+    if (type === "dipole") { ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(cx, cy - 22); ctx.lineTo(cx, cy - 3); ctx.moveTo(cx, cy + 3); ctx.lineTo(cx, cy + 22); ctx.stroke(); }
+    else if (type === "patch") { ctx.fillRect(cx - 4, cy - 12, 5, 24); ctx.globalAlpha = 0.5; ctx.fillRect(cx - 9, cy - 18, 3, 36); ctx.globalAlpha = 1; }
+    else { const N = patN(), sp = Math.min(10, 120 / N); for (let i = 0; i < N; i++) ctx.fillRect(cx - 3, cy - ((N - 1) / 2 - i) * sp - 3, 5, 6); }
+    NB.text(ctx, type === "dipole" ? "옆에서 본 단면 (막대는 세로)" : "위에서 본 단면 · 오른쪽이 정면", 10, 14, { size: 11.5, color: P.dim });
+    NB.text(ctx, "0°", cx + R + 6, cy, { size: 10.5, mono: true, color: P.dim });
+    NB.text(ctx, "90°", cx, cy - R - 10, { align: "center", size: 10.5, mono: true, color: P.dim });
+  }, { aspect: 0.75, minHeight: 300, maxHeight: 400 });
+  patUpd();
+
+  /* ============ 3. 링크 버짓 ============ */
+  const FREQS = [0.9, 2.4, 5, 6, 28];
+  const WALL = [[2, 3, 4, 4.5, 7], [5, 7, 10, 11, 28], [9, 12, 16, 18, 45]];
+  // Wi-Fi 6식 MCS (80 MHz, 1스트림): [필요 SNR dB, 변조, 속도 Mbps]
+  const MCS = [[5, "BPSK 1/2", 36], [8, "QPSK 1/2", 72], [11, "QPSK 3/4", 108], [14, "16QAM 1/2", 144], [17, "16QAM 3/4", 216], [21, "64QAM 2/3", 288], [23, "64QAM 3/4", 324], [25, "64QAM 5/6", 360], [29, "256QAM 3/4", 432], [31, "256QAM 5/6", 480], [34, "1024QAM 3/4", 540], [37, "1024QAM 5/6", 600]];
+  const NOISE = -174 + 10 * lg(80e6) + 6;
+  const lbF = NB.seg("lb-f", () => lbUpd());
+  const lbWt = NB.seg("lb-wt", () => lbUpd());
+  const lbD = NB.range("lb-d", (v) => fmtLen(Math.pow(10, v)), () => lbUpd());
+  const lbP = NB.range("lb-p", (v) => v + " dBm (" + NB.si(Math.pow(10, v / 10) / 1000, "W", 2) + ")", () => lbUpd());
+  const lbGt = NB.range("lb-gt", (v) => v + " dBi", () => lbUpd());
+  const lbGr = NB.range("lb-gr", (v) => v + " dBi", () => lbUpd());
+  const lbW = NB.range("lb-w", (v) => v + "장", () => lbUpd());
+  const fspl = (dm, fGHz) => 20 * lg(Math.max(dm, 0.1)) + 20 * lg(fGHz * 1000) - 27.55;
+  function rxAt(dm) { const f = Number(lbF()); const wl = lbW() * WALL[Number(lbWt())][FREQS.indexOf(f)]; return lbP() + lbGt() + lbGr() - fspl(dm, f) - wl; }
+  function lbUpd() {
+    const f = Number(lbF()), d = Math.pow(10, lbD());
+    const L = fspl(d, f), wl = lbW() * WALL[Number(lbWt())][FREQS.indexOf(f)], rx = rxAt(d), snr = rx - NOISE;
+    NB.stat("lb-fspl", L.toFixed(1) + " dB");
+    NB.stat("lb-wl", wl.toFixed(0) + " dB");
+    NB.stat("lb-rx", rx.toFixed(1) + " dBm");
+    const marg = snr - MCS[0][0];
+    NB.stat("lb-mg", `<span style="color:${marg >= 0 ? "var(--ok)" : "var(--bad)"}">${marg >= 0 ? "+" : ""}${marg.toFixed(0)} dB</span> <small>SNR ${snr.toFixed(0)} dB</small>`);
+    let m = null; MCS.forEach((x) => { if (snr >= x[0]) m = x; });
+    NB.stat("lb-rate", m ? `${m[1]} · 약 ${m[2]} Mbps` : `<span style="color:var(--bad)">연결 불가</span>`);
+    lbcv.redraw();
+  }
+  const lbcv = NB.canvas($("cv-lb"), (ctx, w, h) => {
+    const P = NB.palette(), narrow = w < 500;
+    const data = []; for (let e = 0; e <= 4.0001; e += 0.02) { const d = Math.pow(10, e); data.push([d, rxAt(d)]); }
+    const d = Math.pow(10, lbD());
+    const ch = NB.chart(ctx, { x: 58, y: 14, w: w - 58 - 14, h: h - 14 - 46 }, {
+      x: [1, 10000], y: [-130, 0], logX: true, xLabel: "거리 (m, 로그)", yLabel: "수신 전력 (dBm)",
+      xFmt: (v) => (v >= 1000 ? v / 1000 + "km" : v + "m"),
+      bands: [],
+      hlines: [
+        { y: NOISE + MCS[11][0], color: P.ok, label: narrow ? "1024QAM" : "1024QAM 5/6 (600 Mbps)" },
+        { y: NOISE + MCS[5][0], color: P.warn, label: narrow ? "64QAM" : "64QAM (288 Mbps)" },
+        { y: NOISE + MCS[0][0], color: P.bad, label: narrow ? "연결 한계" : "연결 한계 BPSK (36 Mbps)" },
+        { y: NOISE, color: P.faint },
+      ],
+      series: [{ data, color: P.accent, width: 2.5 }],
+      points: [{ x: d, y: rxAt(d), color: P.accent2, r: 6 }],
+    });
+    NB.text(ctx, "잡음 바닥 " + NOISE.toFixed(0) + " dBm", ch.box.x + 6, ch.Y(NOISE) + 9, { size: 10.5, color: P.dim });
+  }, { aspect: 0.45, minHeight: 260, maxHeight: 340 });
+  lbUpd();
+
+  /* ============ 4. 다중 경로 ============ */
+  const mpX = NB.range("mp-x", (v) => v.toFixed(3) + " m", () => mpPos());
+  const mpR = NB.range("mp-r", (v) => v.toFixed(2), () => mpUpd());
+  const mpN = NB.seg("mp-n", () => mpUpd());
+  const mpF = NB.seg("mp-f", () => mpUpd());
+  $("mp-los").addEventListener("change", () => mpUpd());
+  $("mp-div").addEventListener("change", () => mpUpd());
+  const RW = 20, RH = 8, TX = [2, 5], RY = 3;
+  const rnd = NB.rng(7); const SCAT = []; for (let i = 0; i < 24; i++) SCAT.push([3 + rnd() * 16, 0.4 + rnd() * 7.2, 0.5 + rnd() * 0.5, rnd() * Math.PI * 2]);
+  function paths() {
+    const n = Number(mpN()), r = mpR(), out = [];
+    if (!$("mp-los").checked) out.push({ kind: "d", amp: 1 });
+    if (n === 20) { SCAT.forEach((s) => out.push({ kind: "s", s, amp: r * s[2] * 0.9, ph: s[3] })); return out; }
+    const imgs = [{ img: [TX[0], -TX[1]], wall: "y0" }, { img: [TX[0], 2 * RH - TX[1]], wall: "yH" }, { img: [2 * RW - TX[0], TX[1]], wall: "xW" }];
+    for (let i = 0; i < n - 1; i++) out.push({ kind: "i", img: imgs[i].img, wall: imgs[i].wall, amp: -r });
+    return out;
+  }
+  function field(P, rx, lam) {
+    let re = 0, im = 0;
+    P.forEach((p) => {
+      let L, a = p.amp;
+      if (p.kind === "d") L = Math.hypot(rx[0] - TX[0], rx[1] - TX[1]);
+      else if (p.kind === "i") L = Math.hypot(rx[0] - p.img[0], rx[1] - p.img[1]);
+      else L = Math.hypot(p.s[0] - TX[0], p.s[1] - TX[1]) + Math.hypot(rx[0] - p.s[0], rx[1] - p.s[1]);
+      const ph = (-2 * Math.PI * L) / lam + (p.ph || 0);
+      re += (a / L) * Math.cos(ph); im += (a / L) * Math.sin(ph);
+    });
+    return re * re + im * im;
+  }
+  let mpCurve = null;
+  function mpUpd() {
+    const lam = C / (Number(mpF()) * 1e9), P = paths(), div = $("mp-div").checked;
+    const N = 1500, a = [], b = [], c = [];
+    for (let i = 0; i <= N; i++) {
+      const x = 8 + (3 * i) / N;
+      const ref = 1 / Math.pow(Math.hypot(x - TX[0], RY - TX[1]), 2);
+      const p1 = 10 * lg(Math.max(field(P, [x, RY], lam), 1e-12) / ref);
+      const p2 = 10 * lg(Math.max(field(P, [x, RY + lam / 2], lam), 1e-12) / ref);
+      a.push([x, p1]); b.push([x, p2]); c.push([x, Math.max(p1, p2)]);
+    }
+    mpCurve = { a, b, c, div };
+    mpPos();
+  }
+  function mpPos() {
+    if (!mpCurve) return;
+    const { a, c, div } = mpCurve, N = a.length - 1, use = div ? c : a;
+    const x = mpX(), idx = Math.round(((x - 8) / 3) * N);
+    const now = use[NB.clamp(idx, 0, N)][1];
+    let mx = -1e9, mn = 1e9, deep = 0, deepS = 0;
+    const avg = 10 * lg(a.reduce((s, p) => s + Math.pow(10, p[1] / 10), 0) / a.length);
+    use.forEach((p) => { mx = Math.max(mx, p[1]); mn = Math.min(mn, p[1]); if (p[1] < avg - 10) deep++; });
+    a.forEach((p) => { if (p[1] < avg - 10) deepS++; });
+    NB.stat("mp-now", now.toFixed(1) + " dB");
+    NB.stat("mp-rng", `${mx.toFixed(0)} ~ ${Math.max(mn, -60).toFixed(0)} dB`);
+    NB.stat("mp-deep", div ? `${((deep / use.length) * 100).toFixed(1)}% <small>(1개일 때 ${((deepS / a.length) * 100).toFixed(1)}%)</small>` : ((deep / use.length) * 100).toFixed(1) + "% <small>(평균보다 10 dB↓)</small>");
+    NB.stat("mp-lam", fmtLen(C / (Number(mpF()) * 1e9) / 2));
+    mpcv.redraw();
+  }
+  const mpcv = NB.canvas($("cv-mp"), (ctx, w, h) => {
+    const P = NB.palette(), narrow = w < 500;
+    const topH = Math.round(h * 0.42);
+    // 방 그리기
+    const pad = 12, sc = Math.min((w - 2 * pad) / RW, (topH - 2 * pad) / RH), ox = (w - RW * sc) / 2, oy = pad;
+    const X = (x) => ox + x * sc, Y = (y) => oy + (RH - y) * sc;
+    ctx.fillStyle = P.surface; ctx.fillRect(X(0), Y(RH), RW * sc, RH * sc);
+    ctx.strokeStyle = P.text; ctx.lineWidth = 3; ctx.strokeRect(X(0), Y(RH), RW * sc, RH * sc);
+    ctx.fillStyle = P.accent; ctx.globalAlpha = 0.1; ctx.fillRect(X(8), Y(RY) - 4, 3 * sc, 8); ctx.globalAlpha = 1;
+    const rx = [mpX(), RY], Pth = paths();
+    if ($("mp-los").checked) { ctx.strokeStyle = P.bad; ctx.lineWidth = 4; const mx = (TX[0] + rx[0]) / 2; ctx.beginPath(); ctx.moveTo(X(mx), Y(TX[1] + 1.5)); ctx.lineTo(X(mx), Y(RY - 1)); ctx.stroke(); }
+    ctx.lineWidth = 1.3;
+    Pth.forEach((p, i) => {
+      ctx.strokeStyle = p.kind === "d" ? P.accent : P.accent2; ctx.globalAlpha = p.kind === "s" ? 0.35 : 0.9;
+      ctx.beginPath(); ctx.moveTo(X(TX[0]), Y(TX[1]));
+      if (p.kind === "i") {
+        let q;
+        if (p.wall === "y0") { const t = p.img[1] / (p.img[1] - rx[1]); q = [p.img[0] + t * (rx[0] - p.img[0]), 0]; }
+        else if (p.wall === "yH") { const t = (p.img[1] - RH) / (p.img[1] - rx[1]); q = [p.img[0] + t * (rx[0] - p.img[0]), RH]; }
+        else { const t = (p.img[0] - RW) / (p.img[0] - rx[0]); q = [RW, p.img[1] + t * (rx[1] - p.img[1])]; }
+        ctx.lineTo(X(q[0]), Y(q[1]));
+      } else if (p.kind === "s") ctx.lineTo(X(p.s[0]), Y(p.s[1]));
+      ctx.lineTo(X(rx[0]), Y(rx[1])); ctx.stroke(); ctx.globalAlpha = 1;
+      if (p.kind === "s") { ctx.fillStyle = P.ok; ctx.beginPath(); ctx.arc(X(p.s[0]), Y(p.s[1]), 3, 0, 7); ctx.fill(); }
+    });
+    NB.box(ctx, X(TX[0]) - 16, Y(TX[1]) - 10, 32, 20, { fill: P.accent, stroke: false, text: "Tx", color: "#fff", size: 11, bold: true, r: 5 });
+    NB.box(ctx, X(rx[0]) - 16, Y(rx[1]) - 10, 32, 20, { fill: P.accent2, stroke: false, text: "Rx", color: "#fff", size: 11, bold: true, r: 5 });
+    // 그래프
+    if (!mpCurve) return;
+    const box = { x: 50, y: topH + 14, w: w - 50 - 12, h: h - topH - 14 - 40 };
+    const series = [];
+    if (mpCurve.div) { series.push({ data: mpCurve.a, color: P.faint, width: 1 }); series.push({ data: mpCurve.b, color: P.faint, width: 1, dash: [3, 3] }); series.push({ data: mpCurve.c, color: P.ok, width: 2 }); }
+    else series.push({ data: mpCurve.a, color: P.accent, width: 1.8 });
+    const use = mpCurve.div ? mpCurve.c : mpCurve.a, idx = NB.clamp(Math.round(((mpX() - 8) / 3) * 1500), 0, 1500);
+    NB.chart(ctx, box, { x: [8, 11], y: [-40, 12], xLabel: narrow ? "수신기 위치 x (m)" : "수신기 위치 x (m) · 3 m 구간", yLabel: "세기 (dB)", series, hlines: [{ y: 0, color: P.dim, label: "직접파만" }, { y: -10, color: P.bad }], vlines: [{ x: mpX(), color: P.accent2, dash: [] }], points: [{ x: mpX(), y: Math.max(-40, use[idx][1]), color: P.accent2, r: 5 }] });
+  }, { aspect: 0.62, minHeight: 380, maxHeight: 520 });
+  let walking = false, dir = 1;
+  $("mp-walk").onclick = () => { walking = !walking; $("mp-walk").textContent = walking ? "멈춤 ■" : "걷기 ▶"; };
+  NB.loop($("cv-mp"), (dt) => {
+    if (!walking) return;
+    let x = mpX() + dir * dt * 0.5; // 0.5 m/s (천천히)
+    if (x > 11) { x = 11; dir = -1; } if (x < 8) { x = 8; dir = 1; }
+    mpX.set(x);
+  });
+  mpUpd();
+
+  /* ============ 5. 도플러 ============ */
+  const dopV = NB.seg("dop-v", () => dopUpd());
+  const dopF = NB.seg("dop-f", () => dopUpd());
+  function dopUpd() {
+    const v = Number(dopV()) / 3.6, f = Number(dopF()) * 1e9, fd = (v / C) * f;
+    NB.stat("dop-fd", "± " + NB.si(fd, "Hz", 3));
+    const tc = 0.423 / fd;
+    NB.stat("dop-tc", NB.time(tc));
+    NB.stat("dop-n", NB.fmt((v / (C / f / 2)), 3) + "개");
+  }
+  let waves = [], tsrc = 0, dopSx = 40, dopW = 600;
+  const dopcv = NB.canvas($("cv-dop"), (ctx, w, h) => {
+    const P = NB.palette();
+    const vrel = Math.min(0.75, 0.1 + 0.6 * (Math.log10(Number(dopV())) - 0.7) / 3.73); // 시각적 과장
+    const cy = h / 2, speed = 70;
+    const sx = 40 + ((tsrc * vrel * speed) % (w - 80));
+    waves.forEach((wv) => { ctx.strokeStyle = P.accent; ctx.globalAlpha = Math.max(0, 1 - wv.r / (w * 0.7)); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(wv.x, cy, wv.r, 0, 7); ctx.stroke(); });
+    ctx.globalAlpha = 1;
+    NB.box(ctx, sx - 18, cy - 11, 36, 22, { fill: P.accent2, stroke: false, text: "→", color: "#fff", size: 14, bold: true, r: 6 });
+    NB.text(ctx, "앞쪽: 파면이 촘촘 → 주파수 ↑", w - 12, 16, { align: "right", size: 11.5, color: P.dim });
+    NB.text(ctx, "뒤쪽: 듬성듬성 → 주파수 ↓", 12, h - 14, { size: 11.5, color: P.dim });
+    dopSx = sx; dopW = w;
+  }, { aspect: 0.26, minHeight: 150, maxHeight: 200 });
+  let emitT = 0, lastSx = null;
+  NB.loop($("cv-dop"), (dt) => {
+    tsrc += dt; emitT += dt;
+    waves.forEach((wv) => (wv.r += dt * 120));
+    if (lastSx != null && dopSx < lastSx) waves = [];
+    lastSx = dopSx;
+    if (emitT > 0.25) { emitT = 0; waves.push({ x: dopSx, r: 0 }); }
+    waves = waves.filter((wv) => wv.r < dopW * 0.8);
+    dopcv.redraw();
+  });
+  dopUpd();
+})();
+</script>
+</body>
+</html>
