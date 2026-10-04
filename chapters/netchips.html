@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>네트워크 칩: 스위치와 NIC · NetworkBook</title>
+<meta name="description" content="51.2 Tbps 스위치 ASIC의 내부를 3D로 뜯어보고, 초당 수십억 패킷을 처리하는 파이프라인, TCAM의 병렬 검색, 마이크로버스트를 견디는 버퍼, NIC·SmartNIC·DPU의 오프로드를 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .nc-desc { padding: 12px 18px; border-top: 1px solid var(--border); font-size: 15px; min-height: 76px; }
+  .tc-wrap { overflow-x: auto; padding: 12px 18px 14px; }
+  .tc-tbl { min-width: 640px; font-family: var(--mono); font-size: 12px; display: grid; gap: 3px; }
+  .tc-row { display: grid; grid-template-columns: 26px 128px 1fr 64px 92px; gap: 8px; align-items: center; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); transition: background .15s, border-color .15s; }
+  .tc-row.key { background: var(--bg-elev); border-style: dashed; }
+  .tc-row.hit { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  .tc-row.win { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 2px var(--accent) inset; }
+  .tc-row .ix { color: var(--text-faint); }
+  .tc-row .pf { color: var(--text); font-weight: 600; white-space: nowrap; }
+  .tc-row .act { color: var(--text-dim); white-space: nowrap; }
+  .tc-row .ml { text-align: center; font-weight: 700; white-space: nowrap; }
+  .tc-bits { display: flex; gap: 6px; }
+  .tc-bits span.byte { display: inline-flex; gap: 0; }
+  .tc-bits i { font-style: normal; width: 0.62em; text-align: center; color: var(--text); }
+  .tc-bits i.x { color: var(--text-faint); }
+  .tc-bits i.mis { color: var(--bad); font-weight: 700; background: color-mix(in srgb, var(--bad) 16%, transparent); border-radius: 2px; }
+  .tc-ctrl { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; padding: 14px 18px 0; }
+  .tc-ctrl .ctrl { min-width: 180px; flex: 1; }
+  .tc-pre { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tc-pre .btn { padding: 5px 10px; font-size: 13px; font-family: var(--mono); }
+</style>
+</head>
+<body data-chapter="netchips">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 17</div>
+    <h1>네트워크 칩: 스위치와 NIC</h1>
+    <p class="lead">데이터센터 랙 맨 위에 꽂힌 납작한 상자 하나가 1초에 50테라비트, 100테라비트를 주고받는다. 넷플릭스 4K 영상 1,000만 편을 동시에 흘려보낼 수 있는 양이다. 그 일을 하는 것은 상자 한가운데 커다란 방열판 아래 숨은 칩 하나다. 이 장에서는 그 <strong>스위치 칩</strong>과, 서버 쪽 출입구인 <strong>NIC</strong>의 속을 들여다본다.</p>
+    <ul class="objectives">
+      <li>스위치·라우터 상자 안의 칩 구성(스위치 ASIC, CPU, 광 모듈, 리타이머, NIC/DPU)을 그린다.</li>
+      <li>스위치 칩 용량이 약 2년마다 두 배가 된 역사와 “용량 = SerDes 수 × 레인 속도” 관계를 계산한다.</li>
+      <li>51.2 Tbps 칩이 초당 수백억 개의 패킷을 처리해야 하는 이유와 파이프라인 구조를 안다.</li>
+      <li>TCAM이 모든 엔트리를 한 사이클에 동시에 비교하는 원리와 그 대가(전력·면적)를 설명한다.</li>
+      <li>마이크로버스트와 공유 버퍼, 딥 버퍼 라우터 칩의 필요성을 시뮬레이터로 확인한다.</li>
+      <li>NIC의 DMA·오프로드·RSS·SR-IOV와 SmartNIC·DPU가 서버 CPU의 일을 덜어 주는 방식을 이해한다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="map">
+    <h2>네트워크 장비 속 칩 지도</h2>
+    <p>스위치(6장)와 라우터(8장)는 겉으로는 포트가 줄지어 박힌 금속 상자다. 상자를 열면 일이 두 갈래로 나뉘어 있다. 패킷 하나하나를 받아 목적지를 찾아 내보내는 고속 작업, 즉 <span class="term">데이터 평면</span><span class="en">(data plane)</span>은 전용 칩인 <span class="term">스위치 ASIC</span><span class="en">(Application-Specific Integrated Circuit)</span>이 맡는다. 이웃 장비와 라우팅 정보를 주고받고(BGP, 8장), 표를 계산해 ASIC에 써 넣고, 관리자의 명령을 받는 느린 두뇌 작업, 즉 <span class="term">제어 평면</span><span class="en">(control plane)</span>은 옆의 평범한 CPU가 맡는다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 330" style="min-width:640px" role="img" aria-label="스위치 상자와 서버 속 네트워크 칩의 배치">
+        <defs><marker id="nc-a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-dim)"/></marker></defs>
+        <rect x="10" y="20" width="520" height="290" rx="14" class="f-surface"/>
+        <text x="24" y="42" class="t" style="font-weight:700">스위치 상자 (1~2U)</text>
+        <g class="t-mono">
+          <rect x="24" y="60" width="74" height="236" rx="8" fill="color-mix(in srgb, var(--warn) 14%, transparent)" stroke="var(--warn)"/>
+          <text x="61" y="84" text-anchor="middle" style="fill:var(--text)">광 모듈</text><text x="61" y="100" text-anchor="middle">×32~64</text>
+          <g fill="var(--warn)" opacity=".55"><rect x="34" y="112" width="54" height="14" rx="3"/><rect x="34" y="132" width="54" height="14" rx="3"/><rect x="34" y="152" width="54" height="14" rx="3"/><rect x="34" y="172" width="54" height="14" rx="3"/><rect x="34" y="192" width="54" height="14" rx="3"/><rect x="34" y="212" width="54" height="14" rx="3"/><rect x="34" y="232" width="54" height="14" rx="3"/><rect x="34" y="252" width="54" height="14" rx="3"/></g>
+          <text x="61" y="286" text-anchor="middle">DSP+레이저</text>
+          <rect x="114" y="120" width="60" height="118" rx="8" class="f-acc2-soft"/><text x="144" y="170" text-anchor="middle" style="fill:var(--text)">리타이머</text><text x="144" y="186" text-anchor="middle">/ PHY</text><text x="144" y="202" text-anchor="middle">(필요 시)</text>
+          <rect x="196" y="78" width="180" height="200" rx="12" class="f-acc-soft"/>
+          <text x="286" y="104" text-anchor="middle" class="t" style="font-weight:700">스위치 ASIC</text>
+          <rect x="212" y="116" width="148" height="22" rx="4" class="f-elev"/><text x="286" y="131" text-anchor="middle">SerDes ×512</text>
+          <rect x="212" y="144" width="70" height="42" rx="4" class="f-elev"/><text x="247" y="162" text-anchor="middle">패킷</text><text x="247" y="177" text-anchor="middle">파이프라인</text>
+          <rect x="290" y="144" width="70" height="42" rx="4" class="f-elev"/><text x="325" y="162" text-anchor="middle">TCAM·</text><text x="325" y="177" text-anchor="middle">SRAM 표</text>
+          <rect x="212" y="192" width="148" height="30" rx="4" class="f-elev"/><text x="286" y="211" text-anchor="middle">공유 패킷 버퍼 (SRAM)</text>
+          <rect x="212" y="228" width="148" height="22" rx="4" class="f-elev"/><text x="286" y="243" text-anchor="middle">트래픽 매니저·큐</text>
+          <text x="286" y="268" text-anchor="middle">데이터 평면</text>
+          <rect x="400" y="78" width="116" height="94" rx="10" class="f-acc2-soft"/><text x="458" y="100" text-anchor="middle" class="t" style="font-weight:700">CPU</text><text x="458" y="118" text-anchor="middle">x86/Arm + DRAM</text><text x="458" y="134" text-anchor="middle">SSD, 네트워크 OS</text><text x="458" y="156" text-anchor="middle">제어 평면</text>
+          <rect x="400" y="188" width="116" height="40" rx="10" class="f-elev"/><text x="458" y="212" text-anchor="middle">BMC·전원·팬</text>
+          <rect x="400" y="240" width="116" height="40" rx="10" class="f-elev"/><text x="458" y="264" text-anchor="middle">클럭·타이밍</text>
+        </g>
+        <g class="s-line" marker-end="url(#nc-a1)"><path d="M98 180 H110"/><path d="M174 180 H192"/><path d="M398 125 H380"/></g>
+        <text x="388" y="118" text-anchor="end" class="t-mono" style="font-size:10px">PCIe</text>
+        <rect x="570" y="20" width="240" height="290" rx="14" class="f-surface"/>
+        <text x="584" y="42" class="t" style="font-weight:700">서버</text>
+        <g class="t-mono">
+          <rect x="586" y="60" width="208" height="70" rx="10" class="f-elev"/><text x="690" y="88" text-anchor="middle" class="t" style="font-weight:700">CPU·GPU</text><text x="690" y="108" text-anchor="middle">애플리케이션, OS</text>
+          <rect x="586" y="160" width="208" height="88" rx="10" class="f-acc-soft"/><text x="690" y="186" text-anchor="middle" class="t" style="font-weight:700">NIC / SmartNIC / DPU</text><text x="690" y="206" text-anchor="middle">MAC·PHY, DMA, 오프로드</text><text x="690" y="224" text-anchor="middle">(DPU: Arm 코어 + 가속기)</text>
+          <rect x="586" y="262" width="96" height="34" rx="8" fill="color-mix(in srgb, var(--warn) 14%, transparent)" stroke="var(--warn)"/><text x="634" y="283" text-anchor="middle">광/DAC</text>
+        </g>
+        <g class="s-line" marker-end="url(#nc-a1)" marker-start="url(#nc-a1)"><path d="M690 134 V156"/></g>
+        <text x="698" y="150" class="t-mono" style="font-size:10px">PCIe</text>
+        <path d="M30 300 C 200 326, 450 326, 586 284" fill="none" stroke="var(--warn)" stroke-width="2" stroke-dasharray="6 4"/>
+        <text x="300" y="324" text-anchor="middle" class="t-dim">광섬유 또는 구리 케이블 (16장, 19장)</text>
+      </svg></div>
+      <figcaption><b>그림 17-1.</b> 네트워크 장비 속 칩 지도(대략). 스위치 상자의 주인공은 데이터 평면을 맡는 스위치 ASIC이고, CPU는 PCIe로 붙어 표를 관리한다. 서버 쪽에서는 NIC(또는 SmartNIC·DPU)가 네트워크와 CPU 사이를 잇는다.</figcaption>
+    </figure>
+    <div class="callout analogy"><strong>거대 물류 허브</strong><p>스위치 상자는 택배 물류 허브다. 앞면의 광 모듈 포트는 트럭이 드나드는 하역 도크, 스위치 ASIC은 초고속 컨베이어와 자동 분류기, 칩 안의 버퍼는 잠깐 쌓아 두는 적치장, CPU는 2층 관제실이다. 관제실은 “서울행은 3번 레인”이라는 규칙표를 만들어 분류기에 내려보낼 뿐, 상자 하나하나를 직접 만지지 않는다. 상자를 만지는 건 분류기다. 관제실이 잠깐 멈춰도 분류기는 마지막 규칙표대로 계속 돈다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="teardown">
+    <h2>스위치 상자 열어 보기</h2>
+    <p>아래는 데이터센터용 1U(높이 약 4.4 cm) 스위치를 단순화한 3D 모형이다. 분해 정도를 올리면 덮개와 방열판이 들려 올라가고 칩이 드러난다. 부품을 눌러 설명을 읽어 보자.</p>
+    <div class="sim" id="sim-sw">
+      <div class="sim-head"><span class="sim-tag three">3D</span><h3>스위치 분해 모형</h3></div>
+      <div class="sim-view"><canvas id="cv-sw"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>분해 정도 <output id="sw-ex-out"></output></span><input type="range" id="sw-ex" min="0" max="100" value="65"></label>
+        <div class="ctrl"><span>보기</span><div class="btn-row"><button class="btn" id="sw-top">위에서</button><button class="btn" id="sw-front">앞에서</button><button class="btn" id="sw-side">비스듬히</button></div></div>
+      </div>
+      <div class="nc-desc" id="sw-desc">부품을 눌러 보자. 드래그하면 모형이 돌아간다.</div>
+      <div class="sim-note">크기와 배치는 이해를 돕기 위한 그림이다. 실제 51.2 Tbps 장비는 800G 포트 64개를 넣느라 보통 2U 높이이며, 포트 수와 리타이머 유무, 전원·팬 배치는 제품마다 다르다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="capacity">
+    <h2>스위치 칩 용량: 2년마다 두 배</h2>
+    <p>한 칩이 동시에 처리할 수 있는 총 대역폭을 <b>스위칭 용량</b>이라 한다. 데이터센터 스위치 칩의 용량은 2010년 무렵 640 Gbps에서 2025년 102.4 Tbps까지, 대략 <b>2년마다 두 배</b>씩 늘었다. 15년 동안 160배다. 이 성장을 가능하게 한 것은 두 가지다. 공정 미세화로 같은 면적에 더 많은 로직과 SRAM을 넣은 것, 그리고 SerDes 레인 속도를 10G → 25G → 50G → 100G → 200G로 올린 것(16장)이다.</p>
+    <div class="formula"><b>칩 용량 = SerDes 레인 수 × 레인 속도</b><div class="where">예: 512 × 100G = 51.2 Tbps (= 800G 포트 64개) · 512 × 200G = 102.4 Tbps (= 1.6T 포트 64개 또는 800G 포트 128개)</div></div>
+    <div class="sim" id="sim-cap">
+      <div class="sim-head"><span class="sim-tag">CALCULATOR</span><h3>스위치 칩 용량 계산기</h3></div>
+      <div class="sim-view"><canvas id="cv-cap"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>SerDes 레인 수</span><div class="seg" id="cp-lanes"><button data-value="128">128</button><button data-value="256">256</button><button data-value="512" class="on">512</button><button data-value="1024">1024</button></div></div>
+        <div class="ctrl"><span>레인 속도</span><div class="seg" id="cp-rate"><button data-value="10">10G</button><button data-value="25">25G</button><button data-value="50">50G</button><button data-value="100" class="on">100G</button><button data-value="200">200G</button></div></div>
+        <div class="ctrl"><span>포트 속도</span><div class="seg" id="cp-port"><button data-value="100">100G</button><button data-value="400">400G</button><button data-value="800" class="on">800G</button><button data-value="1600">1.6T</button></div></div>
+        <label class="ctrl"><span>SerDes 에너지 (가정) <output id="cp-pj-out"></output></span><input type="range" id="cp-pj" min="1" max="10" step="0.5" value="4"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">칩 용량</span><span class="v" id="cp-cap">—</span></div>
+        <div class="stat"><span class="k">포트 구성</span><span class="v" id="cp-ports">—</span></div>
+        <div class="stat"><span class="k">포트당 레인</span><span class="v" id="cp-lpp">—</span></div>
+        <div class="stat"><span class="k">SerDes 전력(추정)</span><span class="v" id="cp-pw">—</span></div>
+        <div class="stat"><span class="k">하루에 지나는 데이터</span><span class="v" id="cp-day">—</span></div>
+      </div>
+      <div class="sim-note">왼쪽: 세대별 대표 용량(로그 눈금, 연도는 대략)과 지금 계산한 값(빨간 점). 오른쪽: 다이 가장자리에 늘어선 SerDes(한 변에 레인 수의 1/4). SerDes 전력은 송수신 합쳐 비트당 에너지 × 용량으로 계산한 대략값이다. 해볼 것: 레인 수를 고정하고 레인 속도만 올려 보자. 칩 세대가 바뀔 때 주로 무엇이 두 배가 되었는가?</div>
+    </div>
+    <p>레인 수를 마냥 늘릴 수는 없다. SerDes는 다이의 <b>가장자리</b>에 놓여야 패키지 바깥으로 신호를 뺄 수 있는데, 다이의 둘레는 면적만큼 빨리 늘지 않는다. 이를 “해안선(beachfront) 문제”라 부른다. 그래서 칩 회사들은 레인 수보다 레인 속도를 올리는 쪽을 택해 왔고, 레인 속도를 올리기 어려워지자 SerDes를 별도 칩렛으로 떼어 내 패키지 둘레를 넓히는 방법(뒤에서 다룬다)과, 광 엔진을 패키지에 붙이는 공동 패키징 광학(19장)으로 나아가고 있다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="pipeline">
+    <h2>패킷 처리 파이프라인</h2>
+    <p>51.2 Tbps 칩에 가장 작은 이더넷 프레임(64바이트)이 꽉 차게 들어오면 1초에 몇 개일까? 프레임마다 앞뒤로 프리앰블과 프레임 간 간격 20바이트가 붙으므로, 51.2 × 10¹² ÷ ((64 + 20) × 8) ≈ <b>760억 개</b>다. 패킷 하나에 주어진 시간은 약 13 ps. 1 GHz 클럭 한 사이클(1 ns) 동안 76개의 패킷을 처리해야 한다는 뜻이다. CPU 소프트웨어로는 어림도 없다. 그래서 스위치 칩은 패킷 처리 과정을 잘게 쪼개 조립 라인처럼 늘어놓은 <span class="term">패킷 처리 파이프라인</span><span class="en">(packet processing pipeline)</span>을 쓰고, 그런 라인을 여러 개 병렬로 둔다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 840 250" style="min-width:660px" role="img" aria-label="스위치 칩의 패킷 처리 파이프라인">
+        <defs><marker id="nc-a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <g class="t-mono">
+          <rect x="10" y="60" width="78" height="80" rx="10" class="f-surface"/><text x="49" y="94" text-anchor="middle" style="fill:var(--text)">입력</text><text x="49" y="112" text-anchor="middle">포트·MAC</text>
+          <rect x="108" y="60" width="82" height="80" rx="10" class="f-acc-soft"/><text x="149" y="94" text-anchor="middle" style="fill:var(--text);font-weight:700">파서</text><text x="149" y="112" text-anchor="middle">헤더 분해</text>
+          <rect x="210" y="40" width="260" height="120" rx="12" class="f-acc-soft"/><text x="340" y="60" text-anchor="middle" style="fill:var(--text);font-weight:700">인그레스 매치-액션 단계들</text>
+          <rect x="222" y="72" width="72" height="72" rx="8" class="f-elev"/><text x="258" y="98" text-anchor="middle">L2</text><text x="258" y="114" text-anchor="middle">MAC 표</text><text x="258" y="130" text-anchor="middle">(정확 일치)</text>
+          <rect x="304" y="72" width="72" height="72" rx="8" class="f-elev"/><text x="340" y="98" text-anchor="middle">L3</text><text x="340" y="114" text-anchor="middle">경로 표</text><text x="340" y="130" text-anchor="middle">(LPM)</text>
+          <rect x="386" y="72" width="72" height="72" rx="8" class="f-elev"/><text x="422" y="98" text-anchor="middle">ACL</text><text x="422" y="114" text-anchor="middle">보안 규칙</text><text x="422" y="130" text-anchor="middle">(TCAM)</text>
+          <rect x="490" y="50" width="120" height="100" rx="12" class="f-acc2-soft"/><text x="550" y="78" text-anchor="middle" style="fill:var(--text);font-weight:700">트래픽 매니저</text><text x="550" y="98" text-anchor="middle">공유 버퍼</text><text x="550" y="114" text-anchor="middle">큐·스케줄러</text><text x="550" y="130" text-anchor="middle">(복제·혼잡 표시)</text>
+          <rect x="630" y="60" width="96" height="80" rx="10" class="f-acc-soft"/><text x="678" y="90" text-anchor="middle" style="fill:var(--text);font-weight:700">이그레스</text><text x="678" y="108" text-anchor="middle">매치-액션 +</text><text x="678" y="124" text-anchor="middle">디파서</text>
+          <rect x="746" y="60" width="84" height="80" rx="10" class="f-surface"/><text x="788" y="94" text-anchor="middle" style="fill:var(--text)">출력</text><text x="788" y="112" text-anchor="middle">포트·MAC</text>
+        </g>
+        <g class="s-acc" marker-end="url(#nc-a2)"><path d="M88 100 H104"/><path d="M190 100 H206"/><path d="M470 100 H486"/><path d="M610 100 H626"/><path d="M726 100 H742"/></g>
+        <rect x="108" y="180" width="502" height="54" rx="10" class="f-elev"/>
+        <text x="122" y="202" class="t-dim">파서가 뽑은 헤더 필드(목적지 MAC·IP, 포트 번호…)와 메타데이터만 파이프라인을 따라 흐르고,</text>
+        <text x="122" y="222" class="t-dim">패킷 본문은 버퍼에 들어가 기다린다. 마지막에 디파서가 (바뀐) 헤더를 본문에 다시 붙인다.</text>
+      </svg></div>
+      <figcaption><b>그림 17-2.</b> 스위치 칩의 패킷 처리 파이프라인(대략). 각 단계는 “표에서 키로 찾아(match) 정해진 동작을 한다(action)”는 같은 구조를 반복한다. 동작은 출력 포트 정하기, 헤더 고치기, 버리기, 카운터 올리기 등이다.</figcaption>
+    </figure>
+    <p><span class="term">파서</span><span class="en">(parser)</span>는 패킷 앞부분의 바이트열을 읽어 이더넷·VLAN·IP·TCP 헤더를 차례로 알아보고 필드를 뽑는다(3장의 캡슐화를 거꾸로 벗기는 일). 이어지는 <span class="term">매치-액션 테이블</span><span class="en">(match-action table)</span> 단계마다 표 검색이 한 번씩 일어난다. L2 표는 목적지 MAC을 정확히 일치로 찾고(해시 + SRAM), L3 표는 목적지 IP의 최장 접두사 일치(8장)를 찾고, ACL은 여러 필드에 와일드카드가 섞인 규칙을 찾는다(뒤의 TCAM). 그다음 <span class="term">트래픽 매니저</span><span class="en">(traffic manager)</span>가 패킷을 출력 포트의 큐에 넣고, 스케줄러가 우선순위와 공정성에 따라 꺼낸다.</p>
+    <div class="sim" id="sim-pps">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>초당 패킷 수와 파이프라인</h3></div>
+      <div class="sim-view"><canvas id="cv-pps"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>대역폭</span><div class="seg" id="pp-bw"><button data-value="100">100G 포트</button><button data-value="800">800G 포트</button><button data-value="12800">12.8T 칩</button><button data-value="51200" class="on">51.2T 칩</button><button data-value="102400">102.4T 칩</button></div></div>
+        <label class="ctrl"><span>패킷 크기 <output id="pp-size-out"></output></span><input type="range" id="pp-size" min="0" max="100" value="0"></label>
+        <label class="ctrl"><span>칩 클럭 <output id="pp-clk-out"></output></span><input type="range" id="pp-clk" min="0.8" max="2" step="0.05" value="1"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">초당 패킷 수</span><span class="v" id="pp-pps">—</span></div>
+        <div class="stat"><span class="k">패킷 1개당 시간</span><span class="v" id="pp-t">—</span></div>
+        <div class="stat"><span class="k">한 사이클에 처리할 패킷</span><span class="v" id="pp-ppc">—</span></div>
+        <div class="stat"><span class="k">필요한 파이프라인 수 (사이클당 1개 처리 시)</span><span class="v" id="pp-pipes">—</span></div>
+      </div>
+      <div class="sim-note">패킷마다 프리앰블 8바이트와 프레임 간 간격 12바이트(합 20바이트)를 더해 계산했다. 그림은 파이프라인이 매 사이클 한 칸씩 전진하는 모습으로, 한 패킷이 모든 단계를 지나는 데는 수십~수백 사이클이 걸려도 매 사이클 새 패킷이 하나씩 들어간다. 실제 칩은 파이프라인 여러 개를 두고 한 파이프라인이 사이클당 여러 패킷을 다루기도 하며, 아주 작은 패킷에서는 최대 속도를 보장하지 않는 설계도 있다. 해볼 것: 패킷 크기를 1,500바이트로 올리면 필요한 처리 속도가 얼마나 줄어드는가?</div>
+    </div>
+    <h3>프로그래머블 스위치와 P4</h3>
+    <p>예전 스위치 칩은 어떤 헤더를 어떻게 처리할지가 회로에 고정되어 있었다. 새 프로토콜(예: 새 터널 헤더)이 나오면 새 칩이 나올 때까지 2~3년을 기다려야 했다. 2010년대 중반부터는 파서와 매치-액션 단계를 소프트웨어로 정의할 수 있는 <b>프로그래머블 파이프라인</b> 칩이 나왔고, 이를 기술하는 언어가 <span class="term">P4</span><span class="en">(Programming Protocol-independent Packet Processors)</span>다. 아래처럼 “어떤 키로 어떤 표를 찾아 어떤 동작을 할지”를 선언하면, 컴파일러가 칩의 단계와 메모리에 배치한다.</p>
+    <div class="codebox"><span class="k">table</span> ipv4_lpm {
+  <span class="k">key</span>     = { hdr.ipv4.dstAddr : <span class="s">lpm</span>; }      <span class="c">// 목적지 IP로 최장 접두사 일치</span>
+  <span class="k">actions</span> = { set_nexthop; drop; }
+  <span class="k">size</span>    = <span class="n">131072</span>;
+}
+<span class="k">apply</span> {
+  <span class="k">if</span> (hdr.ipv4.isValid()) { ipv4_lpm.apply(); }      <span class="c">// 이 단계에서 표 검색 한 번</span>
+}</div>
+    <p>프로그래머블 칩은 네트워크 측정(패킷마다 지연·큐 길이를 헤더에 기록하는 인밴드 텔레메트리), 부하 분산, 새 혼잡 제어 실험 같은 곳에 쓰인다. 다만 같은 공정에서 고정 기능 칩보다 면적과 전력이 더 들기 때문에, 업계는 “필요한 곳만 프로그래머블하게”라는 절충을 택하는 경우가 많다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="tcam">
+    <h2>TCAM: 모든 줄을 한꺼번에 비교하는 메모리</h2>
+    <p>보통의 메모리(SRAM, DRAM)는 <b>주소</b>를 주면 그 칸의 내용을 돌려준다. 그런데 라우팅 표 검색은 반대다. 내용(목적지 IP)을 주고 “이것과 맞는 줄이 어디냐”를 물어야 한다. 이런 질문에 답하는 메모리가 <b>내용 주소 메모리</b>(CAM, Content-Addressable Memory)이고, 각 비트에 0과 1 말고 “상관없음”(X)까지 저장할 수 있는 것이 <span class="term">TCAM</span><span class="en">(Ternary CAM, 3진 내용 주소 메모리)</span>이다.</p>
+    <p>IP 접두사 10.1.0.0/16은 앞 16비트는 정해져 있고 뒤 16비트는 무엇이든 되므로, TCAM 한 줄에 “앞 16비트 = 00001010 00000001, 뒤 16비트 = X”로 저장된다. 검색 키를 넣으면 <b>모든 줄이 동시에</b>, 비트마다 비교한다. 한 비트라도 어긋난 줄은 탈락하고, 살아남은 줄 중 가장 위의 줄을 <span class="term">우선순위 인코더</span><span class="en">(priority encoder)</span>가 골라 그 줄 번호를 내놓는다. 줄을 접두사 길이 순(긴 것이 위)으로 넣어 두면, 맨 위 일치 = 최장 접두사 일치가 된다. 표에 수만 줄이 있어도 검색은 <b>한 사이클</b>이다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 270" style="min-width:640px" role="img" aria-label="TCAM 배열의 검색선, 일치선, 우선순위 인코더">
+        <defs><marker id="nc-a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-dim)"/></marker></defs>
+        <text x="20" y="24" class="t" style="font-weight:700">검색 키 →</text>
+        <g class="t-mono" style="font-size:13px"><text x="140" y="24">1</text><text x="190" y="24">0</text><text x="240" y="24">1</text><text x="290" y="24">1</text></g>
+        <g stroke="var(--accent-2)" stroke-width="1.5"><path d="M144 32 V214 M194 32 V214 M244 32 V214 M294 32 V214"/></g>
+        <text x="320" y="44" class="t-mono" style="fill:var(--accent-2)">검색선 (모든 줄에 동시에)</text>
+        <g class="t-mono" style="font-size:13px">
+          <text x="20" y="74" class="t-dim">줄 0</text><rect x="124" y="56" width="40" height="28" rx="5" class="f-elev"/><text x="144" y="75" text-anchor="middle">1</text><rect x="174" y="56" width="40" height="28" rx="5" class="f-elev"/><text x="194" y="75" text-anchor="middle">1</text><rect x="224" y="56" width="40" height="28" rx="5" class="f-elev"/><text x="244" y="75" text-anchor="middle">X</text><rect x="274" y="56" width="40" height="28" rx="5" class="f-elev"/><text x="294" y="75" text-anchor="middle">X</text>
+          <text x="20" y="124" class="t-dim">줄 1</text><rect x="124" y="106" width="40" height="28" rx="5" class="f-elev"/><text x="144" y="125" text-anchor="middle">1</text><rect x="174" y="106" width="40" height="28" rx="5" class="f-elev"/><text x="194" y="125" text-anchor="middle">0</text><rect x="224" y="106" width="40" height="28" rx="5" class="f-elev"/><text x="244" y="125" text-anchor="middle">1</text><rect x="274" y="106" width="40" height="28" rx="5" class="f-elev"/><text x="294" y="125" text-anchor="middle">X</text>
+          <text x="20" y="174" class="t-dim">줄 2</text><rect x="124" y="156" width="40" height="28" rx="5" class="f-elev"/><text x="144" y="175" text-anchor="middle">1</text><rect x="174" y="156" width="40" height="28" rx="5" class="f-elev"/><text x="194" y="175" text-anchor="middle">X</text><rect x="224" y="156" width="40" height="28" rx="5" class="f-elev"/><text x="244" y="175" text-anchor="middle">X</text><rect x="274" y="156" width="40" height="28" rx="5" class="f-elev"/><text x="294" y="175" text-anchor="middle">X</text>
+        </g>
+        <rect x="174" y="56" width="40" height="28" rx="5" fill="none" stroke="var(--bad)" stroke-width="2"/>
+        <g stroke-width="2.5" fill="none"><path d="M330 70 H520" stroke="var(--bad)" stroke-dasharray="5 4"/><path d="M330 120 H520" stroke="var(--ok)"/><path d="M330 170 H520" stroke="var(--ok)"/></g>
+        <g class="t-mono"><text x="420" y="64" text-anchor="middle" style="fill:var(--bad)">일치선: 방전(불일치)</text><text x="420" y="114" text-anchor="middle" style="fill:var(--ok)">일치</text><text x="420" y="164" text-anchor="middle" style="fill:var(--ok)">일치</text></g>
+        <rect x="524" y="50" width="120" height="140" rx="12" class="f-acc-soft"/><text x="584" y="112" text-anchor="middle" class="t" style="font-weight:700">우선순위</text><text x="584" y="130" text-anchor="middle" class="t" style="font-weight:700">인코더</text>
+        <path d="M644 120 H690" class="s-line" marker-end="url(#nc-a3)"/>
+        <rect x="694" y="96" width="116" height="48" rx="10" class="f-elev"/><text x="752" y="116" text-anchor="middle" class="t-mono">줄 1 선택</text><text x="752" y="134" text-anchor="middle" class="t-mono">→ 동작 SRAM</text>
+        <text x="20" y="240" class="t-dim">각 줄의 일치선은 검색 전에 충전해 두고, 어느 한 셀이라도 어긋나면 방전된다. 일치한 줄(1, 2) 중 가장 위(가장 긴 접두사)가 이긴다.</text>
+        <text x="20" y="260" class="t-dim">TCAM 셀 하나 = 저장용 SRAM 셀 2개(값·마스크) + 비교 트랜지스터 → 약 16개. SRAM 셀은 6개.</text>
+      </svg></div>
+      <figcaption><b>그림 17-3.</b> TCAM 배열의 원리(4비트, 3줄로 단순화). 검색 키가 모든 줄에 동시에 뿌려지고, 줄마다 일치선이 살아남았는지로 결과가 나온다. X 셀은 무엇과도 일치한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-tcam">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>TCAM 최장 접두사 검색</h3></div>
+      <div class="tc-ctrl">
+        <label class="ctrl"><span>목적지 IP (검색 키)</span><input type="text" id="tc-key" value="10.1.2.77" maxlength="15" inputmode="decimal"></label>
+        <div class="ctrl"><span>예시</span><div class="tc-pre" id="tc-pre"><button class="btn" data-ip="10.1.2.77">10.1.2.77</button><button class="btn" data-ip="10.1.9.9">10.1.9.9</button><button class="btn" data-ip="10.200.3.4">10.200.3.4</button><button class="btn" data-ip="192.168.10.5">192.168.10.5</button><button class="btn" data-ip="172.20.1.1">172.20.1.1</button><button class="btn" data-ip="8.8.8.8">8.8.8.8</button></div></div>
+      </div>
+      <div class="tc-ctrl" style="padding-top:8px"><label class="check"><input type="checkbox" id="tc-unsorted"> 만약에? 엔트리를 접두사 길이순으로 정렬하지 않고 넣었다면</label></div>
+      <div class="tc-wrap"><div class="tc-tbl" id="tc-tbl"></div></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">일치한 줄</span><span class="v" id="tc-hits">—</span></div>
+        <div class="stat"><span class="k">우선순위 인코더 선택</span><span class="v" id="tc-win">—</span></div>
+        <div class="stat"><span class="k">내보낼 곳</span><span class="v" id="tc-act">—</span></div>
+        <div class="stat"><span class="k">한 사이클에 비교한 비트</span><span class="v" id="tc-bits">—</span></div>
+      </div>
+      <div class="sim-note">각 줄은 32비트 IPv4 접두사다(X = 상관없음). 빨간 비트는 검색 키와 어긋난 자리, 초록 테두리는 일치한 줄, 파란 줄은 우선순위 인코더가 고른 첫 번째 일치다. 실제 칩은 이 비교를 수만~수십만 줄에 대해 동시에 한다. 해볼 것: 8.8.8.8을 넣으면 어느 줄이 이기는가? ‘정렬하지 않고’를 켜면 결과가 어떻게 틀어지는가?</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">TCAM에 기본 경로 0.0.0.0/0을 맨 위 줄에 넣어 버렸다. 10.1.2.77을 검색하면?</p><p class="wi-hint">TCAM 시뮬레이터에서 ‘정렬하지 않고’를 켜고 확인하자.</p><div class="opts">
+      <button class="opt">그래도 10.1.2.0/24 줄이 이긴다. TCAM은 가장 긴 접두사를 알아서 고른다</button>
+      <button class="opt" data-correct>기본 경로 줄이 이긴다. 우선순위 인코더는 일치한 줄 중 가장 위를 고를 뿐이다</button>
+      <button class="opt">일치하는 줄이 여러 개라 오류가 난다</button>
+    </div><div class="quiz-exp">TCAM 자체는 “길이”를 모른다. 위에 있는 줄이 이긴다. 그래서 라우터 소프트웨어는 새 경로를 넣을 때마다 접두사 길이 순서가 유지되도록 엔트리를 옮겨 가며 TCAM을 관리한다.</div></div>
+    <p>TCAM은 강력하지만 비싸다. 셀 하나에 트랜지스터가 SRAM의 2~3배(약 16개) 들고, 검색할 때마다 수만 줄의 일치선을 모두 충전했다 방전하므로 전력을 많이 먹는다. 그래서 스위치 칩은 TCAM을 와일드카드가 꼭 필요한 ACL 같은 곳에 아껴 쓰고, 수십만~수백만 개의 경로 표는 해시 표와 압축된 트리(trie)를 SRAM에 담아 파이프라인 여러 단계에 걸쳐 찾는 알고리즘 방식으로 처리하는 경우가 많다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="buffer">
+    <h2>버퍼: 마이크로버스트를 견디는 창고</h2>
+    <p>포트 하나의 평균 사용률이 30%여도 순간적으로는 넘칠 수 있다. 분산 학습이나 검색 서비스처럼 서버 수십 대가 동시에 한 서버에게 답을 보내면(인캐스트, 20장) 출력 포트 하나에 입력 여러 개가 수십 µs 동안 몰린다. 이렇게 1 ms도 안 되는 아주 짧은 폭주를 <span class="term">마이크로버스트</span><span class="en">(microburst)</span>라 한다. 평균 사용률 그래프(보통 1초~1분 평균)에는 보이지도 않지만, 버퍼가 모자라면 패킷이 버려지고 TCP가 속도를 확 줄인다(9장).</p>
+    <p>그래서 스위치 칩 안에는 패킷을 잠깐 쌓아 둘 SRAM이 들어 있다. 포트마다 따로 나누지 않고 칩 전체가 함께 쓰는 <span class="term">공유 버퍼</span><span class="en">(shared buffer)</span> 구조로, 지금 붐비는 포트가 남는 공간을 더 가져다 쓰게 한다. 51.2 Tbps급 칩에는 대략 수십~백수십 MB가 들어간다. 커 보이지만 51.2 Tbps로 들어오면 100 MB는 16 µs 만에 찬다. 칩 용량이 2년마다 두 배가 되는 동안 SRAM은 그만큼 늘지 못해서, Tbps당 버퍼 크기는 세대마다 줄어 왔다.</p>
+    <div class="sim" id="sim-buf">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>인캐스트 마이크로버스트와 버퍼</h3></div>
+      <div class="sim-view"><canvas id="cv-buf"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>동시에 보내는 입력 포트 수 <output id="bf-n-out"></output></span><input type="range" id="bf-n" min="2" max="32" value="16"></label>
+        <label class="ctrl"><span>포트마다 보내는 버스트 크기 <output id="bf-b-out"></output></span><input type="range" id="bf-b" min="0" max="8" value="3"></label>
+        <div class="ctrl"><span>포트 속도</span><div class="seg" id="bf-r"><button data-value="100">100G</button><button data-value="400" class="on">400G</button><button data-value="800">800G</button></div></div>
+        <label class="ctrl"><span>이 출력 포트가 쓸 수 있는 버퍼 <output id="bf-cap-out"></output></span><input type="range" id="bf-cap" min="0" max="13" value="4"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">버스트 총량</span><span class="v" id="bf-tot">—</span></div>
+        <div class="stat"><span class="k">최대 큐 길이</span><span class="v" id="bf-q">—</span></div>
+        <div class="stat"><span class="k">버려진 데이터</span><span class="v" id="bf-drop">—</span></div>
+        <div class="stat"><span class="k">최대 큐 대기 시간</span><span class="v" id="bf-lat">—</span></div>
+      </div>
+      <div class="sim-note">N개 입력 포트가 같은 순간 각자 버스트를 최대 속도로 보내고, 출력 포트는 같은 속도로 내보낸다고 단순화했다. 큐는 (N − 1) × 포트 속도로 차오르고 버스트가 끝나면 비워진다. 버퍼 한도를 넘는 양은 버려진다(꼬리 버림). 해볼 것: 버퍼를 1 GB 이상(HBM을 쓰는 딥 버퍼 칩 수준)으로 올리면 버려짐은 사라지지만 대기 시간은 어떻게 되는가?</div>
+    </div>
+    <p>통신사 백본이나 데이터센터 경계의 라우터처럼 거리가 멀고(지연이 길고) 트래픽이 들쭉날쭉한 곳에서는 수 GB의 버퍼가 필요하다. 이런 <b>딥 버퍼</b> 라우터 칩은 칩 옆 같은 패키지에 GPU처럼 <b>HBM</b>(고대역폭 메모리)을 붙여 패킷을 쌓는다. 대신 HBM 대역폭과 전력, 비용 때문에 같은 세대의 데이터센터 스위치 칩보다 총 용량이 작다. 버퍼가 크다고 늘 좋은 것도 아니다. 시뮬레이터에서 보듯 큐가 길면 패킷이 오래 기다리고(버퍼블로트), 지연에 민감한 AI 학습 트래픽은 버퍼를 키우기보다 혼잡을 일찍 알려 보내는 속도를 줄이게 하는(ECN, 20장) 쪽을 택한다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="nic">
+    <h2>NIC: 서버의 네트워크 출입구</h2>
+    <p>서버 쪽 출입구는 <span class="term">NIC</span><span class="en">(Network Interface Card, 네트워크 인터페이스 카드)</span>다. 노트북에서는 메인보드의 작은 칩이지만, 데이터센터 서버에서는 100~800 Gbps 포트가 달린 PCIe 카드다. NIC의 기본 일은 세 가지다. 선로의 신호를 비트로 바꾸는 <b>PHY</b>(SerDes, 16장), 이더넷 프레임을 만들고 검사하는 <b>MAC</b>(6장), 그리고 프레임을 CPU를 거치지 않고 서버 메모리에 직접 써 넣는 <span class="term">DMA</span><span class="en">(Direct Memory Access)</span>다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 280" style="min-width:640px" role="img" aria-label="NIC의 구성: 메모리 링, DMA, 오프로드, RSS 큐, MAC과 PHY">
+        <defs><marker id="nc-a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-dim)"/></marker></defs>
+        <rect x="10" y="20" width="250" height="240" rx="14" class="f-surface"/><text x="24" y="42" class="t" style="font-weight:700">서버 (호스트)</text>
+        <g class="t-mono">
+          <rect x="24" y="56" width="104" height="40" rx="8" class="f-elev"/><text x="76" y="80" text-anchor="middle">CPU 코어 0</text>
+          <rect x="140" y="56" width="104" height="40" rx="8" class="f-elev"/><text x="192" y="80" text-anchor="middle">CPU 코어 1…N</text>
+          <rect x="24" y="110" width="220" height="92" rx="8" class="f-elev"/><text x="134" y="128" text-anchor="middle" style="fill:var(--text)">메모리: 큐마다 디스크립터 링</text>
+          <g fill="var(--accent)" opacity=".7"><rect x="36" y="140" width="16" height="16" rx="3"/><rect x="56" y="140" width="16" height="16" rx="3"/><rect x="76" y="140" width="16" height="16" rx="3"/><rect x="96" y="140" width="16" height="16" rx="3"/></g>
+          <g fill="var(--accent-2)" opacity=".7"><rect x="140" y="140" width="16" height="16" rx="3"/><rect x="160" y="140" width="16" height="16" rx="3"/><rect x="180" y="140" width="16" height="16" rx="3"/><rect x="200" y="140" width="16" height="16" rx="3"/></g>
+          <text x="74" y="176" text-anchor="middle">큐 0 → 코어 0</text><text x="178" y="176" text-anchor="middle">큐 1 → 코어 1</text>
+          <text x="134" y="194" text-anchor="middle">VM마다 가상 기능(VF) 큐</text>
+          <text x="134" y="236" text-anchor="middle" class="t-dim">드라이버가 빈 버퍼 주소를 링에 올려 둔다</text>
+        </g>
+        <rect x="300" y="20" width="510" height="240" rx="14" class="f-acc-soft"/><text x="314" y="42" class="t" style="font-weight:700">NIC</text>
+        <g class="t-mono">
+          <rect x="316" y="60" width="110" height="64" rx="8" class="f-elev"/><text x="371" y="86" text-anchor="middle" style="fill:var(--text)">PCIe + DMA</text><text x="371" y="104" text-anchor="middle">메모리에 직접 쓰기</text>
+          <rect x="316" y="140" width="110" height="64" rx="8" class="f-elev"/><text x="371" y="166" text-anchor="middle" style="fill:var(--text)">SR-IOV</text><text x="371" y="184" text-anchor="middle">PF + VF 수백 개</text>
+          <rect x="446" y="60" width="150" height="144" rx="8" class="f-elev"/><text x="521" y="82" text-anchor="middle" style="fill:var(--text)">오프로드 엔진</text><text x="521" y="104" text-anchor="middle">체크섬 계산·검사</text><text x="521" y="122" text-anchor="middle">TSO: 큰 덩어리 쪼개기</text><text x="521" y="140" text-anchor="middle">LRO/GRO: 합치기</text><text x="521" y="158" text-anchor="middle">VLAN·터널 헤더</text><text x="521" y="176" text-anchor="middle">암호화(일부)</text>
+          <rect x="616" y="60" width="90" height="64" rx="8" class="f-elev"/><text x="661" y="86" text-anchor="middle" style="fill:var(--text)">RSS</text><text x="661" y="104" text-anchor="middle">해시 → 큐</text>
+          <rect x="616" y="140" width="90" height="64" rx="8" class="f-elev"/><text x="661" y="166" text-anchor="middle" style="fill:var(--text)">MAC</text><text x="661" y="184" text-anchor="middle">프레임·FCS</text>
+          <rect x="722" y="100" width="76" height="64" rx="8" class="f-elev"/><text x="760" y="126" text-anchor="middle" style="fill:var(--text)">PHY</text><text x="760" y="144" text-anchor="middle">SerDes</text>
+        </g>
+        <g class="s-line" marker-end="url(#nc-a4)"><path d="M312 92 H264"/><path d="M442 92 H430"/><path d="M612 92 H600"/><path d="M661 136 V128"/><path d="M718 132 H710"/></g>
+        <path d="M798 132 H816" class="s-line"/>
+        <text x="555" y="240" text-anchor="middle" class="t-dim">수신: PHY → MAC → RSS가 흐름별 큐 선택 → 오프로드 → DMA로 메모리에 → 인터럽트로 코어에 알림</text>
+      </svg></div>
+      <figcaption><b>그림 17-4.</b> NIC의 구성(수신 방향 중심, 대략). 서버 메모리에는 큐마다 “여기에 써 줘” 하는 빈 버퍼 목록(디스크립터 링)이 있고, NIC는 도착한 패킷을 DMA로 그 자리에 바로 써 넣는다.</figcaption>
+    </figure>
+    <p>100 Gbps를 1,500바이트 패킷으로 받으면 초당 800만 개가 넘는다. 패킷마다 CPU가 체크섬을 계산하고, TCP 처리를 하고, 메모리를 복사하면 코어 몇 개가 통째로 묶인다. 그래서 NIC는 CPU의 일을 하드웨어로 떼어 가는 <b>오프로드</b>를 한다.</p>
+    <ul>
+      <li><b>체크섬 오프로드</b>: IP·TCP 체크섬(3장)을 NIC가 계산하고 검사한다.</li>
+      <li><span class="term">TSO</span><span class="en">(TCP Segmentation Offload)</span>: 운영체제는 64 KB짜리 큰 덩어리 하나만 넘기고, NIC가 MTU 크기로 잘라 헤더를 붙인다. 받는 쪽의 <b>LRO/GRO</b>는 반대로 같은 흐름의 패킷들을 큰 덩어리로 합쳐 올린다. 패킷 수가 수십 분의 1로 줄어 패킷당 비용이 사라진다.</li>
+      <li><span class="term">RSS</span><span class="en">(Receive Side Scaling)</span>: 패킷 헤더(주소·포트 다섯 개 묶음)를 해시해서 흐름마다 서로 다른 수신 큐와 CPU 코어로 나눠 준다. 같은 흐름은 늘 같은 코어로 가서 순서가 지켜진다.</li>
+      <li><span class="term">SR-IOV</span><span class="en">(Single Root I/O Virtualization)</span>: NIC 하나를 PCIe 장치 수백 개(가상 기능, VF)처럼 보이게 해서, 가상 머신마다 자기 전용 NIC를 직접 쓰게 한다(21장).</li>
+    </ul>
+    <div class="sim" id="sim-nic">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>오프로드와 RSS: 코어가 얼마나 바쁜가</h3></div>
+      <div class="sim-view"><canvas id="cv-nic"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>링크 속도</span><div class="seg" id="ni-link"><button data-value="25">25G</button><button data-value="100" class="on">100G</button><button data-value="200">200G</button><button data-value="400">400G</button></div></div>
+        <label class="ctrl"><span>동시 TCP 흐름 수 <output id="ni-flows-out"></output></span><input type="range" id="ni-flows" min="1" max="64" value="8"></label>
+        <label class="ctrl"><span>RSS 수신 큐(=코어) 수 <output id="ni-q-out"></output></span><input type="range" id="ni-q" min="1" max="16" value="8"></label>
+        <div class="ctrl"><label class="check"><input type="checkbox" id="ni-csum" checked> 체크섬 오프로드</label><label class="check"><input type="checkbox" id="ni-tso" checked> TSO / LRO·GRO</label></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">실제 처리량</span><span class="v" id="ni-thr">—</span></div>
+        <div class="stat"><span class="k">일하는 코어</span><span class="v" id="ni-busy">—</span></div>
+        <div class="stat"><span class="k">코어 1개의 최대 처리량</span><span class="v" id="ni-core">—</span></div>
+        <div class="stat"><span class="k">CPU가 다루는 패킷/초</span><span class="v" id="ni-pps">—</span></div>
+      </div>
+      <div class="sim-note">흐름마다 링크를 똑같이 나눠 쓰려 하고, RSS 해시가 흐름을 큐에 흩뿌린다고 가정했다(같은 큐에 여러 흐름이 몰릴 수 있다). 코어 비용은 패킷당 약 1.2 µs, 바이트당 복사 0.1 ns, 소프트웨어 체크섬 0.15 ns로 잡은 대략값이며, TSO/GRO를 켜면 평균 32 KB 덩어리로 묶인다고 보았다. 해볼 것: 흐름을 1개로 줄이면 큐를 아무리 늘려도 처리량이 오르지 않는 이유는?</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">100G NIC에 RSS 큐 16개를 켰다. 그런데 큰 파일 하나를 TCP 연결 1개로 받는다면 처리량은?</p><p class="wi-hint">오프로드·RSS 시뮬레이터에서 흐름 수를 1, 큐를 16으로 맞춰 보자.</p><div class="opts">
+      <button class="opt">100G 가까이 나온다. 큐가 16개니까</button>
+      <button class="opt" data-correct>코어 하나가 감당하는 만큼(이 모델에선 약 60G)에서 막힌다</button>
+      <button class="opt">0에 가깝다. RSS는 흐름이 여러 개여야 동작한다</button>
+    </div><div class="quiz-exp">RSS는 흐름 단위로 나눈다. 흐름 하나는 순서를 지키려고 늘 같은 큐, 같은 코어로 가므로 그 코어의 처리 능력이 상한이 된다. 그래서 대용량 전송 도구는 연결을 여러 개 열거나, 아예 CPU를 거치지 않는 RDMA(20장)를 쓴다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="dpu">
+    <h2>SmartNIC, DPU, IPU: NIC 위의 작은 컴퓨터</h2>
+    <p>클라우드 서버의 CPU는 손님(가상 머신)에게 빌려줄 상품이다. 그런데 가상 스위치, 방화벽, 암호화, 원격 스토리지 처리 같은 “인프라 일”이 코어의 상당 부분을 잡아먹는다. 이 일을 아예 NIC로 옮기자는 것이 <span class="term">SmartNIC</span>이고, 더 나아가 NIC 위에 Arm CPU 코어 여러 개와 전용 가속기, 메모리를 얹어 독립된 컴퓨터처럼 만든 것이 <span class="term">DPU</span><span class="en">(Data Processing Unit)</span>다. 회사에 따라 IPU(Infrastructure Processing Unit)라고도 부른다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>종류</th><th>속에 든 것</th><th>대표적인 일</th><th>누가 프로그래밍하나</th></tr></thead>
+      <tbody>
+        <tr><td><b>기본 NIC</b></td><td>MAC·PHY, DMA, 고정 오프로드</td><td>체크섬, TSO/LRO, RSS, SR-IOV</td><td>드라이버만</td></tr>
+        <tr><td><b>SmartNIC</b></td><td>+ 프로그래머블 파이프라인 또는 FPGA</td><td>가상 스위치 규칙, 터널(VXLAN) 처리, 흐름 통계</td><td>클라우드 사업자가 규칙·펌웨어로</td></tr>
+        <tr><td><b>DPU / IPU</b></td><td>+ Arm 코어 8~16개 이상, DRAM, 암호·압축·스토리지 가속기</td><td>가상화 네트워크·보안·NVMe 스토리지 전체를 호스트 밖에서 실행</td><td>DPU 위에서 도는 별도 OS와 소프트웨어</td></tr>
+      </tbody>
+    </table></div>
+    <p>DPU의 또 다른 장점은 <b>격리</b>다. 인프라 소프트웨어가 손님의 CPU가 아니라 별도 칩에서 돌므로, 손님 가상 머신이 탈취돼도 네트워크 규칙이나 암호 키를 건드리기 어렵다. 대형 클라우드 사업자들은 이런 칩을 직접 설계해 모든 서버에 넣고 있으며(21장), AI 클러스터에서는 GPU마다 고속 NIC를 하나씩 붙여 GPU 메모리끼리 직접 데이터를 주고받게 한다(20장).</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="industry">
+    <h2>업계 지형과 칩 만드는 법</h2>
+    <p>스위치 칩은 크게 두 갈래로 공급된다. 누구에게나 파는 <span class="term">머천트 실리콘</span><span class="en">(merchant silicon)</span>과, 장비 회사나 클라우드 회사가 자기 장비에만 쓰려고 만드는 <b>자체 칩</b>이다. 2010년대 이후 데이터센터에서는 머천트 칩 위에 여러 회사의 스위치 상자와 오픈소스 네트워크 OS를 조합하는 방식이 퍼졌다. 반면 통신사 백본용 대형 라우터나 일부 하이퍼스케일러는 딥 버퍼, 특수 기능, 공급망 통제를 위해 자체 칩을 고집한다. 같은 회사가 데이터센터용 고용량 칩, 딥 버퍼 라우터 칩, 프로그래머블 칩을 따로 내놓기도 한다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>항목</th><th>최신 세대 스위치 칩의 대략적 수준 (2025년 무렵)</th></tr></thead>
+      <tbody>
+        <tr><td>용량</td><td class="num">51.2 Tbps 주력, 102.4 Tbps 출시</td></tr>
+        <tr><td>SerDes</td><td>512개 × 100G PAM4 또는 512개 × 200G PAM4</td></tr>
+        <tr><td>공정</td><td>5 nm → 3 nm급</td></tr>
+        <tr><td>다이 크기</td><td>레티클 한계(약 26 × 33 mm, 858 mm²) 근처, 또는 칩렛 여러 개</td></tr>
+        <tr><td>온칩 버퍼</td><td>수십~백수십 MB SRAM (딥 버퍼 칩은 HBM 수 GB)</td></tr>
+        <tr><td>전력</td><td>칩 하나 수백 W, 장비 전체 kW 수준(광 모듈 포함)</td></tr>
+      </tbody>
+    </table></div>
+    <p>반도체 관점에서 스위치 칩은 극단적인 칩이다. 노광 장비가 한 번에 찍을 수 있는 최대 크기인 <span class="term">레티클 한계</span><span class="en">(reticle limit)</span>에 거의 닿을 만큼 크다. 다이가 크면 결함이 하나라도 걸릴 확률이 높아져 수율이 떨어진다. 그래서 최근 세대는 패킷 처리 코어를 첨단 공정의 다이 하나로 만들고, SerDes는 별도의 작은 다이로 떼어 함께 한 패키지에 올리는 <span class="term">칩렛</span><span class="en">(chiplet)</span> 구조를 쓰기 시작했다. 아날로그 회로인 SerDes는 공정을 따라 작아지는 정도가 디지털보다 덜해서, 굳이 가장 비싼 공정에 함께 넣을 이유가 줄어든 것도 한 이유다. 칩렛끼리는 16장의 UCIe 같은 넓은 병렬 인터페이스로 잇는다. 그리고 다음 단계는 SerDes가 뽑아낸 전기 신호를 패키지 바로 옆에서 빛으로 바꾸는 실리콘 포토닉스다(19장).</p>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>네트워크 장비는 패킷을 나르는 <b>데이터 평면</b>(스위치 ASIC)과 표를 관리하는 <b>제어 평면</b>(CPU)으로 나뉜다. 앞면에는 광 모듈, 그 사이에는 필요하면 리타이머가 있다.</li>
+      <li>스위치 칩 용량은 약 <b>2년마다 두 배</b>(640G → 102.4T)로 늘었다. <b>용량 = SerDes 레인 수 × 레인 속도</b>(예: 512 × 100G = 51.2T).</li>
+      <li>51.2T 칩은 최소 크기 패킷으로 초당 약 <b>760억 개</b>를 처리해야 한다. 그래서 파서 → 매치-액션 → 트래픽 매니저 → 디파서의 <b>파이프라인</b>을 여러 개 병렬로 둔다. P4는 이 파이프라인을 프로그래밍하는 언어다.</li>
+      <li><b>TCAM</b>은 0/1/X로 저장된 모든 줄을 한 사이클에 동시에 비교하고, 우선순위 인코더가 첫 일치를 고른다. 대가는 큰 셀(약 16 트랜지스터)과 높은 전력이다.</li>
+      <li>칩 안의 <b>공유 버퍼</b>(수십~백수십 MB)가 마이크로버스트를 흡수한다. 원거리 라우터는 <b>HBM</b>으로 수 GB의 딥 버퍼를 쓰지만, 큰 큐는 지연을 늘린다.</li>
+      <li><b>NIC</b>는 DMA로 메모리에 직접 쓰고, 체크섬·TSO/LRO·RSS·SR-IOV로 CPU 일을 덜어 준다. <b>SmartNIC·DPU</b>는 가상화·보안·스토리지까지 떼어 가는 NIC 위의 컴퓨터다.</li>
+      <li>최신 스위치 칩은 5·3 nm 공정, <b>레티클 한계</b> 근처 크기이며, SerDes를 떼어 낸 <b>칩렛</b> 구조와 광 공동 패키징으로 진화하고 있다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>스위치 상자에서 BGP로 이웃과 경로를 주고받고 라우팅 표를 계산하는 것은?</p><div class="opts">
+        <button class="opt">스위치 ASIC의 파서</button>
+        <button class="opt">광 모듈의 DSP</button>
+        <button class="opt">리타이머</button>
+        <button class="opt" data-correct>제어 평면을 맡은 CPU</button>
+      </div><div class="quiz-exp">경로 계산 같은 느린 두뇌 작업은 CPU(제어 평면)가 하고, 결과 표를 PCIe로 ASIC에 써 넣는다. ASIC은 그 표대로 패킷 하나하나를 처리한다(데이터 평면).</div></div>
+      <div class="quiz-q"><p>SerDes 레인 512개, 레인당 200G인 스위치 칩의 용량과 가능한 포트 구성은?</p><div class="opts">
+        <button class="opt">51.2 Tbps, 800G × 64</button>
+        <button class="opt" data-correct>102.4 Tbps, 1.6T × 64 또는 800G × 128</button>
+        <button class="opt">25.6 Tbps, 400G × 64</button>
+        <button class="opt">204.8 Tbps, 1.6T × 128</button>
+      </div><div class="quiz-exp">512 × 200 Gbps = 102.4 Tbps. 포트당 레인 8개를 묶으면 1.6T 포트 64개, 4개씩 묶으면 800G 포트 128개다.</div></div>
+      <div class="quiz-q"><p>51.2 Tbps 칩이 64바이트 패킷을 최대 속도로 처리할 때 초당 패킷 수에 가장 가까운 것은? (프레임마다 20바이트 추가)</p><div class="opts">
+        <button class="opt">약 7.6억 개</button><button class="opt">약 76억 개</button><button class="opt" data-correct>약 760억 개</button><button class="opt">약 7.6조 개</button>
+      </div><div class="quiz-exp">51.2 × 10¹² ÷ (84 × 8) ≈ 7.6 × 10¹⁰, 즉 약 760억 개다. 1 GHz 한 사이클에 76개를 처리해야 하는 셈이다.</div></div>
+      <div class="quiz-q"><p>TCAM이 라우팅·ACL 검색에 쓰이는 이유와 그 대가로 옳은 짝은?</p><div class="opts">
+        <button class="opt" data-correct>와일드카드(X)가 섞인 모든 줄을 한 사이클에 동시에 비교한다 — 셀이 크고 전력을 많이 쓴다</button>
+        <button class="opt">주소를 주면 내용을 가장 싸게 돌려준다 — 속도가 느리다</button>
+        <button class="opt">전원이 꺼져도 표가 유지된다 — 쓰기 횟수에 한계가 있다</button>
+        <button class="opt">가장 긴 접두사를 스스로 계산한다 — 줄 수가 8개로 제한된다</button>
+      </div><div class="quiz-exp">TCAM은 내용으로 찾는 메모리로, 모든 줄을 병렬로 비교한다. 줄마다 일치선을 충전·방전하므로 전력이 크고, 셀당 트랜지스터가 SRAM(6개)보다 훨씬 많다(약 16개). 최장 접두사 일치는 줄을 길이순으로 넣어야 성립한다.</div></div>
+      <div class="quiz-q"><p>평균 사용률이 낮은 포트에서도 패킷 손실이 생기는 대표적인 원인은?</p><div class="opts">
+        <button class="opt">SerDes 레인 수가 너무 많아서</button>
+        <button class="opt" data-correct>여러 입력이 한 출력으로 동시에 몰리는 마이크로버스트가 버퍼를 넘쳐서</button>
+        <button class="opt">TCAM 엔트리가 정렬되어 있어서</button>
+        <button class="opt">체크섬 오프로드를 켜서</button>
+      </div><div class="quiz-exp">수십 µs짜리 폭주는 1초 평균 그래프에는 보이지 않지만, 그 순간 큐가 버퍼 한도를 넘으면 패킷이 버려진다.</div></div>
+      <div class="quiz-q"><p>NIC의 RSS(Receive Side Scaling)가 하는 일은?</p><div class="opts">
+        <button class="opt">64 KB 덩어리를 MTU 크기로 자른다</button>
+        <button class="opt">NIC 하나를 여러 가상 NIC로 보이게 한다</button>
+        <button class="opt">IP 체크섬을 하드웨어로 계산한다</button>
+        <button class="opt" data-correct>헤더를 해시해 흐름마다 서로 다른 수신 큐와 CPU 코어로 나눈다</button>
+      </div><div class="quiz-exp">RSS는 흐름 단위로 큐를 나눠 여러 코어가 함께 받게 한다. 같은 흐름은 같은 큐로 가므로 순서가 지켜진다. 자르기는 TSO, 가상 NIC는 SR-IOV, 체크섬은 체크섬 오프로드다.</div></div>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  /* ================= 1. 3D 스위치 분해 ================= */
+  const DESC = {
+    chassis: "<b>섀시(금속 상자)</b> — 19인치 랙에 꽂는 규격 상자. 1U는 높이 약 4.4 cm다. 공기는 앞에서 뒤로(또는 반대로) 흐르도록 설계되어, 랙 전체의 냉·온 통로 배치(20장)에 맞춘다.",
+    lid: "<b>덮개</b> — 공기 흐름이 칩 위로만 지나가도록 통로 역할을 한다. 분해 정도를 올리면 들어 올려진다.",
+    pcb: "<b>메인보드</b> — 20층이 넘는 다층 기판. 스위치 칩에서 앞면 포트까지 수백 쌍의 고속 차동 배선이 지나가므로 저손실 재료를 쓰고 비아 스텁을 깎아 낸다(16장). 배선이 길면 손실 예산이 모자라 리타이머를 넣거나 케이블로 대신한다.",
+    cage: "<b>포트 케이지 (OSFP·QSFP-DD)</b> — 광 모듈이나 구리 케이블을 꽂는 금속 틀. 800G OSFP 포트 하나에는 100G 레인 8개가 들어간다. 51.2 Tbps 장비라면 800G 포트 64개가 앞면을 가득 채운다.",
+    optic: "<b>광 트랜시버 모듈</b> — 칩에서 온 전기 신호를 레이저 빛으로 바꾸고 받은 빛을 다시 전기로 바꾼다. 안에 신호를 다듬는 DSP 칩, 레이저, 광검출기가 들어 있고 800G 모듈 하나가 십수 W를 쓴다. 포트가 64개면 광 모듈 전력만 칩 하나만큼 된다(19장).",
+    retimer: "<b>리타이머</b> — 칩과 포트 사이 배선이 길어 손실이 클 때 중간에서 신호를 완전히 다시 만들어 보내는 칩(16장). 최근 칩은 SerDes가 강해져 앞면 포트를 직접 구동하는 경우도 많다.",
+    pkg: "<b>칩 패키지</b> — 실리콘 다이를 올린 기판. 한 변이 수 cm에 이르고, 바닥에는 기판과 연결되는 볼(단자)이 수천 개 있다. 수백 개 SerDes 레인의 차동 쌍, 전원과 접지 볼이 대부분을 차지한다.",
+    die: "<b>스위치 ASIC 다이</b> — 상자의 심장. 가장자리를 SerDes 수백 개가 둘러싸고, 안쪽에 패킷 처리 파이프라인, TCAM·SRAM 표, 공유 패킷 버퍼가 있다. 5·3 nm급 공정에 레티클 한계에 가까운 크기이며, 최근에는 SerDes를 별도 칩렛으로 떼어 내기도 한다.",
+    heat: "<b>방열판</b> — 스위치 칩은 수백 W를 쓴다. 구리 바닥판과 증기 챔버(vapor chamber), 얇은 핀들로 열을 퍼뜨려 팬 바람에 실어 보낸다. 장비 전력이 더 오르면서 액체 냉각을 쓰는 스위치도 나오고 있다.",
+    cpu: "<b>CPU 보드 (제어 평면)</b> — x86 또는 Arm CPU에 DRAM과 SSD를 단 작은 컴퓨터. 리눅스 기반 네트워크 OS가 돌며 BGP 같은 라우팅 프로토콜(8장)로 경로를 계산하고, 결과를 PCIe로 스위치 ASIC의 표에 써 넣는다. 관리용 BMC도 근처에 있다.",
+    dram: "<b>DRAM·SSD</b> — 네트워크 OS와 라우팅 소프트웨어가 쓰는 메모리와 저장장치. 패킷 자체는 여기를 거치지 않는다. 패킷은 ASIC 안의 버퍼에만 머문다.",
+    fan: "<b>팬 모듈</b> — 고장 나면 장비를 끄지 않고 갈아 끼울 수 있다(핫스왑). 하나가 멈춰도 나머지가 바람을 더 세게 내도록 여유를 두고 설계한다.",
+    psu: "<b>전원 공급 장치 (PSU)</b> — 보통 두 개를 넣어 하나가 고장 나도 버티게 한다(1+1 이중화). 칩과 광 모듈, 팬을 합친 장비 전력은 kW 수준에 이른다.",
+  };
+  const swEx = NB.range("sw-ex", (v) => v + "%", () => sw.redraw());
+  const sw = NB.scene3d($("cv-sw"), () => {
+    const P = NB.palette(), e = swEx() / 100, B = [];
+    const lidUp = e * 5.5;
+    B.push({ id: "chassis", x: -8, y: 0, z: -10, w: 16, h: 0.2, d: 20, color: P.surface });
+    B.push({ id: "chassis", x: -8, y: 0.2, z: -10, w: 0.15, h: 1.4, d: 20, color: P.surface });
+    B.push({ id: "chassis", x: 7.85, y: 0.2, z: -10, w: 0.15, h: 1.4, d: 20, color: P.surface });
+    B.push({ id: "pcb", x: -7.6, y: 0.2, z: -6.6, w: 15.2, h: 0.12, d: 14.9, color: P.ok, alpha: 0.95, label: e > 0.35 ? "메인보드" : null });
+    for (let i = 0; i < 32; i++) B.push({ id: "cage", x: -7.6 + i * 0.475, y: 0.32, z: 8.3, w: 0.42, h: 1.0, d: 1.7, color: P.faint, label: i === 26 ? "포트 케이지" : null });
+    [1, 4, 7, 10, 13, 18, 21, 29].forEach((i, k) => B.push({ id: "optic", x: -7.6 + i * 0.475 + 0.04, y: 0.45, z: 8.9 + e * 2.4, w: 0.34, h: 0.74, d: 2.6, color: P.warn, label: k === 2 ? "광 모듈" : null }));
+    for (let i = 0; i < 4; i++) B.push({ id: "retimer", x: -6.2 + i * 3.9, y: 0.32, z: 6.1, w: 0.9, h: 0.14, d: 0.9, color: P.accent2, label: i === 3 ? "리타이머" : null });
+    const py = 0.32 + e * 0.7;
+    B.push({ id: "pkg", x: -2.4, y: py, z: 0.4, w: 4.8, h: 0.24, d: 4.8, color: P.dim, label: e > 0.3 ? "패키지" : null, labelLift: 6 });
+    B.push({ id: "die", x: -1.25, y: py + 0.24 + e * 0.9, z: 1.55, w: 2.5, h: 0.14, d: 2.5, color: P.accent, label: "스위치 ASIC", labelAlways: true });
+    const hy = py + 0.4 + e * 3.4;
+    B.push({ id: "heat", x: -2.9, y: hy, z: 0.0, w: 5.8, h: 0.16, d: 5.6, color: P.faint, label: e > 0.2 ? "방열판" : null, labelLift: 26 });
+    for (let k = 0; k < 10; k++) B.push({ id: "heat", x: -2.8 + k * 0.6, y: hy + 0.16, z: 0.05, w: 0.12, h: 0.8, d: 5.5, color: P.faint, alpha: 0.9 });
+    B.push({ id: "cpu", x: -7.2, y: 0.32 + e * 0.6, z: -6.2, w: 4.4, h: 0.1, d: 3.4, color: P.accent2, alpha: 0.85, label: e > 0.25 ? "CPU 보드" : null });
+    B.push({ id: "cpu", x: -6.4, y: 0.42 + e * 0.6, z: -5.4, w: 1.3, h: 0.16, d: 1.3, color: P.text });
+    B.push({ id: "dram", x: -4.6, y: 0.42 + e * 0.6, z: -5.9, w: 1.3, h: 0.12, d: 0.5, color: P.dim });
+    B.push({ id: "dram", x: -4.6, y: 0.42 + e * 0.6, z: -5.2, w: 1.3, h: 0.12, d: 0.5, color: P.dim });
+    for (let i = 0; i < 5; i++) B.push({ id: "fan", x: -7.7 + i * 2.25, y: 0.2, z: -10, w: 2.1, h: 1.35, d: 1.5, color: P.dim, label: i === 2 ? "팬" : null });
+    for (let i = 0; i < 2; i++) B.push({ id: "psu", x: 3.9 + i * 1.95, y: 0.2, z: -10, w: 1.85, h: 1.3, d: 6.2, color: P.series[4], alpha: 0.9, label: i === 1 ? "전원" : null });
+    B.push({ id: "lid", x: -8, y: 1.6 + lidUp, z: -10, w: 16, h: 0.08, d: 20, color: P.surface, alpha: e < 0.04 ? 0.97 : 0.14 });
+    return B;
+  }, { radius: 13, zoom: 1.5, center: [0, 1.2, 0], yaw: -0.55, pitch: 0.62, cyFrac: 0.54, compactBelow: 560, hint: "드래그: 회전 · 클릭: 설명", aspect: 0.62, maxHeight: 460,
+    onPick: (id) => { $("sw-desc").innerHTML = DESC[id] || "부품을 눌러 보자. 드래그하면 모형이 돌아간다."; } });
+  $("sw-top").onclick = () => { sw.stop(); sw.setView(0, 1.3); };
+  $("sw-front").onclick = () => { sw.stop(); sw.setView(0, 0.25); };
+  $("sw-side").onclick = () => { sw.stop(); sw.setView(-0.55, 0.62); };
+
+  /* ================= 2. 용량 계산기 ================= */
+  const GENS = [[2010, 0.64, "64×10G"], [2012, 1.28, "128×10G"], [2014.5, 3.2, "128×25G"], [2016.5, 6.4, "256×25G"], [2018, 12.8, "256×50G"], [2020, 25.6, "512×50G"], [2022.6, 51.2, "512×100G"], [2025.4, 102.4, "512×200G"]];
+  const cpLanes = NB.seg("cp-lanes", () => cpUpd()), cpRate = NB.seg("cp-rate", () => cpUpd()), cpPort = NB.seg("cp-port", () => cpUpd());
+  const cpPj = NB.range("cp-pj", (v) => v + " pJ/bit", () => cpUpd());
+  const fmtBw = (g) => (g >= 1000 ? (g / 1000).toFixed(g % 1000 ? 1 : 0).replace(/\.0$/, "") + " Tbps" : g + " Gbps");
+  function cpUpd() {
+    const L = +cpLanes(), R = +cpRate(), Pt = +cpPort(), cap = L * R;
+    NB.stat("cp-cap", fmtBw(cap).replace(" ", "<small> ") + "</small>");
+    if (Pt >= R) { const lpp = Pt / R; NB.stat("cp-ports", Math.floor(L / lpp) + " × " + (Pt >= 1000 ? Pt / 1000 + "T" : Pt + "G")); NB.stat("cp-lpp", lpp + "<small>레인</small>"); }
+    else { NB.stat("cp-ports", L + " × " + R + "G"); NB.stat("cp-lpp", "<small>레인 1개 = 포트 1개 (" + R + "G가 최대)</small>"); }
+    NB.stat("cp-pw", Math.round(cap * 1e9 * cpPj() * 1e-12) + "<small>W</small>");
+    NB.stat("cp-day", NB.bytes((cap * 1e9 * 86400) / 8, 2));
+    cpCv.redraw();
+  }
+  const cpCv = NB.canvas($("cv-cap"), (ctx, w, h) => {
+    const P = NB.palette(), L = +cpLanes(), R = +cpRate(), cap = (L * R) / 1000, narrow = w < 560;
+    const cw = narrow ? w : w * 0.62, chh = narrow ? h * 0.6 : h;
+    const ch = NB.chart(ctx, { x: 52, y: 14, w: cw - 52 - 14, h: chh - 14 - 44 }, { x: [2009, 2026.5], y: [0.3, 300], logY: true, xLabel: "연도 (대략)", yLabel: "칩 용량 (Tbps)", xTicks: [2010, 2014, 2018, 2022, 2026], yFmt: (v) => (v >= 1 ? String(v) : String(v)),
+      series: [{ data: GENS.map((g) => [g[0], g[1]]), color: P.accent, width: 2.2 }, { data: [[2010, 0.64], [2026, 0.64 * Math.pow(2, 8)]], color: P.faint, width: 1, dash: [4, 4] }],
+      points: GENS.map((g) => ({ x: g[0], y: g[1], color: P.accent, r: 3.5 })).concat([{ x: 2026, y: cap, color: P.bad, r: 6, label: narrow ? "" : "계산값" }]) });
+    ctx.font = "10.5px " + NB.color("mono");
+    GENS.forEach((g, i) => { if (narrow && i % 2) return; NB.text(ctx, g[1] >= 1 ? g[1] + "T" : g[1] * 1000 + "G", ch.X(g[0]) - 4, ch.Y(g[1]) - 12, { size: 10.5, align: "right", mono: true, color: P.dim }); });
+    NB.text(ctx, "2년마다 ×2 (점선)", ch.X(2014), ch.Y(30), { size: 11, color: P.faint });
+    // 다이 그림
+    const dx = narrow ? 12 : cw + 10, dy = narrow ? chh + 6 : 16, ds = narrow ? Math.min(w - 24, h - chh - 16) : Math.min(w - cw - 24, h - 40);
+    const cx = narrow ? w / 2 - ds / 2 : dx + (w - dx - ds) / 2;
+    ctx.fillStyle = P.surface; ctx.strokeStyle = P.border; NB.rrect(ctx, cx, dy, ds, ds, 6); ctx.fill(); ctx.stroke();
+    const m = ds * 0.13; ctx.fillStyle = P.accent; ctx.globalAlpha = 0.18; ctx.fillRect(cx + m, dy + m, ds - 2 * m, ds - 2 * m); ctx.globalAlpha = 1;
+    NB.text(ctx, "코어 로직", cx + ds / 2, dy + ds / 2 - 8, { align: "center", size: 11, bold: true, color: P.text });
+    NB.text(ctx, "+ 버퍼 SRAM", cx + ds / 2, dy + ds / 2 + 8, { align: "center", size: 10.5, color: P.dim });
+    const per = L / 4, t = m * 0.75; ctx.strokeStyle = P.accent2; ctx.lineWidth = Math.max(0.5, Math.min(2, (ds / per) * 0.5));
+    for (let s = 0; s < 4; s++) for (let i = 0; i < per; i++) {
+      const f = (i + 0.5) / per, a = cx + m + f * (ds - 2 * m);
+      ctx.beginPath();
+      if (s === 0) { ctx.moveTo(a, dy + 3); ctx.lineTo(a, dy + 3 + t); } else if (s === 1) { ctx.moveTo(a, dy + ds - 3); ctx.lineTo(a, dy + ds - 3 - t); }
+      else { const b = dy + m + f * (ds - 2 * m); if (s === 2) { ctx.moveTo(cx + 3, b); ctx.lineTo(cx + 3 + t, b); } else { ctx.moveTo(cx + ds - 3, b); ctx.lineTo(cx + ds - 3 - t, b); } }
+      ctx.stroke();
+    }
+    NB.text(ctx, "SerDes " + L + "개 (한 변 " + per + ")", cx + ds / 2, dy + ds + 12, { align: "center", size: 11, color: P.accent2, bold: true });
+  }, { aspect: 0.42, minHeight: 320, maxHeight: 400 });
+  cpUpd();
+
+  /* ================= 3. pps 파이프라인 ================= */
+  const SIZES = (() => { const a = []; for (let i = 0; i <= 100; i++) a.push(Math.round(64 * Math.pow(9000 / 64, i / 100))); return a; })();
+  const ppBw = NB.seg("pp-bw", () => ppUpd());
+  const ppSize = NB.range("pp-size", (v) => SIZES[v].toLocaleString() + " B", () => ppUpd());
+  const ppClk = NB.range("pp-clk", (v) => v.toFixed(2) + " GHz", () => ppUpd());
+  let ppPPC = 1;
+  function ppUpd() {
+    const bw = +ppBw() * 1e9, sz = SIZES[ppSize()], pps = bw / ((sz + 20) * 8), clk = ppClk() * 1e9;
+    ppPPC = pps / clk;
+    NB.stat("pp-pps", pps >= 1e8 ? NB.kn(Math.round(pps)) + "<small>개/s</small>" : (pps / 1e6).toFixed(1) + "<small>M개/s</small>");
+    const t = 1 / pps; NB.stat("pp-t", t < 1e-9 ? (t * 1e12).toFixed(1) + "<small>ps</small>" : (t * 1e9).toFixed(2) + "<small>ns</small>");
+    NB.stat("pp-ppc", ppPPC >= 1 ? ppPPC.toFixed(1) + "<small>개</small>" : "<small>" + (1 / ppPPC).toFixed(1) + " 사이클에 1개</small>");
+    NB.stat("pp-pipes", Math.max(1, Math.ceil(ppPPC - 1e-9)) + "<small>개</small>");
+  }
+  const STAGES = ["파서", "L2", "L3", "ACL", "큐", "출력"];
+  let ppTick = 0, ppAcc = 0;
+  const ppCv = NB.canvas($("cv-pps"), (ctx, w, h) => {
+    const P = NB.palette(), lanes = Math.max(1, Math.ceil(ppPPC - 1e-9)), shown = Math.min(lanes, 8);
+    const x0 = 64, x1 = w - 16, top = 30, bot = h - 16, sw = (x1 - x0) / STAGES.length, lh = (bot - top) / shown;
+    STAGES.forEach((s, i) => NB.text(ctx, s, x0 + sw * (i + 0.5), 14, { align: "center", size: 12, bold: true, color: P.dim }));
+    for (let l = 0; l < shown; l++) {
+      const y = top + l * lh;
+      NB.text(ctx, shown < lanes && l === shown - 1 ? "… ×" + lanes : "#" + (l + 1), 8, y + lh / 2, { size: 11, mono: true, color: P.faint });
+      for (let i = 0; i < STAGES.length; i++) { ctx.strokeStyle = P.border; ctx.lineWidth = 1; NB.rrect(ctx, x0 + i * sw + 2, y + 2, sw - 4, lh - 4, 5); ctx.stroke(); }
+      for (let i = 0; i < STAGES.length; i++) {
+        const k = ppTick - i; if (k < 0) continue;
+        const occupied = ppPPC >= 1 ? true : (k % Math.round(1 / ppPPC)) === 0; if (!occupied) continue;
+        const hue = P.series[(k + l) % 4], bh = Math.min(lh - 10, 26), bw = Math.min(sw - 14, 46);
+        NB.box(ctx, x0 + i * sw + (sw - bw) / 2 + (ppAcc - 0.5) * 6, y + (lh - bh) / 2, bw, bh, { fill: hue, stroke: hue, r: 5, text: lh > 22 ? "P" + (k * shown + l) % 100 : "", color: "#fff", size: 10, bold: true });
+      }
+    }
+    NB.text(ctx, "매 사이클 모든 단계가 서로 다른 패킷을 처리한다", w - 16, h - 6, { align: "right", size: 10.5, color: P.faint });
+  }, { aspect: 0.32, minHeight: 210, maxHeight: 280 });
+  NB.loop($("cv-pps"), (dt) => { ppAcc += dt * 1.6; if (ppAcc >= 1) { ppAcc = 0; ppTick++; } ppCv.redraw(); });
+  ppUpd();
+
+  /* ================= 4. TCAM ================= */
+  const ROUTES = [["10.1.2.0", 24, "포트 3"], ["192.168.10.0", 24, "포트 7"], ["10.1.0.0", 16, "포트 2"], ["192.168.0.0", 16, "포트 6"], ["172.16.0.0", 12, "포트 5"], ["10.0.0.0", 8, "포트 1"], ["0.0.0.0", 0, "포트 0 (기본)"]];
+  const ip2n = (s) => { const p = s.trim().split("."); if (p.length !== 4) return null; let n = 0; for (const x of p) { if (!/^\d{1,3}$/.test(x) || +x > 255) return null; n = n * 256 + +x; } return n >>> 0; };
+  function tcRender() {
+    const key = ip2n($("tc-key").value), unsorted = $("tc-unsorted").checked;
+    const rows = unsorted ? ROUTES.slice().reverse() : ROUTES;
+    const bitsOf = (n) => { const a = []; for (let i = 31; i >= 0; i--) a.push((n >>> i) & 1); return a; };
+    const kb = key == null ? null : bitsOf(key);
+    let html = "", hits = 0, win = -1;
+    const mkBits = (b, len, against) => { let s = "<div class='tc-bits'>"; for (let by = 0; by < 4; by++) { s += "<span class='byte'>"; for (let j = 0; j < 8; j++) { const i = by * 8 + j; if (i >= len) s += "<i class='x'>X</i>"; else { const mis = against && against[i] !== b[i]; s += `<i class='${mis ? "mis" : ""}'>${b[i]}</i>`; } } s += "</span>"; } return s + "</div>"; };
+    html += `<div class="tc-row key"><span class="ix">키</span><span class="pf">${key == null ? "잘못된 주소" : $("tc-key").value.trim()}</span>${kb ? mkBits(kb, 32, null) : "<div></div>"}<span class="ml">일치선</span><span class="act">동작</span></div>`;
+    rows.forEach((r, i) => {
+      const n = ip2n(r[0]), b = bitsOf(n), len = r[1];
+      let hit = kb != null; if (kb) for (let k = 0; k < len; k++) if (kb[k] !== b[k]) { hit = false; break; }
+      if (hit) { hits++; if (win < 0) win = i; }
+      html += `<div class="tc-row ${hit ? (win === i ? "win" : "hit") : ""}"><span class="ix">${i}</span><span class="pf">${r[0]}/${len}</span>${mkBits(b, len, kb)}<span class="ml" style="color:${hit ? "var(--ok)" : "var(--bad)"}">${kb ? (hit ? "● 일치" : "○ 탈락") : "—"}</span><span class="act">${r[2]}</span></div>`;
+    });
+    $("tc-tbl").innerHTML = html;
+    NB.stat("tc-hits", kb ? hits + "<small>/" + rows.length + "줄</small>" : "—");
+    NB.stat("tc-win", win >= 0 ? "줄 " + win + " <small>" + rows[win][0] + "/" + rows[win][1] + "</small>" : "—");
+    const correct = kb ? ROUTES.find((r) => { const b = bitsOf(ip2n(r[0])); for (let k = 0; k < r[1]; k++) if (kb[k] !== b[k]) return false; return true; }) : null;
+    NB.stat("tc-act", win >= 0 ? rows[win][2] + (unsorted && correct && correct !== rows[win] ? " <small style='color:var(--bad)'>(틀림! 정답 " + correct[2] + ")</small>" : "") : "—");
+    NB.stat("tc-bits", rows.length * 32 + "<small>비트 · 1사이클</small>");
+  }
+  $("tc-key").addEventListener("input", tcRender);
+  $("tc-unsorted").addEventListener("change", tcRender);
+  $("tc-pre").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { $("tc-key").value = b.dataset.ip; tcRender(); }));
+  tcRender();
+
+  /* ================= 5. 버퍼 ================= */
+  const BURST = [64e3, 128e3, 256e3, 512e3, 1e6, 2e6, 4e6, 8e6, 16e6];
+  const bfN = NB.range("bf-n", (v) => v + "개", () => bfUpd());
+  const bfB = NB.range("bf-b", (v) => NB.bytes(BURST[v], 3), () => bfUpd());
+  const bfR = NB.seg("bf-r", () => bfUpd());
+  const bfCap = NB.range("bf-cap", (v) => NB.bytes(Math.pow(2, v) * 1e6, 3), () => bfUpd());
+  let bfS = null;
+  function bfUpd() {
+    const N = bfN(), B = BURST[bfB()], R = (+bfR() * 1e9) / 8, cap = Math.pow(2, bfCap()) * 1e6;
+    const T1 = B / R, peak = (N - 1) * B, drop = Math.max(0, peak - cap), qmax = Math.min(peak, cap), T2 = T1 + qmax / R;
+    bfS = { N, B, R, cap, T1, T2, peak, drop, qmax };
+    NB.stat("bf-tot", NB.bytes(N * B, 3));
+    NB.stat("bf-q", NB.bytes(qmax, 3));
+    NB.stat("bf-drop", drop > 0 ? "<span style='color:var(--bad)'>" + NB.bytes(drop, 3) + "</span> <small>(" + ((100 * drop) / (N * B)).toFixed(0) + "%)</small>" : "0");
+    NB.stat("bf-lat", NB.si(qmax / R, "s", 3));
+    bfCv.redraw();
+  }
+  const bfCv = NB.canvas($("cv-buf"), (ctx, w, h) => {
+    if (!bfS) return; const P = NB.palette(), s = bfS, tmax = s.T2 * 1.15 + 1e-9, us = 1e6;
+    const ymax = Math.max(s.peak, s.cap) * 1.12 / 1e6;
+    const q = [[0, 0], [s.T1 * us, s.qmax / 1e6], [s.T2 * us, 0], [tmax * us, 0]];
+    // 꽉 차는 시점
+    if (s.drop > 0) { const tf = s.cap / ((s.N - 1) * s.R); q.splice(1, 0, [tf * us, s.cap / 1e6]); }
+    const ideal = [[0, 0], [s.T1 * us, s.peak / 1e6]];
+    const ch = NB.chart(ctx, null, { x: [0, tmax * us], y: [0, ymax], xLabel: "시간 (µs)", yLabel: "출력 큐 (MB)", series: [{ data: ideal, color: P.bad, width: 1.5, dash: [5, 4] }, { data: q, color: P.accent, width: 2.5, fill: NB.isDark() ? "rgba(79,168,255,0.15)" : "rgba(10,108,201,0.12)" }],
+      hlines: [{ y: s.cap / 1e6, color: P.warn, label: "버퍼 한도 " + NB.bytes(s.cap, 3) }], vlines: [{ x: s.T1 * us, color: P.faint, label: "버스트 끝" }] });
+    if (s.drop > 0) NB.text(ctx, "넘친 만큼 버려짐 (점선)", ch.X(s.T1 * us * 0.55), ch.Y(Math.min(ymax * 0.92, (s.peak / 1e6) * 0.8)), { size: 11.5, bold: true, color: P.bad, align: "right" });
+  }, { aspect: 0.42, minHeight: 260, maxHeight: 340 });
+  bfUpd();
+
+  /* ================= 6. NIC 오프로드·RSS ================= */
+  const niLink = NB.seg("ni-link", () => niUpd());
+  const niFlows = NB.range("ni-flows", (v) => v + "개", () => niUpd());
+  const niQ = NB.range("ni-q", (v) => v + "개", () => niUpd());
+  ["ni-csum", "ni-tso"].forEach((id) => $(id).addEventListener("change", () => niUpd()));
+  let niS = null;
+  const hashQ = (f, q) => { let x = Math.imul(f + 0x9e37, 0x85ebca6b) >>> 0; x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35) >>> 0; x ^= x >>> 16; return (x >>> 0) % q; };
+  function niUpd() {
+    const link = +niLink() * 1e9 / 8, F = niFlows(), Q = niQ(), csum = $("ni-csum").checked, tso = $("ni-tso").checked;
+    const seg = tso ? 32768 : 1500, cost = 1.2e-6 + seg * (0.1e-9 + (csum ? 0 : 0.15e-9));
+    const coreCap = seg / cost; // B/s
+    // 흐름별 최대-최소 공정 분배: 링크 용량과 코어 용량을 모두 지킨다
+    const fq = []; for (let f = 0; f < F; f++) fq.push(hashQ(f, Q));
+    const nOn = new Array(Q).fill(0); fq.forEach((q) => nOn[q]++);
+    const rate = new Array(F).fill(0), fixed = new Array(F).fill(false), coreFixed = new Array(Q).fill(false);
+    let remain = link, active = F;
+    for (let it = 0; it < Q + 1 && active > 0; it++) {
+      const r = remain / active; let changed = false;
+      for (let q = 0; q < Q; q++) if (!coreFixed[q] && nOn[q] && nOn[q] * r > coreCap) { coreFixed[q] = true; changed = true; fq.forEach((qq, f) => { if (qq === q) { rate[f] = coreCap / nOn[q]; fixed[f] = true; remain -= rate[f]; active--; } }); }
+      if (!changed) { fq.forEach((qq, f) => { if (!fixed[f]) rate[f] = r; }); break; }
+    }
+    const demand = new Array(Q).fill(0); fq.forEach((q, f) => (demand[q] += rate[f]));
+    const thr = demand.reduce((x, y) => x + y, 0);
+    niS = { Q, demand, coreCap, util: demand.map((d) => Math.min(1, d / coreCap)), link };
+    NB.stat("ni-thr", ((thr * 8) / 1e9).toFixed(1) + "<small>Gbps / " + niLink() + "G</small>");
+    NB.stat("ni-busy", demand.filter((d) => d > 0).length + "<small>/" + Q + "</small>");
+    NB.stat("ni-core", ((coreCap * 8) / 1e9).toFixed(1) + "<small>Gbps</small>");
+    NB.stat("ni-pps", NB.kn(Math.round(thr / seg)) + "<small>개/s</small>");
+    niCv.redraw();
+  }
+  const niCv = NB.canvas($("cv-nic"), (ctx, w, h) => {
+    if (!niS) return; const P = NB.palette(), Q = niS.Q, x0 = 46, x1 = w - 12, top = 26, bot = h - 34, bw = (x1 - x0) / Q;
+    NB.text(ctx, "코어별 사용률", x0, 12, { size: 12, bold: true, color: P.text });
+    ctx.strokeStyle = P.grid; [0, 0.5, 1].forEach((v) => { const y = bot - v * (bot - top); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); NB.text(ctx, v * 100 + "%", x0 - 6, y, { align: "right", size: 10.5, mono: true, color: P.dim }); });
+    niS.util.forEach((u, i) => {
+      const x = x0 + i * bw + bw * 0.12, ww = bw * 0.76, hh = u * (bot - top);
+      ctx.fillStyle = P.surface; ctx.fillRect(x, top, ww, bot - top);
+      ctx.fillStyle = u >= 0.999 ? P.bad : u > 0.7 ? P.warn : P.accent; ctx.fillRect(x, bot - hh, ww, hh);
+      if (niS.demand[i] >= niS.coreCap * 0.999) NB.text(ctx, "포화", x + ww / 2, top - 8, { align: "center", size: 10, bold: true, color: P.bad });
+      if (bw > 22 || i % 2 === 0) NB.text(ctx, String(i), x + ww / 2, bot + 12, { align: "center", size: 10.5, mono: true, color: P.dim });
+    });
+    NB.text(ctx, "코어(수신 큐) 번호", (x0 + x1) / 2, h - 8, { align: "center", size: 11, color: P.dim });
+  }, { aspect: 0.36, minHeight: 220, maxHeight: 300 });
+  niUpd();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>DNS, 웹, 스트리밍 · NetworkBook</title>
+<meta name="description" content="이름을 주소로 바꾸는 DNS의 계층 구조와 캐시, HTTP 요청과 응답, HTTP/1.1에서 HTTP/3까지의 페이지 로딩, CDN 엣지 캐시, 이메일과 웹소켓, 끊김 없는 동영상을 만드는 적응형 비트레이트 스트리밍, 실시간 통화와 P2P를 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .halo { paint-order: stroke; stroke: var(--bg-elev); stroke-width: 4px; stroke-linejoin: round; }
+  .dns-input { display: flex; gap: 8px; flex-wrap: wrap; }
+  .dns-input input { flex: 1 1 160px; min-width: 0; }
+  .mono-tbl td:first-child { font-family: var(--mono); white-space: nowrap; font-weight: 700; }
+  .log { max-height: 200px; }
+  .log b { color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body data-chapter="apps">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 10</div>
+    <h1>DNS, 웹, 스트리밍</h1>
+    <p class="lead">주소창에 이름을 치고 엔터를 누르면 1초도 안 되어 화면이 뜬다. 그 사이에 브라우저는 이름을 숫자 주소로 바꾸고, 가장 가까운 서버를 찾고, 수십 개의 파일을 한꺼번에 받아 온다. 지하철에서 보던 동영상은 터널에 들어가도 멈추지 않고 화질만 살짝 낮아진다. 이 장은 우리가 매일 쓰는 인터넷 서비스, 즉 응용 계층이 앞 장들의 도구를 어떻게 엮어 쓰는지 따라간다.</p>
+    <ul class="objectives">
+      <li>클라이언트-서버 방식과 P2P 방식의 차이와 장단점을 설명한다.</li>
+      <li>DNS의 계층 구조(루트·TLD·권한 서버)와 재귀 리졸버, 캐시와 TTL의 역할을 따라간다.</li>
+      <li>HTTP 요청·응답의 형식, 메서드와 상태 코드, 쿠키와 무상태성을 안다.</li>
+      <li>HTTP/1.1, HTTP/2, HTTP/3가 페이지 로딩을 어떻게 바꿨는지 폭포수 그래프로 비교한다.</li>
+      <li>CDN이 캐시 적중률로 응답 시간과 원본 서버 부담을 줄이는 원리를 계산한다.</li>
+      <li>적응형 비트레이트(ABR) 스트리밍이 버퍼와 화질 사이에서 균형을 잡는 방식을 체험한다.</li>
+      <li>실시간 통화가 일반 스트리밍과 다른 이유, 이메일·웹소켓·비트토렌트의 기본 구조를 안다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="app-layer">
+    <h2>응용 계층: 누가 누구에게 묻는가</h2>
+    <p>지금까지 본 계층들은 “상자를 어떻게 옮길까”의 문제였다. 응용 계층은 “상자에 무엇을 담고, 어떤 순서로 대화할까”를 정한다. 웹 브라우저와 웹 서버의 HTTP, 메일 프로그램의 SMTP와 IMAP, 이름을 묻는 DNS가 모두 응용 계층 프로토콜이다. 이들은 앞 장의 TCP나 UDP(9장)를 그대로 가져다 쓴다.</p>
+    <p>대화 구조는 크게 두 가지다. <b>클라이언트-서버</b> 방식에서는 항상 켜져 있고 주소가 잘 알려진 서버가 있고, 손님(클라이언트)들이 찾아와 요청한다. 웹, 메일, 대부분의 앱이 이렇다. 관리가 쉽고 일관되지만, 손님이 몰리면 서버와 서버 쪽 회선이 감당해야 한다. <span class="term">P2P</span><span class="en">(peer-to-peer)</span> 방식에서는 참가자(피어)끼리 직접 주고받는다. 손님이 늘면 나눠 줄 사람도 함께 늘어나는 대신, 피어가 수시로 들어오고 나가며 NAT(7장) 뒤에 숨어 있어 연결이 까다롭다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 250" style="min-width:600px" role="img" aria-label="클라이언트-서버 구조와 P2P 구조 비교">
+        <text x="200" y="22" text-anchor="middle" class="t" style="font-weight:700">클라이언트-서버</text>
+        <text x="600" y="22" text-anchor="middle" class="t" style="font-weight:700">P2P</text>
+        <g transform="translate(0,0)">
+          <rect x="160" y="100" width="80" height="50" rx="10" class="f-acc"/><text x="200" y="130" text-anchor="middle" class="t" style="fill:#fff;font-weight:700">서버</text>
+          <g class="s-acc" style="stroke-width:1.6">
+            <path d="M200 100 L80 50 M200 100 L200 45 M200 100 L320 50 M200 150 L80 200 M200 150 L200 210 M200 150 L320 200 M160 125 L60 125 M240 125 L340 125"/>
+          </g>
+          <g class="f-surface">
+            <circle cx="80" cy="50" r="15"/><circle cx="200" cy="45" r="15"/><circle cx="320" cy="50" r="15"/><circle cx="80" cy="200" r="15"/><circle cx="200" cy="210" r="15"/><circle cx="320" cy="200" r="15"/><circle cx="50" cy="125" r="15"/><circle cx="350" cy="125" r="15"/>
+          </g>
+          <text x="200" y="244" text-anchor="middle" class="t-dim">손님이 늘수록 서버 하나가 모두 감당한다</text>
+        </g>
+        <g>
+          <g stroke="var(--accent-2)" stroke-width="1.6" fill="none">
+            <path d="M480 60 L600 45 L720 60 L750 130 L700 200 L600 210 L500 200 L450 130 Z M480 60 L700 200 M600 45 L600 210 M720 60 L500 200 M450 130 L750 130"/>
+          </g>
+          <g class="f-acc2-soft">
+            <circle cx="480" cy="60" r="15"/><circle cx="600" cy="45" r="15"/><circle cx="720" cy="60" r="15"/><circle cx="750" cy="130" r="15"/><circle cx="700" cy="200" r="15"/><circle cx="600" cy="210" r="15"/><circle cx="500" cy="200" r="15"/><circle cx="450" cy="130" r="15"/>
+          </g>
+          <text x="600" y="244" text-anchor="middle" class="t-dim">받는 사람이 곧 나눠 주는 사람이 된다</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 10-1.</b> 클라이언트-서버와 P2P. 실제 서비스는 둘을 섞기도 한다. 영상 통화는 서버가 상대를 찾아 준 뒤 가능하면 두 사람이 직접 연결하고, 게임 업데이트를 P2P로 나눠 받는 서비스도 있다.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="dns">
+    <h2>DNS: 인터넷의 주소록</h2>
+    <p>라우터는 숫자 IP 주소(7장)만 안다. 하지만 사람은 <code>203.0.113.7</code>보다 <code>www.example.com</code>을 훨씬 잘 기억한다. 이름을 주소로 바꿔 주는 전 세계 분산 데이터베이스가 <span class="term">DNS</span><span class="en">(Domain Name System)</span>다. 거의 모든 인터넷 통신이 DNS 조회로 시작한다.</p>
+    <div class="callout analogy"><strong>전화번호 안내의 사슬</strong><p>“서울 강남구 ○○빌딩 3층 김 대리 번호 좀 알려 주세요.” 국가 안내소는 김 대리를 모르지만 “서울 안내소에 물어보세요”라고 알려 준다. 서울 안내소는 “○○빌딩 관리실에 물어보세요”라고 하고, 관리실이 마침내 번호를 알려 준다. 이 심부름을 대신 해 주고, 한 번 알아낸 번호는 수첩(캐시)에 적어 두는 비서가 <b>재귀 리졸버</b>다.</p></div>
+    <p>이름은 점(.)으로 나뉜 계층이고, 오른쪽이 위쪽이다. <code>www.example.com.</code>은 사실 맨 끝에 보이지 않는 점(루트)이 있다.</p>
+    <ul>
+      <li><span class="term">루트 서버</span><span class="en">(root server)</span>: 맨 위. <code>a.root-servers.net</code>부터 <code>m.root-servers.net</code>까지 <b>13개의 이름</b>이 있고, 12개 기관이 운영한다. 실제 서버는 같은 주소를 여러 곳에서 동시에 광고하는 <b>애니캐스트</b>(8장)로 전 세계 1,900곳이 넘는 곳에 흩어져 있어, 어디서 물어도 가까운 복제본이 답한다.</li>
+      <li><span class="term">TLD</span><span class="en">(top-level domain)</span> 서버: <code>.com</code>, <code>.org</code>, <code>.kr</code>, <code>.io</code> 같은 최상위 도메인을 맡는다. 약 1,500개가 있다. <code>.com</code>은 Verisign이, <code>.kr</code>은 한국인터넷진흥원(KISA)이 운영한다.</li>
+      <li><span class="term">권한 네임서버</span><span class="en">(authoritative name server)</span>: 도메인 주인(또는 그가 맡긴 DNS 업체)이 운영하며, 그 도메인 안의 이름에 대한 “정답”을 갖고 있다.</li>
+    </ul>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 290" style="min-width:600px" role="img" aria-label="DNS 이름 공간의 계층 구조: 루트, TLD, 도메인, 호스트">
+        <g class="s-line" style="stroke-width:1.4">
+          <path d="M400 56 L130 120 M400 56 L310 120 M400 56 L490 120 M400 56 L670 120"/>
+          <path d="M130 150 L70 200 M130 150 L200 200 M670 150 L620 200 M670 150 L740 200 M620 230 L620 254 M70 230 L70 254"/>
+        </g>
+        <rect x="330" y="20" width="140" height="36" rx="10" class="f-acc"/><text x="400" y="43" text-anchor="middle" class="t" style="fill:#fff;font-weight:700">루트 “.”</text>
+        <rect x="90" y="120" width="80" height="30" rx="8" class="f-acc-soft"/><text x="130" y="140" text-anchor="middle" class="t-mono" style="fill:var(--text)">com</text>
+        <rect x="270" y="120" width="80" height="30" rx="8" class="f-acc-soft"/><text x="310" y="140" text-anchor="middle" class="t-mono" style="fill:var(--text)">org</text>
+        <rect x="450" y="120" width="80" height="30" rx="8" class="f-acc-soft"/><text x="490" y="140" text-anchor="middle" class="t-mono" style="fill:var(--text)">net</text>
+        <rect x="630" y="120" width="80" height="30" rx="8" class="f-acc-soft"/><text x="670" y="140" text-anchor="middle" class="t-mono" style="fill:var(--text)">kr</text>
+        <rect x="20" y="200" width="100" height="30" rx="8" class="f-acc2-soft"/><text x="70" y="220" text-anchor="middle" class="t-mono" style="fill:var(--text)">example</text>
+        <rect x="150" y="200" width="100" height="30" rx="8" class="f-acc2-soft"/><text x="200" y="220" text-anchor="middle" class="t-mono" style="fill:var(--text)">wikipedia</text>
+        <rect x="580" y="200" width="80" height="30" rx="8" class="f-acc2-soft"/><text x="620" y="220" text-anchor="middle" class="t-mono" style="fill:var(--text)">co</text>
+        <rect x="700" y="200" width="80" height="30" rx="8" class="f-acc2-soft"/><text x="740" y="220" text-anchor="middle" class="t-mono" style="fill:var(--text)">go</text>
+        <rect x="30" y="254" width="80" height="26" rx="8" class="f-elev"/><text x="70" y="272" text-anchor="middle" class="t-mono" style="fill:var(--text)">www</text>
+        <rect x="575" y="254" width="90" height="26" rx="8" class="f-elev"/><text x="620" y="272" text-anchor="middle" class="t-mono" style="fill:var(--text)">(회사명)</text>
+        <g class="t-dim" style="font-size:11.5px">
+          <text x="480" y="30">13개 이름 · 1,900곳 넘는 애니캐스트 인스턴스</text>
+          <text x="20" y="96">TLD 서버 (약 1,500개)</text>
+          <text x="400" y="216" text-anchor="middle">권한 네임서버</text>
+          <text x="400" y="232" text-anchor="middle">(도메인 주인이 운영)</text>
+          <text x="140" y="272">www.example.com = 아래에서 위로 읽는다</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 10-2.</b> DNS 이름 공간. 각 층은 바로 아래 층의 서버 주소만 안다(“위임”). 루트는 <code>.com</code> 서버를, <code>.com</code> 서버는 <code>example.com</code>의 권한 서버를 알려 주고, 마지막 서버가 실제 IP 주소를 답한다.</figcaption>
+    </figure>
+    <p>내 컴퓨터는 이 사슬을 직접 따라가지 않는다. 통신사나 공용 DNS(1.1.1.1, 8.8.8.8 등)가 운영하는 <span class="term">재귀 리졸버</span><span class="en">(recursive resolver)</span>에게 “www.example.com의 주소를 알아다 줘”라고 한 번 묻는다. 리졸버가 루트 → TLD → 권한 서버를 차례로 묻고, 얻은 답을 각 기록에 붙은 <span class="term">TTL</span><span class="en">(time to live)</span>만큼 캐시에 보관한다. 같은 이름을 다시 물으면 루트까지 갈 필요 없이 바로 답한다. 실제로는 브라우저와 운영체제도 각자 작은 캐시를 갖고 있다.</p>
+    <div class="sim" id="sim-dns">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>DNS 조회의 여행: 캐시와 TTL</h3></div>
+      <div class="sim-controls" style="border-top:0">
+        <label class="ctrl"><span>찾을 이름</span><div class="dns-input"><input type="text" id="dns-name" value="www.example.com" maxlength="60" spellcheck="false" autocomplete="off"><button class="btn primary" id="dns-go">조회</button></div></label>
+        <label class="ctrl"><span>A 레코드의 TTL <output id="dns-ttl-out"></output></span><input type="range" id="dns-ttl" min="0" max="5" value="2"></label>
+      </div>
+      <div class="sim-view"><canvas id="cv-dns"></canvas></div>
+      <div class="sim-controls">
+        <label class="check"><input type="checkbox" id="dns-cache" checked> 리졸버 캐시 사용</label>
+        <div class="ctrl"><span>가상 시계 · 캐시</span><div class="btn-row"><button class="btn" id="dns-age">시간 +10분</button><button class="btn" id="dns-flush">캐시 비우기</button></div></div>
+        <div class="ctrl"><span>다른 이름 조회</span><div class="btn-row"><button class="btn" data-n="docs.example.com">docs.example.com</button><button class="btn" data-n="www.example.org">www.example.org</button><button class="btn" data-n="shop.example.co.kr">shop.example.co.kr</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">이번 조회 소요 시간</span><span class="v" id="dns-t">—</span></div>
+        <div class="stat"><span class="k">리졸버가 밖으로 보낸 질의</span><span class="v" id="dns-q">—</span></div>
+        <div class="stat"><span class="k">흐른 시간 (가상 시계)</span><span class="v" id="dns-clock">0초</span></div>
+      </div>
+      <div class="log" id="dns-log"></div>
+      <div class="sim-note">왕복 시간 가정: 내 컴퓨터↔리졸버 10 ms, 리졸버↔루트 15 ms(애니캐스트로 가까움), ↔TLD 25 ms, ↔권한 서버 40~180 ms(도메인마다 다름). TLD 위임 기록의 TTL은 2일, 도메인의 NS 기록은 1일로 두었다. 해볼 것: 같은 이름을 두 번 조회 → 다른 이름(docs.example.com)을 조회해 이미 아는 <code>.com</code>·<code>example.com</code> 서버를 건너뛰는지 보기 → “시간 +10분”으로 TTL 300초가 지나게 한 뒤 다시 조회. 돌려주는 주소는 문서용 예시 주소(203.0.113.x 등)다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">www.example.com의 A 레코드 TTL이 5분이다. 처음 조회에 약 200 ms가 걸렸다. 2분 뒤 같은 리졸버를 쓰는 다른 사람이 같은 이름을 조회하면?</p><p class="wi-hint">DNS 시뮬레이터에서 TTL을 5분으로 두고 두 번 조회해 보자.</p><div class="opts">
+      <button class="opt">다시 약 200 ms가 걸린다</button><button class="opt" data-correct>리졸버 캐시에서 바로 답해 약 10 ms(내 컴퓨터↔리졸버 왕복)면 된다</button><button class="opt">TTL이 남아 있어 0 ms다</button><button class="opt">루트 서버만 건너뛰어 약 185 ms가 걸린다</button>
+    </div><div class="quiz-exp">리졸버는 TTL이 끝날 때까지 답을 기억한다. 그래서 인기 있는 이름은 대부분 리졸버 캐시에서 바로 답이 나오고, 루트 서버까지 가는 질의는 생각보다 훨씬 적다. TTL을 짧게 하면 서버 주소를 빨리 바꿀 수 있지만, 그만큼 조회가 자주 원본까지 가서 느려지고 권한 서버 부담이 커진다.</div></div>
+    <p>DNS 데이터베이스에는 주소 말고도 여러 종류의 <b>레코드</b>가 들어 있다.</p>
+    <div class="table-wrap"><table class="mono-tbl">
+      <thead><tr><th>레코드</th><th>뜻</th><th>예</th></tr></thead>
+      <tbody>
+        <tr><td>A</td><td>이름 → IPv4 주소</td><td><code>www.example.com. 300 A 203.0.113.7</code></td></tr>
+        <tr><td>AAAA</td><td>이름 → IPv6 주소</td><td><code>www.example.com. 300 AAAA 2001:db8::7</code></td></tr>
+        <tr><td>CNAME</td><td>다른 이름의 별명(“저쪽에 가서 물어봐”). CDN 연결에 많이 쓴다</td><td><code>www.example.com. CNAME example.cdn-provider.net.</code></td></tr>
+        <tr><td>MX</td><td>이 도메인 앞으로 온 메일을 받을 서버(우선순위 포함)</td><td><code>example.com. MX 10 mail.example.com.</code></td></tr>
+        <tr><td>TXT</td><td>자유 문자열. 스팸 방지(SPF·DKIM·DMARC), 도메인 소유 인증</td><td><code>example.com. TXT "v=spf1 mx -all"</code></td></tr>
+        <tr><td>NS</td><td>이 영역을 책임지는 권한 네임서버(위임)</td><td><code>example.com. NS ns1.example.com.</code></td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout deep"><strong>DNS와 사생활, 보안</strong><p>전통적인 DNS는 UDP 53번(9장)으로 암호화 없이 오간다. 그래서 같은 망의 누구든 내가 어떤 사이트를 찾는지 볼 수 있고, 가짜 답을 끼워 넣는 공격(DNS 스푸핑)도 가능하다. 요즘은 HTTPS 안에 DNS를 담는 DoH(DNS over HTTPS), TLS로 감싸는 DoT(853번)로 엿보기를 막고, 답에 전자 서명을 붙이는 DNSSEC으로 위조를 막는다(22장). 반대로 “사이트가 안 열린다”의 상당수는 DNS 문제다(23장).</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="http">
+    <h2>HTTP: 요청하고 응답한다</h2>
+    <p>주소를 알았으면 이제 웹 서버와 대화할 차례다. 웹의 언어 <span class="term">HTTP</span><span class="en">(HyperText Transfer Protocol)</span>는 놀랄 만큼 단순하다. 클라이언트가 <b>요청</b>을 보내고 서버가 <b>응답</b>을 돌려준다. HTTP/1.1까지는 사람이 읽을 수 있는 글자로 되어 있다(요즘은 그 아래에 TLS 암호화를 깐 HTTPS가 기본이다, 22장).</p>
+    <div class="codebox"><span class="c"># 요청: 메서드, 경로, 버전 + 헤더들 + 빈 줄 (+ 본문)</span>
+<span class="k">GET</span> /index.html HTTP/1.1
+Host: www.example.com
+User-Agent: Mozilla/5.0 (...)
+Accept: text/html
+Accept-Encoding: gzip, br
+Cookie: session=<span class="s">a3f9c1</span>
+
+<span class="c"># 응답: 버전, 상태 코드 + 헤더들 + 빈 줄 + 본문</span>
+HTTP/1.1 <span class="n">200</span> OK
+Content-Type: text/html; charset=utf-8
+Content-Length: <span class="n">5120</span>
+Cache-Control: max-age=<span class="n">3600</span>
+Set-Cookie: theme=<span class="s">dark</span>; Secure; HttpOnly
+
+<span class="hl">&lt;!doctype html&gt;&lt;html&gt; ... (5,120바이트의 HTML)</span></div>
+    <div class="fig-row">
+      <div class="table-wrap"><table class="mono-tbl">
+        <thead><tr><th>메서드</th><th>뜻</th></tr></thead>
+        <tbody>
+          <tr><td>GET</td><td>자원을 달라 (읽기)</td></tr>
+          <tr><td>POST</td><td>데이터를 보낸다 (글쓰기, 결제, 로그인)</td></tr>
+          <tr><td>PUT / PATCH</td><td>자원을 통째로 / 일부 바꾼다</td></tr>
+          <tr><td>DELETE</td><td>자원을 지운다</td></tr>
+          <tr><td>HEAD</td><td>본문 없이 헤더만 달라</td></tr>
+        </tbody>
+      </table></div>
+      <div class="table-wrap"><table class="mono-tbl">
+        <thead><tr><th>상태 코드</th><th>뜻</th></tr></thead>
+        <tbody>
+          <tr><td>200 OK</td><td>성공</td></tr>
+          <tr><td>301 / 302</td><td>다른 주소로 이사 (영구 / 임시)</td></tr>
+          <tr><td>304</td><td>바뀐 것 없음, 캐시 것을 써라</td></tr>
+          <tr><td>404 / 403</td><td>없음 / 권한 없음</td></tr>
+          <tr><td>429</td><td>요청이 너무 많다</td></tr>
+          <tr><td>500 / 503</td><td>서버 오류 / 일시적으로 감당 불가</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <p>첫 자리로 큰 뜻을 알 수 있다. 2xx 성공, 3xx 다른 곳으로, 4xx 손님 잘못, 5xx 서버 잘못. HTTP의 중요한 성질은 <b>무상태성</b><span class="en">(stateless)</span>이다. 서버는 요청 하나하나를 독립적으로 처리하고, 앞의 요청을 기억하지 않는다. 덕분에 서버 수천 대 중 아무 데로나 요청을 보내도 되어 규모를 키우기 쉽다. 그러면 로그인 상태나 장바구니는 어떻게 유지할까? 서버가 응답에 <code>Set-Cookie</code>로 작은 꼬리표를 붙이면, 브라우저가 이후 같은 사이트에 보내는 모든 요청에 <code>Cookie</code>로 그 꼬리표를 돌려준다. 이 <span class="term">쿠키</span><span class="en">(cookie)</span>가 무상태 프로토콜 위에 “세션”을 만든다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="versions">
+    <h2>HTTP/1.1에서 HTTP/3까지: 페이지 하나를 빨리 받기</h2>
+    <p>오늘날 웹 페이지 하나는 HTML 하나에 CSS, 자바스크립트, 이미지, 글꼴 등 보통 <b>수십~백여 개의 파일</b>로 이루어진다. 파일이 작고 많을수록, 대역폭보다 <b>왕복 시간(RTT)</b>이 로딩 시간을 지배한다. HTTP의 역사는 이 왕복을 줄이는 역사다.</p>
+    <ul>
+      <li><b>HTTP/1.1</b>(1997): 연결 하나를 여러 요청에 재사용(keep-alive)하지만, 한 연결에서는 <b>한 번에 하나</b>씩 주고받는다. 앞의 응답이 끝나야 다음 요청을 보낼 수 있다. 그래서 브라우저는 서버 하나에 <b>연결을 6개</b>까지 열어 병렬로 받는다. 연결마다 핸드셰이크 비용과 슬로 스타트(9장)를 따로 치른다.</li>
+      <li><b>HTTP/2</b>(2015): 메시지를 작은 이진 <b>프레임</b>으로 쪼개고, 연결 하나 안에서 여러 요청·응답(스트림)을 섞어 보내는 <span class="term">다중화</span><span class="en">(multiplexing)</span>를 한다. 매번 반복되는 헤더는 HPACK으로 압축한다. 다만 TCP 위에 있으므로 패킷 하나가 손실되면 모든 스트림이 멈춘다(9장의 헤드 오브 라인 블로킹).</li>
+      <li><b>HTTP/3</b>(2022): HTTP/2의 생각을 QUIC(9장) 위로 옮겼다. 연결 준비가 1 RTT 빠르고, 손실은 그 스트림만 멈춘다. 헤더 압축은 QPACK.</li>
+    </ul>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 250" style="min-width:600px" role="img" aria-label="HTTP/1.1의 여러 연결, HTTP/2의 다중화, HTTP/3의 독립 스트림 비교">
+        <g class="t" style="font-weight:700"><text x="20" y="24">HTTP/1.1 — 연결 6개, 연결마다 한 번에 하나</text><text x="20" y="134">HTTP/2 — TCP 연결 하나에 프레임을 섞어서</text><text x="20" y="200">HTTP/3 — QUIC 연결 하나, 스트림끼리 독립</text></g>
+        <g class="t-mono" style="font-size:10px">
+          <text x="20" y="48">TCP 1</text><text x="20" y="68">TCP 2</text><text x="20" y="88">TCP 3</text><text x="20" y="108">…</text>
+        </g>
+        <g>
+          <rect x="70" y="38" width="120" height="14" rx="3" fill="var(--accent)"/><rect x="200" y="38" width="90" height="14" rx="3" fill="var(--accent-2)"/><rect x="300" y="38" width="140" height="14" rx="3" fill="var(--warn)"/>
+          <rect x="70" y="58" width="80" height="14" rx="3" fill="var(--ok)"/><rect x="160" y="58" width="150" height="14" rx="3" fill="var(--accent)"/>
+          <rect x="70" y="78" width="200" height="14" rx="3" fill="var(--accent-2)"/><rect x="280" y="78" width="60" height="14" rx="3" fill="var(--ok)"/>
+          <text x="460" y="66" class="t-dim">응답이 끝나야 다음 요청 (연결마다 대기)</text>
+        </g>
+        <g>
+          <rect x="70" y="144" width="560" height="22" rx="5" class="f-surface"/>
+          <g id="h2f">
+            <rect x="74" y="148" width="26" height="14" rx="2" fill="var(--accent)"/><rect x="104" y="148" width="26" height="14" rx="2" fill="var(--accent-2)"/><rect x="134" y="148" width="26" height="14" rx="2" fill="var(--warn)"/><rect x="164" y="148" width="26" height="14" rx="2" fill="var(--ok)"/>
+            <rect x="194" y="148" width="26" height="14" rx="2" fill="var(--accent)"/><rect x="224" y="148" width="26" height="14" rx="2" fill="var(--accent-2)"/>
+          </g>
+          <text x="267" y="160" text-anchor="middle" class="t" style="fill:var(--bad);font-weight:700">✕</text>
+          <rect x="284" y="148" width="26" height="14" rx="2" fill="var(--ok)" opacity=".35"/><rect x="314" y="148" width="26" height="14" rx="2" fill="var(--accent)" opacity=".35"/><rect x="344" y="148" width="26" height="14" rx="2" fill="var(--accent-2)" opacity=".35"/><rect x="374" y="148" width="26" height="14" rx="2" fill="var(--ok)" opacity=".35"/>
+          <text x="410" y="160" class="t-dim" style="font-size:11.5px">← 하나(주황)가 빠지면 뒤의 모든 색이 대기</text>
+        </g>
+        <g>
+          <rect x="70" y="210" width="560" height="22" rx="5" class="f-surface"/>
+          <rect x="74" y="214" width="26" height="14" rx="2" fill="var(--accent)"/><rect x="104" y="214" width="26" height="14" rx="2" fill="var(--accent-2)"/><rect x="134" y="214" width="26" height="14" rx="2" fill="var(--warn)"/><rect x="164" y="214" width="26" height="14" rx="2" fill="var(--ok)"/>
+          <rect x="194" y="214" width="26" height="14" rx="2" fill="var(--accent)"/><rect x="224" y="214" width="26" height="14" rx="2" fill="var(--accent-2)"/>
+          <text x="267" y="226" text-anchor="middle" class="t" style="fill:var(--bad);font-weight:700">✕</text>
+          <rect x="284" y="214" width="26" height="14" rx="2" fill="var(--ok)"/><rect x="314" y="214" width="26" height="14" rx="2" fill="var(--accent)"/><rect x="344" y="214" width="26" height="14" rx="2" fill="var(--accent-2)"/><rect x="374" y="214" width="26" height="14" rx="2" fill="var(--warn)" opacity=".35"/>
+          <text x="410" y="226" class="t-dim" style="font-size:11.5px">← 주황 스트림만 대기, 나머지는 계속</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 10-3.</b> HTTP 버전별 전송 방식. 색은 서로 다른 파일(스트림)이다. HTTP/2는 연결 하나를 꽉 채워 쓰지만 TCP 손실에 약하고, HTTP/3는 QUIC 덕분에 손실의 피해가 그 스트림에만 머문다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-wf">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>페이지 로딩 폭포수: HTTP/1.1 · HTTP/2 · HTTP/3</h3></div>
+      <div class="sim-view"><canvas id="cv-wf"></canvas></div>
+      <div class="legend"><span><i style="background:var(--text-faint)"></i>대기(연결 준비·줄 서기)</span><span><i style="background:var(--accent-2)"></i>첫 바이트 기다림</span><span><i style="background:var(--accent)"></i>내려받기</span><span><i style="background:var(--bad)"></i>손실 복구 대기</span></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>보여 줄 버전</span><div class="seg" id="wf-ver"><button data-value="1">HTTP/1.1</button><button data-value="2" class="on">HTTP/2</button><button data-value="3">HTTP/3</button></div></div>
+        <label class="ctrl"><span>하위 리소스 개수 <output id="wf-n-out"></output></span><input type="range" id="wf-n" min="4" max="80" value="30"></label>
+        <label class="ctrl"><span>왕복 시간 RTT <output id="wf-rtt-out"></output></span><input type="range" id="wf-rtt" min="10" max="300" step="10" value="100"></label>
+        <label class="ctrl"><span>대역폭 <output id="wf-bw-out"></output></span><input type="range" id="wf-bw" min="1" max="100" value="20"></label>
+        <label class="ctrl"><span>패킷 손실률 <output id="wf-loss-out"></output></span><input type="range" id="wf-loss" min="0" max="3" step="0.25" value="0.5"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">HTTP/1.1 로딩 완료</span><span class="v" id="wf-t1">—</span></div>
+        <div class="stat"><span class="k">HTTP/2 로딩 완료</span><span class="v" id="wf-t2">—</span></div>
+        <div class="stat"><span class="k">HTTP/3 로딩 완료</span><span class="v" id="wf-t3">—</span></div>
+        <div class="stat"><span class="k">손실 대기를 겪은 리소스 (1.1 / 2 / 3)</span><span class="v" id="wf-hol">—</span></div>
+      </div>
+      <div class="sim-note">HTML(60 KB)을 받은 뒤 나머지 리소스(평균 약 40 KB)를 한꺼번에 발견한다고 가정했다. HTTP/1.1과 HTTP/2는 TCP+TLS 1.3(2 RTT), HTTP/3는 QUIC(1 RTT)으로 연결한다. 모든 연결은 cwnd 10에서 슬로 스타트하고, 손실이 나면 RTT당 한 번 cwnd를 0.7배로 줄인다(CUBIC 근사). 손실이 나면 TCP는 그 연결의 진행 중인 모든 응답이, QUIC은 그 스트림만 1 RTT 늦어진다. DNS, 서버 처리 시간, 렌더링, 우선순위는 뺐다. 해볼 것: 손실 0%에서 RTT를 키우면 세 버전의 차이가 벌어진다. 대역폭을 1~2 Mbps로 줄이면 어떤 버전이든 대역폭이 병목이 되어 차이가 줄어든다. 손실률을 높이면 HTTP/2에서는 빨간 대기가 거의 모든 리소스로 번지지만 HTTP/3에서는 일부에만 생긴다. 한편 손실이 많으면 연결 하나에 모든 것을 실은 HTTP/2·3는 cwnd가 줄어든 영향을 혼자 받아, 연결 6개로 나눠 받는 HTTP/1.1보다 느려지기도 한다. 실제로 관찰되는 현상이다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">리소스 60개, 대역폭 50 Mbps, 손실 0%에서 RTT를 20 ms에서 200 ms로 늘렸다. HTTP/1.1과 HTTP/2의 로딩 시간 차이는 어떻게 될까?</p><p class="wi-hint">폭포수 시뮬레이터의 세 결과 칸을 비교하자.</p><div class="opts">
+      <button class="opt">RTT와 상관없이 차이가 일정하다</button><button class="opt">RTT가 길수록 HTTP/1.1이 유리해진다</button><button class="opt" data-correct>RTT가 길수록 차이가 크게 벌어진다. HTTP/1.1은 연결마다 줄 선 요청이 RTT를 한 번씩 더 치르기 때문이다</button><button class="opt">둘 다 대역폭으로만 결정되므로 같다</button>
+    </div><div class="quiz-exp">HTTP/1.1은 연결 6개가 각각 “요청 → 1 RTT 기다림 → 받기”를 반복하므로, 리소스 60개면 연결마다 10번씩 RTT를 치른다. HTTP/2는 모든 요청을 한 번에 보내 첫 바이트 대기를 대부분 겹친다. 그래서 RTT가 긴 모바일·해외 접속에서 HTTP/2·3의 이득이 크다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="cdn">
+    <h2>CDN: 가까운 곳에 미리 가져다 두기</h2>
+    <p>아무리 프로토콜을 다듬어도 빛의 속도(5장)는 줄일 수 없다. 서울에서 미국 동부 서버까지의 RTT는 약 200 ms다. 남은 방법은 서버를 사용자 가까이 옮기는 것이다. <span class="term">CDN</span><span class="en">(content delivery network)</span>은 전 세계 수백 곳의 거점(PoP)에 <b>엣지 서버</b>를 두고, 원본(오리진) 서버의 콘텐츠를 복사해 둔다. 사용자는 DNS나 애니캐스트로 가장 가까운 엣지에 연결된다.</p>
+    <div class="callout analogy"><strong>동네 물류 창고</strong><p>인기 상품을 매번 본사 창고(오리진)에서 보내면 며칠이 걸린다. 그래서 택배 회사는 지역마다 물류 창고(엣지)를 두고 잘 팔리는 물건을 미리 쌓아 둔다. 주문이 들어오면 동네 창고에 재고가 있으면 당일 배송(캐시 적중), 없으면 본사에서 가져와 보내면서 다음 손님을 위해 창고에도 하나 남겨 둔다(캐시 실패 후 저장).</p></div>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 240" style="min-width:600px" role="img" aria-label="오리진 서버와 세계 곳곳의 엣지 서버, 가까운 엣지에 붙는 사용자">
+        <rect x="10" y="10" width="780" height="220" rx="16" class="f-surface"/>
+        <g stroke="var(--border)" stroke-width="1.5" stroke-dasharray="4 4" fill="none">
+          <path d="M210 110 L120 60 M210 110 L130 180 M210 110 L400 70 M210 110 L560 80 M210 110 L620 180 M210 110 L360 190"/>
+        </g>
+        <rect x="160" y="88" width="100" height="44" rx="10" class="f-acc"/><text x="210" y="108" text-anchor="middle" class="t" style="fill:#fff;font-weight:700">오리진</text><text x="210" y="124" text-anchor="middle" class="t-mono" style="fill:#fff">미국 동부</text>
+        <g class="f-acc2-soft">
+          <rect x="80" y="44" width="80" height="30" rx="8"/><rect x="90" y="166" width="80" height="30" rx="8"/><rect x="360" y="54" width="80" height="30" rx="8"/><rect x="520" y="64" width="80" height="30" rx="8"/><rect x="580" y="166" width="80" height="30" rx="8"/><rect x="320" y="176" width="80" height="30" rx="8"/>
+        </g>
+        <g class="t-mono" style="font-size:10.5px;fill:var(--text)">
+          <text x="120" y="63" text-anchor="middle">엣지 미국 서부</text><text x="130" y="185" text-anchor="middle">엣지 상파울루</text><text x="400" y="73" text-anchor="middle">엣지 프랑크푸르트</text><text x="560" y="83" text-anchor="middle">엣지 서울</text><text x="620" y="185" text-anchor="middle">엣지 시드니</text><text x="360" y="195" text-anchor="middle">엣지 요하네스버그</text>
+        </g>
+        <g fill="var(--accent)"><circle cx="640" cy="40" r="7"/><circle cx="665" cy="58" r="7"/><circle cx="700" cy="44" r="7"/><circle cx="700" cy="150" r="7"/><circle cx="730" cy="170" r="7"/></g>
+        <g stroke="var(--accent)" stroke-width="2"><path d="M640 40 L600 70 M665 58 L600 76 M700 44 L600 72 M700 150 L660 175 M730 170 L660 182"/></g>
+        <text x="720" y="100" text-anchor="middle" class="t-dim" style="font-size:11.5px">사용자는 가까운</text><text x="720" y="116" text-anchor="middle" class="t-dim" style="font-size:11.5px">엣지에 붙는다</text>
+        <text x="250" y="152" class="t-dim" style="font-size:11px">점선: 캐시 실패 때만 원본에서 가져옴</text>
+      </svg></div>
+      <figcaption><b>그림 10-4.</b> CDN의 구조(개념도, 지도는 정확하지 않다). 엣지는 TLS 연결도 대신 맺어 주므로, 핸드셰이크 왕복까지 짧아진다. 엣지와 원본 사이에는 미리 열어 둔 연결과 잘 관리된 백본망을 쓴다.</figcaption>
+    </figure>
+    <p>CDN의 성능은 <span class="term">캐시 적중률</span><span class="en">(cache hit ratio)</span>에 달려 있다. 요청 중 엣지에 이미 사본이 있는 비율이다. 로고, 이미지, 동영상 조각처럼 모두가 같은 것을 받는 정적 콘텐츠는 적중률이 90%를 넘기 쉽다. 사람마다 다른 페이지나 결제 같은 동적 요청은 원본까지 가야 하지만, 이 경우에도 엣지가 TLS를 대신 맺고 원본과는 미리 열어 둔 연결을 재사용해 시간을 줄인다. 인터넷 트래픽의 절반 이상이 CDN을 거친다고 추정된다.</p>
+    <div class="sim" id="sim-cdn">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>캐시 적중률과 평균 응답 시간</h3></div>
+      <div class="sim-view"><canvas id="cv-cdn"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>사용자 위치 (오리진은 미국 동부)</span><div class="seg" id="cdn-loc"><button data-value="seoul" class="on">서울</button><button data-value="frankfurt">프랑크푸르트</button><button data-value="saopaulo">상파울루</button><button data-value="sydney">시드니</button><button data-value="newyork">뉴욕</button></div></div>
+        <label class="ctrl"><span>캐시 적중률 <output id="cdn-hit-out"></output></span><input type="range" id="cdn-hit" min="0" max="100" value="90"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">CDN 없이 (원본 직접)</span><span class="v" id="cdn-no">—</span></div>
+        <div class="stat"><span class="k">CDN 평균 응답</span><span class="v" id="cdn-avg">—</span></div>
+        <div class="stat"><span class="k">원본이 받는 요청</span><span class="v" id="cdn-org">—</span></div>
+      </div>
+      <div class="sim-note">새 연결 하나로 작은 파일 하나를 받는 시간 = TCP+TLS 1.3(2 RTT) + 요청·응답(1 RTT)으로 셌다. 사용자↔엣지 RTT는 10 ms, 엣지↔원본은 미리 열린 연결로 1 RTT, 원본 처리 20 ms로 두었다. 초록 점 = 엣지에서 바로 응답(적중), 주황 점 = 원본까지 다녀옴(실패). 해볼 것: 적중률 0%여도 CDN이 원본 직결보다 빠른 이유(핸드셰이크를 가까운 엣지와 하므로)를 확인하고, 사용자 위치를 뉴욕으로 바꿔 보자.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="mail">
+    <h2>이메일과 실시간 웹</h2>
+    <p>이메일은 웹보다 오래된(1982년 SMTP) 응용이고, 지금도 거의 같은 구조로 동작한다. 메일은 받는 사람의 컴퓨터로 바로 가지 않는다. 받는 사람이 꺼져 있을 수 있기 때문이다. 대신 항상 켜진 메일 서버가 우체국 사서함처럼 받아 두었다가 건네준다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 170" style="min-width:600px" role="img" aria-label="이메일이 보내는 사람에게서 받는 사람에게 가는 경로">
+        <defs><marker id="ml-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <rect x="10" y="50" width="120" height="56" rx="10" class="f-acc-soft"/><text x="70" y="74" text-anchor="middle" class="t" style="font-weight:700">보내는 사람</text><text x="70" y="94" text-anchor="middle" class="t-mono">메일 앱</text>
+        <rect x="210" y="50" width="130" height="56" rx="10" class="f-surface"/><text x="275" y="74" text-anchor="middle" class="t" style="font-weight:700">내 메일 서버</text><text x="275" y="94" text-anchor="middle" class="t-mono">a.example</text>
+        <rect x="460" y="50" width="130" height="56" rx="10" class="f-surface"/><text x="525" y="74" text-anchor="middle" class="t" style="font-weight:700">상대 메일 서버</text><text x="525" y="94" text-anchor="middle" class="t-mono">b.example 사서함</text>
+        <rect x="670" y="50" width="120" height="56" rx="10" class="f-acc2-soft"/><text x="730" y="74" text-anchor="middle" class="t" style="font-weight:700">받는 사람</text><text x="730" y="94" text-anchor="middle" class="t-mono">메일 앱</text>
+        <path d="M130 78 H206" class="s-acc" marker-end="url(#ml-a)"/><path d="M340 78 H456" class="s-acc" marker-end="url(#ml-a)"/><path d="M670 78 H594" class="s-acc" marker-start="url(#ml-a)"/>
+        <g class="t-mono" style="font-size:10.5px">
+          <text x="168" y="70" text-anchor="middle">SMTP</text><text x="168" y="124" text-anchor="middle">587 (제출)</text>
+          <text x="398" y="70" text-anchor="middle">SMTP 25</text><text x="398" y="124" text-anchor="middle">서버 → 서버</text>
+          <text x="630" y="70" text-anchor="middle">IMAP</text><text x="630" y="124" text-anchor="middle">993 (읽기)</text>
+        </g>
+        <text x="398" y="30" text-anchor="middle" class="t-dim" style="font-size:11.5px">① DNS에 “b.example의 MX는?”을 물어 상대 서버를 찾는다</text>
+        <text x="400" y="156" text-anchor="middle" class="t-dim" style="font-size:11.5px">받는 서버는 SPF·DKIM·DMARC(DNS의 TXT 레코드)로 위조 여부를 확인한다</text>
+      </svg></div>
+      <figcaption><b>그림 10-5.</b> 이메일의 길. 보낼 때는 <span class="term">SMTP</span>(“밀어 넣기”), 읽을 때는 <span class="term">IMAP</span>(“사서함 들여다보기”, 메일은 서버에 남고 여러 기기에서 같은 상태를 본다)을 쓴다. 웹메일은 브라우저와 서버 사이가 HTTP일 뿐, 서버끼리는 여전히 SMTP다.</figcaption>
+    </figure>
+    <p>웹은 원래 “손님이 물어야 서버가 답하는” 구조라서, 채팅이나 주식 시세처럼 <b>서버가 먼저 알려야 하는</b> 일에는 어색했다. 예전에는 몇 초마다 “새 소식 있어?”를 묻는 폴링을 썼다. <span class="term">웹소켓</span><span class="en">(WebSocket)</span>은 HTTP 요청으로 시작해 서버가 <code>101 Switching Protocols</code>로 답하면, 그 TCP 연결을 양쪽이 아무 때나 메시지를 보낼 수 있는 통로로 바꾼다. 채팅, 협업 문서, 게임 로비, 실시간 알림이 이 위에서 돈다. 서버 → 브라우저 한 방향이면 더 단순한 SSE(Server-Sent Events)를, 최근에는 QUIC 위의 WebTransport도 쓴다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="streaming">
+    <h2>동영상 스트리밍: 버퍼와 화질의 줄다리기</h2>
+    <p>동영상은 인터넷 하향 트래픽의 약 3분의 2를 차지한다. 유튜브나 넷플릭스는 영상을 실시간 방송하듯 흘려보내지 않는다. 영상을 <b>2~6초 길이의 조각(세그먼트)</b>으로 잘라 평범한 파일처럼 CDN에 올려 두고, 플레이어가 HTTP로 한 조각씩 내려받아 이어 붙인다. 이 방식이 HLS(애플)와 MPEG-DASH다. 평범한 HTTP 파일이므로 CDN 캐시가 그대로 통한다.</p>
+    <p>핵심 비결은 같은 영상을 여러 화질로 미리 인코딩해 두는 <b>비트레이트 사다리</b>다. 플레이어는 조각마다 어느 화질을 받을지 고른다. 길이 막히면 다음 조각은 낮은 화질로, 넓어지면 높은 화질로. 이것이 <span class="term">적응형 비트레이트</span><span class="en">(ABR, adaptive bitrate)</span> 스트리밍이다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>화질</th><th>해상도</th><th class="num">대략적 비트레이트</th><th class="num">1시간 데이터</th></tr></thead>
+      <tbody>
+        <tr><td>240p</td><td>426×240</td><td class="num">0.4 Mbps</td><td class="num">약 0.2 GB</td></tr>
+        <tr><td>360p</td><td>640×360</td><td class="num">0.75 Mbps</td><td class="num">약 0.3 GB</td></tr>
+        <tr><td>480p</td><td>854×480</td><td class="num">1.2 Mbps</td><td class="num">약 0.5 GB</td></tr>
+        <tr><td>720p</td><td>1280×720</td><td class="num">2.5 Mbps</td><td class="num">약 1.1 GB</td></tr>
+        <tr><td>1080p</td><td>1920×1080</td><td class="num">5 Mbps</td><td class="num">약 2.3 GB</td></tr>
+        <tr><td>1440p</td><td>2560×1440</td><td class="num">8 Mbps</td><td class="num">약 3.6 GB</td></tr>
+        <tr><td>2160p (4K)</td><td>3840×2160</td><td class="num">16 Mbps</td><td class="num">약 7.2 GB</td></tr>
+      </tbody>
+    </table></div>
+    <p>숫자는 H.264/H.265 수준 코덱의 대표값이다. 같은 화질도 AV1 같은 최신 코덱은 30~50% 적게 쓰고, 움직임이 많은 스포츠는 더 많이 쓴다. 플레이어는 앞으로 재생할 조각을 <b>버퍼</b>에 쌓아 두고 재생한다. 버퍼가 바닥나면 화면이 멈추고 빙글빙글 도는 표시가 뜬다. 이것이 <span class="term">재버퍼링</span><span class="en">(rebuffering)</span>이고, 시청자가 가장 싫어하는 순간이다. 화질을 높이면 버퍼가 빨리 줄고, 낮추면 화면이 흐려진다. ABR 알고리즘은 이 줄다리기를 한다.</p>
+    <ul>
+      <li><b>처리율 기반</b>: 최근 조각 몇 개를 받을 때 측정한 속도를 보고 “그보다 조금 낮은” 화질을 고른다. 반응이 빠르지만, 속도 측정이 흔들리면 화질도 오락가락하고 갑자기 떨어지면 버퍼가 바닥난다.</li>
+      <li><b>버퍼 기반</b>(BBA 등): 버퍼가 넉넉하면 높은 화질, 줄어들면 낮은 화질을 고른다. 버퍼가 곧 안전 여유이므로 멈춤이 적다. 대신 시작 직후 버퍼가 비어 있을 때는 한동안 낮은 화질에 머문다. 실제 플레이어는 둘을 섞어 쓴다.</li>
+    </ul>
+    <div class="sim" id="sim-abr">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>적응형 비트레이트: 대역폭이 흔들릴 때 플레이어는</h3></div>
+      <div class="sim-view"><canvas id="cv-abr" style="cursor:crosshair"></canvas></div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>사용 가능한 대역폭</span><span><i style="background:var(--warn)"></i>선택한 화질(비트레이트)</span><span><i style="background:var(--ok)"></i>버퍼 수준</span><span><i style="background:var(--bad)"></i>재버퍼링(멈춤)</span></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>대역폭 시나리오 (그래프 위를 드래그하면 직접 그린다)</span><div class="seg" id="abr-pre"><button data-value="home">집</button><button data-value="cafe">카페</button><button data-value="subway" class="on">지하철</button><button data-value="draw">직접 그리기</button></div></div>
+        <div class="ctrl"><span>ABR 알고리즘</span><div class="seg" id="abr-alg"><button data-value="rate">처리율 기반</button><button data-value="buffer" class="on">버퍼 기반</button><button data-value="fixed">고정 1080p</button></div></div>
+        <label class="ctrl"><span>세그먼트 길이 <output id="abr-seg-out"></output></span><input type="range" id="abr-seg" min="2" max="6" step="2" value="4"></label>
+        <label class="ctrl"><span>최대 버퍼 <output id="abr-buf-out"></output></span><input type="range" id="abr-buf" min="10" max="60" step="5" value="30"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">평균 비트레이트</span><span class="v" id="abr-avg">—</span></div>
+        <div class="stat"><span class="k">재버퍼링</span><span class="v" id="abr-stall">—</span></div>
+        <div class="stat"><span class="k">화질 전환</span><span class="v" id="abr-sw">—</span></div>
+        <div class="stat"><span class="k">시작 지연</span><span class="v" id="abr-start">—</span></div>
+      </div>
+      <div class="sim-note">3분 동안의 시청을 시뮬레이션한다. 위 그래프의 세로축은 로그 눈금(0.1~40 Mbps)이고 가는 점선이 비트레이트 사다리다. 플레이어는 조각 하나가 모이면 재생을 시작하고, 버퍼가 “최대 − 조각 하나”보다 적을 때만 다음 조각을 받는다. 처리율 기반은 최근 3개 조각 속도의 조화 평균 × 0.8 이하에서 가장 높은 화질을, 버퍼 기반은 버퍼 5초 이하면 최저 화질, 최대 버퍼의 90% 이상이면 최고 화질, 그 사이는 비례해 고른다. 해볼 것: 지하철에서 처리율 기반과 버퍼 기반의 멈춤 횟수를 비교하자. 고정 1080p는 어떻게 될까? 최대 버퍼를 늘리면 터널을 버티는 시간이 길어진다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">‘지하철’ 시나리오에서 화질을 1080p로 고정하면, ABR(버퍼 기반)과 비교해 무엇이 달라질까?</p><p class="wi-hint">ABR 시뮬레이터에서 알고리즘을 ‘고정 1080p’로 바꿔 보자.</p><div class="opts">
+      <button class="opt" data-correct>평균 화질은 비슷하거나 높아 보여도, 터널마다 버퍼가 바닥나 재버퍼링이 훨씬 길어진다</button><button class="opt">재버퍼링이 사라진다</button><button class="opt">대역폭이 늘어난다</button><button class="opt">아무 차이 없다</button>
+    </div><div class="quiz-exp">5 Mbps짜리 조각을 고집하면 대역폭이 그보다 낮은 구간마다 버퍼가 줄어 결국 멈춘다. ABR은 화질을 잠시 낮춰 버퍼를 지킨다. 연구에 따르면 시청자는 화질 저하보다 멈춤에 훨씬 민감해서, 멈춤 비율이 1%만 늘어도 시청 시간이 눈에 띄게 줄어든다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="realtime">
+    <h2>실시간 통화와 P2P</h2>
+    <p>유튜브는 버퍼를 30초씩 쌓아도 아무도 모른다. 하지만 영상 통화에서 상대의 말이 1초 늦게 들리면 대화가 무너진다. ITU-T 권고(G.114)는 대화가 자연스러우려면 한쪽 방향 지연을 <b>150 ms 이내</b>로 두라고 한다. 그래서 실시간 통화는 스트리밍과 완전히 다르게 만든다.</p>
+    <ul>
+      <li><b>UDP 위 RTP</b>: 재전송을 기다릴 시간이 없으므로 TCP 대신 UDP(9장)에 RTP(실시간 전송 프로토콜)를 얹어 보낸다. 패킷마다 순서 번호와 시각 도장이 붙는다. 브라우저의 WebRTC가 대표적이다.</li>
+      <li><b>지터 버퍼</b>: 패킷마다 도착 간격이 흔들린다(지터). 받는 쪽은 20~60 ms 정도의 아주 작은 버퍼를 두어 간격을 고르게 편 뒤 재생한다. 버퍼가 크면 끊김은 줄지만 지연이 늘고, 작으면 늦게 온 패킷을 버려야 한다.</li>
+      <li><b>손실은 숨긴다</b>: 빠진 소리 조각은 앞뒤를 이어 그럴듯하게 채우고, 영상은 화질과 해상도를 실시간으로 낮춘다(이것도 일종의 ABR이다).</li>
+    </ul>
+    <p>통화 한 번이 지나는 전체 경로, 즉 Wi-Fi와 셀룰러, NAT 통과, 지터 버퍼와 코덱은 24장 “영상 통화 한 번의 여행”에서 처음부터 끝까지 따라간다.</p>
+    <p>마지막으로 <b>P2P</b>를 다시 보자. 큰 파일을 수천 명에게 나눠 줄 때 서버 하나가 모두에게 보내면, 사람이 늘수록 시간이 정비례로 늘어난다. <span class="term">비트토렌트</span><span class="en">(BitTorrent)</span>는 파일을 수백 KB~수 MB 크기의 조각으로 나누고, 받는 사람끼리 서로 가진 조각을 주고받게 한다. 가장 드문 조각부터 받고(희귀 우선), 나에게 많이 보내 주는 상대에게 더 보내 주는(맞대응) 규칙으로 무임승차를 줄인다. 조각마다 해시값이 있어 변조도 막는다. 리눅스 배포판, 게임 패치 배포 등에 쓰인다.</p>
+    <div class="sim" id="sim-p2p">
+      <div class="sim-head"><span class="sim-tag">CALCULATOR</span><h3>파일 하나를 N명에게: 클라이언트-서버 vs P2P</h3></div>
+      <div class="sim-view"><canvas id="cv-p2p"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>받는 사람 수 N <output id="p2p-n-out"></output></span><input type="range" id="p2p-n" min="0" max="40" value="30"></label>
+        <label class="ctrl"><span>피어 하나의 업로드 속도 <output id="p2p-u-out"></output></span><input type="range" id="p2p-u" min="1" max="50" value="10"></label>
+        <label class="ctrl"><span>서버 업로드 속도 <output id="p2p-s-out"></output></span><input type="range" id="p2p-s" min="100" max="10000" step="100" value="1000"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">클라이언트-서버 배포 시간</span><span class="v" id="p2p-cs">—</span></div>
+        <div class="stat"><span class="k">P2P 배포 시간</span><span class="v" id="p2p-pp">—</span></div>
+        <div class="stat"><span class="k">P2P가 빠른 배수</span><span class="v" id="p2p-x">—</span></div>
+      </div>
+      <div class="sim-note">1 GB 파일을 모두에게 완전히 나눠 주는 데 걸리는 최소 시간을 이상적인 공식으로 계산했다(피어 다운로드 100 Mbps). 클라이언트-서버: max(N·F/서버업로드, F/다운로드). P2P: max(F/서버업로드, F/다운로드, N·F/(서버업로드 + N·피어업로드)). 두 축 모두 로그 눈금이다. 해볼 것: N이 늘수록 클라이언트-서버는 직선으로 늘지만 P2P는 거의 평평해진다. 받는 사람이 곧 나눠 주는 사람이기 때문이다.</div>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>응용 계층은 TCP·UDP 위에서 “무엇을 어떤 순서로 주고받을지”를 정한다. 구조는 클라이언트-서버와 P2P로 나뉜다.</li>
+      <li><b>DNS</b>는 루트(13개 이름, 1,900곳 넘는 애니캐스트) → TLD → 권한 서버로 위임되는 분산 주소록이다. 재귀 리졸버가 대신 물어보고 <b>TTL</b>만큼 캐시해 대부분의 조회를 수 ms에 끝낸다.</li>
+      <li><b>HTTP</b>는 요청(메서드·경로·헤더)과 응답(상태 코드·헤더·본문)으로 된 무상태 프로토콜이고, 쿠키로 세션을 만든다.</li>
+      <li>HTTP/1.1은 연결당 한 번에 하나, HTTP/2는 TCP 연결 하나에 <b>다중화</b>, HTTP/3는 QUIC 위에서 독립 스트림과 1-RTT 연결을 쓴다. RTT가 길수록 차이가 크다.</li>
+      <li><b>CDN</b>은 사용자 가까운 엣지에 사본을 두어 RTT와 원본 부담을 줄인다. 효과는 캐시 적중률이 좌우한다.</li>
+      <li>스트리밍은 2~6초 조각과 비트레이트 사다리로 <b>ABR</b>을 한다. 목표는 재버퍼링 없이 가능한 높은 화질이다.</li>
+      <li>실시간 통화는 한쪽 지연 150 ms 예산 때문에 UDP/RTP와 작은 지터 버퍼를 쓴다(24장). P2P는 받는 사람이 곧 나눠 주는 사람이 되어 규모가 커져도 버틴다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>재귀 리졸버의 캐시가 비어 있을 때 <code>www.example.com</code>을 조회하는 순서로 옳은 것은?</p><div class="opts">
+        <button class="opt">권한 서버 → TLD 서버 → 루트 서버</button>
+        <button class="opt" data-correct>루트 서버 → .com TLD 서버 → example.com 권한 서버</button>
+        <button class="opt">.com TLD 서버 → 루트 서버 → 권한 서버</button>
+        <button class="opt">루트 서버가 모든 이름의 IP 주소를 직접 알려 준다</button>
+      </div><div class="quiz-exp">각 단계는 바로 아래 단계의 서버를 알려 주는 “위임”만 한다. 실제 IP 주소는 마지막의 권한 서버가 답한다.</div></div>
+      <div class="quiz-q"><p>메일을 받을 서버를 알려 주는 DNS 레코드는?</p><div class="opts">
+        <button class="opt">A</button><button class="opt">CNAME</button><button class="opt">TXT</button><button class="opt" data-correct>MX</button>
+      </div><div class="quiz-exp">MX(Mail eXchanger) 레코드에 메일 서버 이름과 우선순위가 적힌다. TXT는 SPF·DKIM 같은 메일 인증 정보에 쓰인다.</div></div>
+      <div class="quiz-q"><p>HTTP가 “무상태”라는 말의 뜻과, 그 위에서 로그인 상태를 유지하는 방법으로 옳은 것은?</p><div class="opts">
+        <button class="opt" data-correct>서버가 요청마다 앞의 요청을 기억하지 않으며, 쿠키를 매 요청에 실어 보내 세션을 이어 간다</button>
+        <button class="opt">연결이 끊기면 데이터가 사라지며, TCP 재전송으로 상태를 유지한다</button>
+        <button class="opt">상태 코드가 없다는 뜻이며, 헤더에 숫자를 붙여 해결한다</button>
+        <button class="opt">서버가 IP 주소로 사용자를 영구히 기억한다</button>
+      </div><div class="quiz-exp">무상태성 덕분에 아무 서버나 요청을 처리할 수 있어 규모를 키우기 쉽다. 세션은 Set-Cookie로 받은 꼬리표를 브라우저가 매번 돌려보내 만든다.</div></div>
+      <div class="quiz-q"><p>HTTP/2가 HTTP/1.1보다 많은 작은 파일을 빨리 받는 핵심 이유는?</p><div class="opts">
+        <button class="opt">UDP를 쓰기 때문</button>
+        <button class="opt">파일을 더 작게 압축하기 때문</button>
+        <button class="opt" data-correct>연결 하나에서 여러 요청·응답을 프레임으로 섞어 보내(다중화) 요청마다 1 RTT씩 줄 서지 않기 때문</button>
+        <button class="opt">패킷 손실이 생겨도 다른 스트림이 영향을 받지 않기 때문</button>
+      </div><div class="quiz-exp">다중화가 핵심이다. 손실이 다른 스트림에 영향을 주지 않는 것은 HTTP/3(QUIC)의 장점이고, HTTP/2는 TCP 위라서 오히려 헤드 오브 라인 블로킹이 있다.</div></div>
+      <div class="quiz-q"><p>CDN의 캐시 적중률이 80%에서 95%로 오르면 가장 크게 줄어드는 것은?</p><div class="opts">
+        <button class="opt">사용자와 엣지 사이의 RTT</button>
+        <button class="opt" data-correct>원본 서버가 받는 요청 수(20% → 5%, 4분의 1로)</button>
+        <button class="opt">파일 크기</button>
+        <button class="opt">DNS 조회 횟수</button>
+      </div><div class="quiz-exp">실패율이 20%에서 5%로 줄어 원본 부담이 4분의 1이 된다. 평균 응답 시간도 줄지만, 엣지까지의 RTT 자체는 그대로다.</div></div>
+      <div class="quiz-q"><p>영상 통화가 유튜브처럼 30초 버퍼를 두지 않고 UDP 위 RTP와 수십 ms의 지터 버퍼를 쓰는 이유는?</p><div class="opts">
+        <button class="opt">UDP가 TCP보다 대역폭이 넓어서</button>
+        <button class="opt">영상 통화는 화질이 중요하지 않아서</button>
+        <button class="opt">재전송을 하면 화질이 떨어져서</button>
+        <button class="opt" data-correct>대화가 자연스러우려면 한쪽 지연이 약 150 ms 이내여야 해서, 늦게 오는 재전송이나 큰 버퍼를 기다릴 수 없기 때문</button>
+      </div><div class="quiz-exp">실시간 대화의 지연 예산은 매우 작다. 그래서 늦은 데이터는 버리고 숨기며, 버퍼도 지터를 펴는 정도로만 둔다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const rgba = (c, a) => { c = String(c).trim(); if (c[0] !== "#") return c; let x = c.slice(1); if (x.length === 3) x = x.split("").map((ch) => ch + ch).join(""); const n = parseInt(x.slice(0, 6), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
+  const hash = (s) => { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h; };
+
+  /* ======================= 1. DNS ======================= */
+  const TTLS = [30, 60, 300, 1800, 3600, 86400];
+  const ttlName = (s) => (s >= 86400 ? s / 86400 + "일" : s >= 3600 ? s / 3600 + "시간" : s >= 60 ? s / 60 + "분" : s + "초");
+  const dnsTtl = NB.range("dns-ttl", (v) => ttlName(TTLS[v]) + " (" + TTLS[v] + "초)");
+  const NODES = { pc: [0.1, 0.5, "내 컴퓨터", "스텁 리졸버"], res: [0.4, 0.5, "재귀 리졸버", "통신사 · 1.1.1.1 등"], root: [0.8, 0.15, "루트 서버", "a~m.root-servers.net"], tld: [0.8, 0.5, "TLD 서버", ".com"], auth: [0.8, 0.85, "권한 서버", "example.com"] };
+  const ONEWAY = { pc: 5, root: 7.5, tld: 12.5 };
+  let cache = {}, clock = 0, hops = [], hopI = 0, hopP = 0, curDom = "example.com", curTld = "com", dnsLog = [];
+  const SLD = new Set(["co", "ac", "go", "or", "ne", "re", "com", "net", "org", "gov", "edu"]);
+  function parseName(raw) {
+    let s = raw.trim().toLowerCase().replace(/^[a-z]+:\/\//, "").split(/[\/?#:]/)[0].replace(/\.$/, "");
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(s) || s.length > 60) return null;
+    return s;
+  }
+  function fakeIP(name) { const h = hash(name); const nets = ["192.0.2.", "198.51.100.", "203.0.113."]; return nets[h % 3] + (1 + ((h >>> 8) % 254)); }
+  function dnsQuery() {
+    const name = parseName($("dns-name").value);
+    if (!name) { NB.stat("dns-t", '<span style="color:var(--bad)">이름 형식 오류</span>'); return; }
+    const L = name.split(".");
+    const tld = L[L.length - 1];
+    const dom = L.length >= 3 && SLD.has(L[L.length - 2]) && tld.length === 2 ? L.slice(-3).join(".") : L.slice(-2).join(".");
+    curDom = dom; curTld = tld;
+    const authOW = (40 + (hash(dom) % 141)) / 2;
+    const ttl = TTLS[dnsTtl()], use = $("dns-cache").checked;
+    const ip = fakeIP(name);
+    hops = []; dnsLog = [];
+    let total = 0, ext = 0;
+    const hop = (a, b, ms, lab) => { hops.push({ a, b, ms, lab }); total += ms; dnsLog.push(`<span>+${Math.round(total)} ms</span> ${lab}`); };
+    hop("pc", "res", ONEWAY.pc, `내 컴퓨터 → 리졸버: <b>${name}</b>의 A 레코드?`);
+    const now = clock;
+    const left = (k) => (use && cache[k] && cache[k].exp > now ? cache[k].exp - now : 0);
+    if (left("A|" + name) > 0) {
+      hop("res", "pc", ONEWAY.pc, `리졸버 → 내 컴퓨터: <b>캐시 적중</b> ${ip} (남은 TTL ${Math.round(left("A|" + name))}초)`);
+    } else {
+      const tldK = left("NS|" + tld) > 0, domK = left("NS|" + dom) > 0;
+      if (!tldK && !domK) {
+        hop("res", "root", ONEWAY.root, `리졸버 → 루트: ${name}?`);
+        hop("root", "res", ONEWAY.root, `루트 → 리졸버: “.${tld}는 TLD 서버에게 물어봐” (NS, TTL 2일)`);
+        ext++; cache["NS|" + tld] = { exp: now + 172800, lab: "." + tld + " NS" };
+      } else if (!domK) dnsLog.push(`<span>     </span> .${tld} 서버 주소는 캐시에 있음 → 루트 건너뜀`);
+      if (!domK) {
+        hop("res", "tld", ONEWAY.tld, `리졸버 → .${tld} TLD: ${name}?`);
+        hop("tld", "res", ONEWAY.tld, `TLD → 리졸버: “${dom}은 ns1.${dom}에게” (NS, TTL 1일)`);
+        ext++; cache["NS|" + dom] = { exp: now + 86400, lab: dom + " NS" };
+      } else dnsLog.push(`<span>     </span> ${dom} 권한 서버 주소는 캐시에 있음 → 루트·TLD 건너뜀`);
+      hop("res", "auth", authOW, `리졸버 → ${dom} 권한 서버: ${name}?`);
+      hop("auth", "res", authOW, `권한 서버 → 리졸버: <b>A ${ip}</b> (TTL ${ttl}초)`);
+      ext++; cache["A|" + name] = { exp: now + ttl, lab: name + " A" };
+      hop("res", "pc", ONEWAY.pc, `리졸버 → 내 컴퓨터: ${ip}`);
+    }
+    hopI = 0; hopP = 0;
+    clock += total / 1000;
+    NB.stat("dns-t", Math.round(total) + " ms");
+    NB.stat("dns-q", ext + "번");
+    NB.stat("dns-clock", fmtClock(clock));
+    renderLog();
+  }
+  function fmtClock(s) { return s < 60 ? s.toFixed(1) + "초" : s < 3600 ? Math.floor(s / 60) + "분 " + Math.floor(s % 60) + "초" : (s / 3600).toFixed(1) + "시간"; }
+  function renderLog() {
+    const live = Object.values(cache).filter((c) => c.exp > clock).map((c) => `${c.lab} (${fmtClock(c.exp - clock)} 남음)`);
+    $("dns-log").innerHTML = dnsLog.map((l, i) => `<div class="${i < (hopI + 1) ? "new" : ""}">${l}</div>`).join("") + `<div style="margin-top:6px;color:var(--text-faint)">리졸버 캐시: ${live.length ? live.join(" · ") : "비어 있음"}</div>`;
+  }
+  $("dns-go").onclick = dnsQuery;
+  $("dns-name").addEventListener("keydown", (e) => { if (e.key === "Enter") dnsQuery(); });
+  document.querySelectorAll("#sim-dns [data-n]").forEach((b) => (b.onclick = () => { $("dns-name").value = b.dataset.n; dnsQuery(); }));
+  $("dns-age").onclick = () => { clock += 600; NB.stat("dns-clock", fmtClock(clock)); renderLog(); };
+  $("dns-flush").onclick = () => { cache = {}; renderLog(); };
+  const dnsCv = NB.canvas("#cv-dns", (ctx, w, h) => {
+    const P = NB.palette();
+    const narrow = w < 520;
+    const bw = narrow ? 92 : 130, bh = narrow ? 40 : 46;
+    const pos = (k) => { const n = NODES[k]; let x = n[0] * w; if (k === "pc") x = Math.max(x, bw / 2 + 6); if (["root", "tld", "auth"].includes(k)) x = Math.min(x, w - bw / 2 - 6); return [x, 14 + n[1] * (h - 28)]; };
+    // 기본 연결선
+    [["pc", "res"], ["res", "root"], ["res", "tld"], ["res", "auth"]].forEach(([a, b]) => {
+      const [x1, y1] = pos(a), [x2, y2] = pos(b);
+      ctx.strokeStyle = P.border; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([]);
+    });
+    // 지나간 홉
+    hops.forEach((hp, i) => {
+      if (i > hopI) return;
+      const [x1, y1] = pos(hp.a), [x2, y2] = pos(hp.b);
+      const f = i < hopI ? 1 : hopP;
+      const up = ["pc", "res"].includes(hp.a) && !(hp.a === "res" && hp.b === "pc");
+      const off = up ? -5 : 5;
+      const nx = -(y2 - y1), ny = x2 - x1, nl = Math.hypot(nx, ny) || 1;
+      const ox = (nx / nl) * off, oy = (ny / nl) * off;
+      const col = hp.b === "res" || hp.b === "pc" ? P.ok : P.accent;
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.globalAlpha = i < hopI ? 0.55 : 1;
+      ctx.beginPath(); ctx.moveTo(x1 + ox, y1 + oy); ctx.lineTo(NB.lerp(x1, x2, f) + ox, NB.lerp(y1, y2, f) + oy); ctx.stroke(); ctx.globalAlpha = 1;
+      if (i === hopI && hopP < 1) { ctx.beginPath(); ctx.arc(NB.lerp(x1, x2, f) + ox, NB.lerp(y1, y2, f) + oy, 6, 0, 7); ctx.fillStyle = col; ctx.fill(); }
+    });
+    Object.keys(NODES).forEach((k) => {
+      const [x, y] = pos(k);
+      const sub = k === "tld" ? "." + curTld : k === "auth" ? curDom : NODES[k][3];
+      const active = hops[hopI] && (hops[hopI].a === k || hops[hopI].b === k);
+      NB.box(ctx, x - bw / 2, y - bh / 2, bw, bh, { fill: P.bg, stroke: false });
+      NB.box(ctx, x - bw / 2, y - bh / 2, bw, bh, { fill: k === "res" ? NB.color("accent-soft") : P.surface, stroke: active ? P.accent : P.border, lw: active ? 2 : 1 });
+      NB.text(ctx, NODES[k][2], x, y - (narrow ? 7 : 8), { align: "center", size: narrow ? 11 : 12.5, bold: true, color: P.text });
+      let s = sub; if (narrow && s.length > 14) s = s.slice(0, 13) + "…";
+      NB.text(ctx, s, x, y + (narrow ? 9 : 10), { align: "center", size: narrow ? 9 : 10.5, mono: true, color: P.dim });
+    });
+  }, { aspect: 0.45, minHeight: 280, maxHeight: 360 });
+  NB.loop($("cv-dns"), (dt) => {
+    if (hopI < hops.length && hops.length) {
+      const hp = hops[hopI];
+      hopP += dt / (0.25 + hp.ms * 0.012);
+      if (hopP >= 1) { if (hopI < hops.length - 1) { hopI++; hopP = 0; renderLog(); } else hopP = 1; }
+      dnsCv.redraw();
+    }
+  });
+  dnsQuery();
+
+  /* ======================= 2. HTTP 폭포수 ======================= */
+  const wfN = NB.range("wf-n", (v) => v + "개", wfRun), wfR = NB.range("wf-rtt", (v) => v + " ms", wfRun);
+  const wfB = NB.range("wf-bw", (v) => v + " Mbps", wfRun), wfL = NB.range("wf-loss", (v) => v + "%", wfRun);
+  const wfV = NB.seg("wf-ver", () => wfCv && wfCv.redraw());
+  let wfRes = null, wfCv = null;
+  function wfSim(ver, N, RTT, BWm, loss) {
+    const srng = NB.rng(17), lrng = NB.rng(91 + Math.round(loss * 1000));
+    const MSSb = 1460 * 8, BWms = BWm * 1e6 / 1000; // bits per ms
+    const hs = ver === 3 ? 1 : 2;
+    const maxCw = Math.max(20, 2 * BWms * RTT / MSSb + 10);
+    const conns = [{ ready: hs * RTT, cwnd: 10, ss: Infinity, pk: 0, cur: null, cut: -1e9 }];
+    const S = [{ name: "HTML", bits: 60e3 * 8, left: 60e3 * 8, disc: 0, req: hs * RTT, fb: hs * RTT + RTT, conn: 0, minDone: 0 }];
+    for (let i = 0; i < N; i++) { const kb = 6 + Math.pow(srng(), 2) * 100; S.push({ name: "r" + (i + 1), bits: kb * 8e3, left: kb * 8e3, disc: null, req: null, fb: null, conn: null, minDone: 0 }); }
+    conns[0].cur = S[0];
+    const queue = [];
+    let t = 0, htmlDone = false;
+    const dt = Math.max(1, Math.round(RTT / 25));
+    const total = S.length;
+    let doneCnt = 0;
+    while (doneCnt < total && t < 120000) {
+      // H1 스케줄
+      if (ver === 1 && htmlDone) {
+        conns.forEach((c, ci) => {
+          if (c.ready > t) return;
+          if (c.cur && (c.cur.done === undefined || c.cur.done > t)) return;
+          if (!queue.length) return;
+          const s = queue.shift(); s.req = t; s.fb = t + RTT; s.conn = ci; c.cur = s;
+        });
+      }
+      // 대역폭 배분
+      const act = conns.map((c, ci) => S.filter((s) => s.conn === ci && s.fb !== null && s.fb <= t && s.left > 0));
+      const want = conns.map((c, ci) => (act[ci].length ? c.cwnd * MSSb / RTT * dt : 0));
+      let k = want.filter((x) => x > 0).length, budget = BWms * dt;
+      const alloc = want.map(() => 0);
+      if (k) {
+        let share = budget / k;
+        want.forEach((wv, i) => { if (wv > 0 && wv <= share) { alloc[i] = wv; budget -= wv; k--; } });
+        share = k ? budget / k : 0;
+        want.forEach((wv, i) => { if (wv > share && alloc[i] === 0 && wv > 0) alloc[i] = share; });
+      }
+      conns.forEach((c, ci) => {
+        const a = alloc[ci]; if (!a) return;
+        const list = act[ci], per = a / list.length;
+        list.forEach((s) => { s.left -= per; if (s.left <= 0 && s.bytesDone === undefined) { s.bytesDone = t + dt; } });
+        const pk = a / MSSb;
+        c.pk += pk;
+        while (c.pk >= 1) {
+          c.pk -= 1;
+          if (lrng() < loss) {
+            const victim = list[Math.floor(lrng() * list.length)];
+            (ver === 3 ? [victim] : list).forEach((s) => (s.minDone = Math.max(s.minDone, t + RTT)));
+            if (t - c.cut >= RTT) { c.cwnd = Math.max(2, c.cwnd * 0.7); c.ss = c.cwnd; c.cut = t; }
+          }
+        }
+        c.cwnd = c.cwnd < c.ss ? c.cwnd + pk : c.cwnd + 2 * pk / c.cwnd;
+        c.cwnd = Math.min(c.cwnd, maxCw);
+      });
+      t += dt;
+      S.forEach((s) => {
+        if (s.bytesDone !== undefined && s.done === undefined) {
+          s.done = Math.max(s.bytesDone, s.minDone);
+        }
+        if (s.done !== undefined && !s.counted && s.done <= t) {
+          s.counted = true; doneCnt++;
+          if (s === S[0]) {
+            htmlDone = true;
+            for (let i = 1; i < S.length; i++) S[i].disc = t;
+            if (ver === 1) {
+              for (let i = 1; i < S.length; i++) queue.push(S[i]);
+              for (let j = 0; j < 5; j++) conns.push({ ready: t + hs * RTT, cwnd: 10, ss: Infinity, pk: 0, cur: null, cut: -1e9 });
+            } else {
+              for (let i = 1; i < S.length; i++) { S[i].req = t; S[i].fb = t + RTT; S[i].conn = 0; }
+            }
+          }
+        }
+      });
+    }
+    return { S, load: Math.max(...S.map((s) => s.done || 0)), hsEnd: hs * RTT, conns: conns.length };
+  }
+  function wfRun() {
+    const N = wfN(), R = wfR(), B = wfB(), L = wfL() / 100;
+    wfRes = { 1: wfSim(1, N, R, B, L), 2: wfSim(2, N, R, B, L), 3: wfSim(3, N, R, B, L) };
+    const best = Math.min(wfRes[1].load, wfRes[2].load, wfRes[3].load);
+    [1, 2, 3].forEach((v) => NB.stat("wf-t" + v, (wfRes[v].load === best ? '<span style="color:var(--ok)">' : "<span>") + (wfRes[v].load / 1000).toFixed(2) + " s</span>"));
+    const hol = (v) => wfRes[v].S.filter((s) => s.done > s.bytesDone + 0.5).length;
+    NB.stat("wf-hol", hol(1) + " / " + hol(2) + " / " + hol(3) + "개");
+    if (wfCv) wfCv.redraw();
+  }
+  wfRun();
+  wfCv = NB.canvas("#cv-wf", (ctx, w, h) => {
+    const P = NB.palette();
+    const r = wfRes[wfV()];
+    const tmax = Math.max(wfRes[1].load, wfRes[2].load, wfRes[3].load) * 1.03;
+    const narrow = w < 520;
+    const lw = narrow ? 34 : 56, x0 = lw + 6, x1 = w - 12, top = 8, bot = h - 22;
+    const rows = r.S.length + 1, rh = (bot - top) / rows;
+    const X = (t) => x0 + (t / tmax) * (x1 - x0);
+    // 눈금
+    ctx.font = "10px " + NB.color("mono"); ctx.fillStyle = P.dim; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    const raw = tmax / 6, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 5, 10].map((m) => m * mag).find((s) => tmax / s <= 6.5);
+    for (let t = 0; t <= tmax; t += step) { const x = X(t); ctx.strokeStyle = P.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bot); ctx.stroke(); ctx.fillText(t >= 1000 ? (t / 1000).toFixed(t % 1000 ? 1 : 0) + "s" : t + "ms", x, bot + 5); }
+    const bar = (a, b, y, col, alpha) => { if (b <= a) return; ctx.globalAlpha = alpha || 1; ctx.fillStyle = col; ctx.fillRect(X(a), y, Math.max(1, X(b) - X(a)), Math.max(1.5, rh * 0.7)); ctx.globalAlpha = 1; };
+    // 연결 준비 행
+    let y = top + rh * 0.15;
+    if (rh >= 9) NB.text(ctx, "연결", lw, y + rh * 0.35, { align: "right", size: Math.min(10.5, rh), mono: true, color: P.dim });
+    bar(0, r.hsEnd, y, wfV() === "3" ? P.accent : P.accent2, 0.35);
+    r.S.forEach((s, i) => {
+      y = top + (i + 1) * rh + rh * 0.15;
+      if (rh >= 9 && (rh >= 12 || i === 0 || (i + 1) % 5 === 0)) NB.text(ctx, i === 0 ? "HTML" : "#" + i, lw, y + rh * 0.35, { align: "right", size: Math.min(10.5, rh), mono: true, color: P.dim });
+      if (s.disc != null && s.req != null) bar(s.disc, s.req, y, P.faint, 0.5);
+      if (s.req != null) bar(s.req, Math.min(s.fb, s.bytesDone || s.fb), y, P.accent2, 0.75);
+      if (s.bytesDone != null) bar(s.fb, s.bytesDone, y, P.accent);
+      if (s.done > s.bytesDone + 0.5) bar(s.bytesDone, s.done, y, P.bad, 0.85);
+    });
+    const lx = X(r.load);
+    ctx.strokeStyle = P.ok; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(lx, top); ctx.lineTo(lx, bot); ctx.stroke(); ctx.setLineDash([]);
+    const lab = "완료 " + (r.load / 1000).toFixed(2) + " s";
+    NB.text(ctx, lab, lx > w - 100 ? lx - 6 : lx + 6, top + 10, { align: lx > w - 100 ? "right" : "left", size: 11.5, bold: true, color: P.ok });
+  }, { aspect: 0.55, minHeight: 320, maxHeight: 460 });
+
+  /* ======================= 3. CDN ======================= */
+  const LOC = { seoul: ["서울", 190], frankfurt: ["프랑크푸르트", 90], saopaulo: ["상파울루", 120], sydney: ["시드니", 200], newyork: ["뉴욕", 8] };
+  const cdnLoc = NB.seg("cdn-loc", cdnCalc);
+  const cdnHit = NB.range("cdn-hit", (v) => v + "%", cdnCalc);
+  const E = 10, PROC = 20;
+  const cdnT = (h, U) => { const o = U * 0.9; return h * (3 * E) + (1 - h) * (3 * E + o + PROC); };
+  const noT = (U) => 3 * U + PROC;
+  let dots = [], dotAcc = 0, cdnCv = null;
+  function cdnCalc() {
+    const h = cdnHit() / 100, U = LOC[cdnLoc()][1];
+    NB.stat("cdn-no", Math.round(noT(U)) + " ms");
+    const c = cdnT(h, U);
+    NB.stat("cdn-avg", Math.round(c) + " ms <small>×" + (noT(U) / c).toFixed(1) + " 빠름</small>");
+    NB.stat("cdn-org", Math.round((1 - h) * 100) + "%");
+    if (cdnCv) cdnCv.redraw();
+  }
+  cdnCalc();
+  cdnCv = NB.canvas("#cv-cdn", (ctx, w, h) => {
+    const P = NB.palette();
+    const narrow = w < 520;
+    const U = LOC[cdnLoc()][1], hr = cdnHit() / 100;
+    const topH = narrow ? 110 : 120;
+    const ux = narrow ? 34 : 60, ex = narrow ? w * 0.36 : w * 0.3, ox = w - (narrow ? 40 : 70), y = 50;
+    ctx.strokeStyle = P.border; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(ux, y); ctx.lineTo(ox, y); ctx.stroke();
+    NB.text(ctx, "RTT 10 ms", (ux + ex) / 2, y - 22, { align: "center", size: 10.5, mono: true, color: P.dim });
+    NB.text(ctx, "RTT " + Math.round(U * 0.9) + " ms", (ex + ox) / 2, y - 22, { align: "center", size: 10.5, mono: true, color: P.dim });
+    dots.forEach((d) => {
+      // 경로 진행: 0~1 사용자→엣지, (미스면) 1~2 엣지→원본, 2~3 원본→엣지, 이후 엣지→사용자
+      let x;
+      const p = d.p;
+      if (d.hit) x = p < 1 ? NB.lerp(ux, ex, p) : NB.lerp(ex, ux, p - 1);
+      else x = p < 1 ? NB.lerp(ux, ex, p) : p < 2 ? NB.lerp(ex, ox, p - 1) : p < 3 ? NB.lerp(ox, ex, p - 2) : NB.lerp(ex, ux, p - 3);
+      ctx.beginPath(); ctx.arc(x, y + (d.hit ? -6 : 6), 4.5, 0, 7); ctx.fillStyle = d.hit ? P.ok : P.warn; ctx.fill();
+    });
+    NB.box(ctx, ux - (narrow ? 30 : 46), y + 14, narrow ? 60 : 92, 34, { text: LOC[cdnLoc()][0] + "\n사용자", size: narrow ? 10 : 11 });
+    NB.box(ctx, ex - (narrow ? 32 : 46), y + 14, narrow ? 64 : 92, 34, { text: "엣지\n(가까운 PoP)", size: narrow ? 10 : 11, fill: NB.color("accent-2-soft"), stroke: P.accent2 });
+    NB.box(ctx, ox - (narrow ? 36 : 56), y + 14, narrow ? 72 : 112, 34, { text: "원본\n미국 동부", size: narrow ? 10 : 11, fill: NB.color("accent-soft"), stroke: P.accent });
+    // 차트
+    const box = { x: 54, y: topH + 8, w: w - 54 - 14, h: h - topH - 8 - 42 };
+    const ymax = Math.max(noT(U), 60) * 1.12;
+    const data = []; for (let i = 0; i <= 50; i++) { const hh = i / 50; data.push([hh * 100, cdnT(hh, U)]); }
+    NB.chart(ctx, box, { x: [0, 100], y: [0, ymax], xLabel: "캐시 적중률 (%)", yLabel: "평균 응답 (ms)", series: [{ data, color: P.accent2, width: 2.4 }], hlines: [{ y: noT(U), color: P.bad, label: "CDN 없이 " + Math.round(noT(U)) + " ms" }], points: [{ x: hr * 100, y: cdnT(hr, U), color: P.accent2, r: 6 }] });
+  }, { aspect: 0.55, minHeight: 330, maxHeight: 420 });
+  NB.loop($("cv-cdn"), (dt) => {
+    dotAcc += dt;
+    if (dotAcc > 0.28) { dotAcc = 0; dots.push({ p: 0, hit: Math.random() < cdnHit() / 100 }); }
+    const U = LOC[cdnLoc()][1];
+    dots.forEach((d) => { const seg = d.hit || d.p < 1 || d.p >= 3 ? 10 : U * 0.9; d.p += dt * 2.2 * (10 / Math.max(10, seg)) * (seg > 10 ? 4 : 1); });
+    dots = dots.filter((d) => d.p < (d.hit ? 2 : 4));
+    cdnCv.redraw();
+  });
+
+  /* ======================= 4. ABR ======================= */
+  const LAD = [0.4, 0.75, 1.2, 2.5, 5, 8, 16], LADN = ["240p", "360p", "480p", "720p", "1080p", "1440p", "4K"];
+  const T = 180;
+  let bw = new Array(T).fill(5), abr = null, reveal = T, abrCv = null;
+  function preset(k) {
+    const r = NB.rng(k === "home" ? 3 : k === "cafe" ? 5 : 9);
+    for (let i = 0; i < T; i++) {
+      if (k === "home") bw[i] = 22 + 4 * Math.sin(i / 9) + (r() - 0.5) * 6 - (i > 100 && i < 112 ? 12 : 0);
+      else if (k === "cafe") bw[i] = Math.max(0.6, 5 + 3 * Math.sin(i / 7) + (r() - 0.5) * 5 - (i % 47 > 40 ? 4 : 0));
+      else if (k === "subway") {
+        const tunnel = (i > 38 && i < 50) || (i > 95 && i < 112) || (i > 150 && i < 158);
+        const station = (i > 60 && i < 80) || (i > 125 && i < 140);
+        bw[i] = tunnel ? 0.12 + r() * 0.1 : station ? 14 + (r() - 0.5) * 6 : 3 + 2.5 * Math.sin(i / 5) + (r() - 0.5) * 3;
+        bw[i] = Math.max(0.1, bw[i]);
+      } else bw[i] = 5;
+    }
+  }
+  const abrPre = NB.seg("abr-pre", (v) => { preset(v); $("cv-abr").style.touchAction = v === "draw" ? "none" : ""; abrRun(true); });
+  const abrAlg = NB.seg("abr-alg", () => abrRun(true));
+  const abrSeg = NB.range("abr-seg", (v) => v + "초", () => abrRun(true));
+  const abrBuf = NB.range("abr-buf", (v) => v + "초", () => abrRun(true));
+  function abrSim() {
+    const L = abrSeg(), MAXB = abrBuf(), alg = abrAlg(), dt = 0.05;
+    let t = 0, buf = 0, playing = false, started = false, startT = null, dl = null;
+    const tp = [], segs = [], stalls = [], bufLog = [];
+    let stallStart = null;
+    const bwAt = (tt) => bw[Math.min(T - 1, Math.floor(tt))];
+    function choose() {
+      if (alg === "fixed") return 4;
+      if (alg === "rate") {
+        if (!tp.length) return 0;
+        const last = tp.slice(-3), hm = last.length / last.reduce((a, x) => a + 1 / x, 0);
+        let q = 0; LAD.forEach((b, i) => { if (b <= hm * 0.8) q = i; }); return q;
+      }
+      const res = Math.max(5, MAXB * 0.35), cush = MAXB * 0.9;
+      if (buf <= res) return 0;
+      if (buf >= cush) return LAD.length - 1;
+      return Math.min(LAD.length - 1, Math.floor((buf - res) / (cush - res) * (LAD.length - 1)));
+    }
+    while (t < T) {
+      if (!dl && buf + L <= MAXB + 1e-9) { const q = choose(); dl = { q, left: LAD[q] * L, st: t }; }
+      if (dl) {
+        dl.left -= bwAt(t) * dt;
+        if (dl.left <= 0) { const el = t + dt - dl.st; tp.push(LAD[dl.q] * L / el); segs.push({ q: dl.q, st: dl.st, en: t + dt }); buf += L; dl = null; }
+      }
+      if (playing) {
+        buf -= dt;
+        if (buf <= 0) { buf = 0; playing = false; stallStart = t; }
+      } else if (buf >= L - 1e-9 || (buf > 0 && !dl && buf + L > MAXB)) {
+        if (!started) { started = true; startT = t; }
+        else if (stallStart !== null) { stalls.push([stallStart, t]); stallStart = null; }
+        playing = true;
+      }
+      bufLog.push([t, buf]);
+      t += dt;
+    }
+    if (stallStart !== null) stalls.push([stallStart, T]);
+    if (dl) segs.push({ q: dl.q, st: dl.st, en: T, partial: true });
+    return { segs, stalls, bufLog, startT, L, MAXB };
+  }
+  function abrRun(anim) {
+    abr = abrSim();
+    if (anim) reveal = 0;
+    const full = abr.segs.filter((s) => !s.partial);
+    const avg = full.length ? full.reduce((a, s) => a + LAD[s.q], 0) / full.length : 0;
+    let sw = 0; for (let i = 1; i < full.length; i++) if (full[i].q !== full[i - 1].q) sw++;
+    const st = abr.stalls.reduce((a, s) => a + s[1] - s[0], 0);
+    NB.stat("abr-avg", avg.toFixed(2) + " Mbps");
+    NB.stat("abr-stall", `<span style="color:${abr.stalls.length ? "var(--bad)" : "var(--ok)"}">${abr.stalls.length}회 · ${st.toFixed(1)}초</span>`);
+    NB.stat("abr-sw", sw + "회");
+    NB.stat("abr-start", abr.startT == null ? "—" : abr.startT.toFixed(1) + "초");
+    if (abrCv) abrCv.redraw();
+  }
+  preset("subway");
+  abrRun(false);
+  let abrBox = null;
+  abrCv = NB.canvas("#cv-abr", (ctx, w, h) => {
+    const P = NB.palette();
+    const narrow = w < 520;
+    const lx = narrow ? 40 : 54;
+    const topH = Math.round((h - 40) * 0.6);
+    const b1 = { x: lx, y: 10, w: w - lx - (narrow ? 10 : 44), h: topH - 10 };
+    const b2 = { x: lx, y: topH + 18, w: b1.w, h: h - topH - 18 - 26 };
+    abrBox = b1;
+    const R = reveal;
+    const bwData = []; for (let i = 0; i < T; i++) { if (i > R) break; bwData.push([i, bw[i]], [i + 1, bw[i]]); }
+    const qData = []; abr.segs.forEach((s) => { if (s.st > R) return; qData.push([s.st, LAD[s.q]], [Math.min(s.en, R), LAD[s.q]]); });
+    const bands = abr.stalls.filter((s) => s[0] <= R).map((s) => ({ x0: s[0], x1: Math.min(s[1], R), color: rgba(P.bad, 0.22) }));
+    if (abr.startT != null && abr.startT <= R) bands.push({ x0: 0, x1: abr.startT, color: P.grid });
+    const ch = NB.chart(ctx, b1, { x: [0, T], y: [0.1, 40], logY: true, yLabel: narrow ? "" : "Mbps", series: [{ data: bwData, color: P.accent, width: 1.6, fill: rgba(P.accent, 0.14) }, { data: qData, color: P.warn, width: 2.6 }], bands, xTicks: [], yFmt: (v) => (v >= 1 ? String(v) : v.toFixed(1)) });
+    // 사다리 표시
+    if (!narrow) LAD.forEach((b, i) => { if (i % 2 === 0 || i === LAD.length - 1) { const yy = ch.Y(b); ctx.strokeStyle = P.grid; ctx.setLineDash([2, 4]); ctx.beginPath(); ctx.moveTo(b1.x, yy); ctx.lineTo(b1.x + b1.w, yy); ctx.stroke(); ctx.setLineDash([]); NB.text(ctx, LADN[i], b1.x + b1.w + 4, yy, { size: 9.5, mono: true, color: P.dim }); } });
+    const bufData = abr.bufLog.filter((p, i) => i % 4 === 0 && p[0] <= R);
+    NB.chart(ctx, b2, { x: [0, T], y: [0, abr.MAXB], xLabel: "", yLabel: narrow ? "" : "버퍼(초)", series: [{ data: bufData, color: P.ok, width: 2, fill: rgba(P.ok, 0.15) }], bands, xFmt: (v) => v + "s" });
+    NB.text(ctx, "버퍼", b2.x + 6, b2.y + 9, { size: 10.5, bold: true, color: P.ok });
+    if (R < T) { const xr = b1.x + (R / T) * b1.w; ctx.strokeStyle = P.text; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(xr, b1.y); ctx.lineTo(xr, b2.y + b2.h); ctx.stroke(); }
+    if (abrPre() === "draw") NB.text(ctx, "그래프 위를 드래그해 대역폭을 그리세요", b1.x + b1.w / 2, b1.y + 14, { align: "center", size: 11.5, bold: true, color: P.accent });
+  }, { aspect: 0.55, minHeight: 340, maxHeight: 460 });
+  NB.loop($("cv-abr"), (dt) => { if (reveal < T) { reveal = Math.min(T, reveal + dt * 30); abrCv.redraw(); } });
+  // 그리기
+  let drawing = false;
+  function drawAt(ev) {
+    if (!abrBox) return;
+    const r = $("cv-abr").getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top, b = abrBox;
+    if (x < b.x - 4 || x > b.x + b.w + 4) return;
+    const i = Math.floor(NB.clamp((x - b.x) / b.w, 0, 0.9999) * T);
+    const fy = NB.clamp((b.y + b.h - y) / b.h, 0, 1);
+    const v = Math.pow(10, NB.lerp(Math.log10(0.1), Math.log10(40), fy));
+    for (let k = -2; k <= 2; k++) if (i + k >= 0 && i + k < T) bw[i + k] = v;
+    if (abrPre() !== "draw") { abrPre.set("draw", false); $("cv-abr").style.touchAction = "none"; }
+    reveal = T; abrRun(false);
+  }
+  $("cv-abr").addEventListener("pointerdown", (e) => { if (e.pointerType !== "mouse" && abrPre() !== "draw") return; drawing = true; drawAt(e); });
+  window.addEventListener("pointermove", (e) => { if (drawing) drawAt(e); });
+  window.addEventListener("pointerup", () => (drawing = false));
+
+  /* ======================= 5. P2P ======================= */
+  const nOf = (v) => Math.round(Math.pow(10, v / 10));
+  const p2pN = NB.range("p2p-n", (v) => nOf(v) + "명", p2pCalc);
+  const p2pU = NB.range("p2p-u", (v) => v + " Mbps", p2pCalc);
+  const p2pS = NB.range("p2p-s", (v) => (v >= 1000 ? v / 1000 + " Gbps" : v + " Mbps"), p2pCalc);
+  const F = 8000, DMIN = 100; // Mbit, Mbps
+  const dcs = (N, us) => Math.max(N * F / us, F / DMIN);
+  const dp2p = (N, us, u) => Math.max(F / us, F / DMIN, N * F / (us + N * u));
+  let p2pCv = null;
+  function p2pCalc() {
+    const N = nOf(p2pN()), u = p2pU(), us = p2pS();
+    const a = dcs(N, us), b = dp2p(N, us, u);
+    NB.stat("p2p-cs", NB.time(a)); NB.stat("p2p-pp", NB.time(b)); NB.stat("p2p-x", (a / b).toFixed(1) + "배");
+    if (p2pCv) p2pCv.redraw();
+  }
+  p2pCalc();
+  p2pCv = NB.canvas("#cv-p2p", (ctx, w, h) => {
+    const P = NB.palette();
+    const N = nOf(p2pN()), u = p2pU(), us = p2pS();
+    const cs = [], pp = [];
+    for (let v = 0; v <= 40; v += 0.5) { const n = Math.pow(10, v / 10); cs.push([n, dcs(n, us)]); pp.push([n, dp2p(n, us, u)]); }
+    const tf = (s) => (s >= 3600 ? Math.round(s / 3600) + "h" : s >= 60 ? Math.round(s / 60) + "m" : Math.round(s) + "s");
+    NB.chart(ctx, null, { x: [1, 10000], y: [10, 1e6], logX: true, logY: true, xLabel: "받는 사람 수 N", yLabel: "모두 받을 때까지", yFmt: tf, xFmt: (v) => (v >= 1000 ? v / 1000 + "천" : String(v)),
+      series: [{ data: cs, color: P.bad, width: 2.4 }, { data: pp, color: P.ok, width: 2.4 }],
+      points: [{ x: N, y: dcs(N, us), color: P.bad, r: 5 }, { x: N, y: dp2p(N, us, u), color: P.ok, r: 5 }] });
+    NB.text(ctx, "클라이언트-서버", 70, 26, { size: 12, bold: true, color: P.bad });
+    NB.text(ctx, "P2P", 70, 44, { size: 12, bold: true, color: P.ok });
+  }, { aspect: 0.48, minHeight: 280, maxHeight: 380 });
+})();
+</script>
+</body>
+</html>

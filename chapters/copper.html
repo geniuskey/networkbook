@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>구리선: 전화선에서 이더넷까지 · NetworkBook</title>
+<meta name="description" content="꼬임쌍선이 꼬인 이유(차동 신호), 동축 케이블과 UTP 카테고리, 감쇠·누화·표피 효과, NRZ·맨체스터·PAM 라인 코딩, 눈 모양 그림, 1000BASE-T와 PoE, 다이얼업에서 DSL·케이블 모뎀까지 구리선 통신의 모든 것.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .cu-tbl td:first-child { font-weight: 700; white-space: nowrap; }
+</style>
+</head>
+<body data-chapter="copper">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 04</div>
+    <h1>구리선: 전화선에서 이더넷까지</h1>
+    <p class="lead">책상 뒤 공유기에 꽂힌 랜선을 칼로 벗겨 보면 가는 구리선 여덟 가닥이 둘씩 짝지어 꼬여 있다. 왜 굳이 꼬았을까? 이 평범한 선 하나가 1초에 10억 비트, 좋은 선은 100억 비트를 100 m 너머로 보낸다. 같은 구리선으로 100년 전에는 목소리 하나를 겨우 실어 날랐다. 이 장에서는 구리선이 어떻게 잡음을 이기고, 신호가 왜 약해지며, 비트를 어떤 모양의 전압으로 싣는지, 그리고 결국 왜 광섬유에 자리를 내주는지 살펴본다.</p>
+    <ul class="objectives">
+      <li>꼬임쌍선과 차동 신호가 외부 잡음을 상쇄하는 원리를 설명한다.</li>
+      <li>동축 케이블과 UTP 카테고리(Cat5e·6·6A·8)의 대역폭·속도·거리를 비교한다.</li>
+      <li>감쇠가 주파수와 거리에 따라 커지는 이유(표피 효과)와 누화(NEXT·FEXT)를 이해한다.</li>
+      <li>NRZ, 맨체스터, MLT-3, PAM-4 같은 라인 코딩과 직류 균형·클럭 복원의 관계를 안다.</li>
+      <li>눈 모양 그림으로 대역폭·잡음·지터가 신호 품질을 어떻게 망가뜨리는지 읽는다.</li>
+      <li>1000BASE-T가 네 쌍 모두로 동시에 주고받는 비밀과 PoE를 안다.</li>
+      <li>다이얼업·ADSL·VDSL·케이블 모뎀·G.fast의 원리와, 거리가 속도를 깎는 이유를 설명한다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="history">
+    <h2>전화선의 탄생</h2>
+    <p>1876년 벨이 전화를 발명했을 때 전화선은 철사 한 가닥이었다. 돌아오는 길은 땅(접지)을 썼다. 그런데 전차가 다니고 전등이 켜지자 전화에서 웅웅거리는 소리와 남의 통화가 섞여 들렸다. 땅과 공기에 흐르는 온갖 전기가 그 한 가닥에 그대로 실렸기 때문이다. 해법은 선을 두 가닥으로 만들어 신호가 가고 오는 길을 모두 전선으로 하는 것, 그리고 그 두 가닥을 서로 꼬는 것이었다. 벨은 1881년 꼬임선 특허를 받았고, 이 <span class="term">꼬임쌍선</span><span class="en">(twisted pair)</span>은 140년이 지난 지금도 랜선, 전화선, USB, HDMI 속에서 쓰인다.</p>
+    <p>20세기 내내 전 세계 집집마다 구리 전화선이 깔렸다. 이 선은 사람 목소리(약 300~3,400 Hz)만 나르도록 설계되었지만, 나중에 사람들은 같은 선에 훨씬 높은 주파수를 실어 인터넷을 보냈다. 이미 깔린 선을 다시 쓰는 것, 이것이 구리선 통신 역사의 큰 줄기다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="twisted">
+    <h2>꼬임쌍선과 차동 신호</h2>
+    <p>꼬임쌍선의 비밀은 <span class="term">차동 신호</span><span class="en">(differential signaling)</span>에 있다. 보내는 쪽은 한 선에 +V, 짝이 되는 선에 −V를 동시에 싣는다. 받는 쪽은 각 선의 전압을 따로 보지 않고 <b>두 선의 차이</b>만 본다. 외부 잡음(형광등, 모터, 옆 케이블)은 가까이 붙은 두 선에 거의 똑같이 실리므로, 빼면 사라진다. 두 선에 똑같이 실리는 성분을 <span class="term">공통 모드 잡음</span><span class="en">(common-mode noise)</span>이라 한다.</p>
+    <p>그럼 왜 꼬는가? 꼬지 않은 두 선은 잡음원 쪽에 있는 선이 늘 조금 더 많은 잡음을 받는다. 그 차이는 빼도 남는다. 꼬면 두 선이 번갈아 가며 잡음원에 가까워지므로, 한 꼬임에서 생긴 차이를 다음 꼬임이 반대 부호로 지운다. 꼬임이 촘촘할수록 더 잘 지워진다. 또 신호선 두 가닥이 내보내는 자기장도 서로 상쇄되어, 내 선이 남에게 잡음을 덜 뿌리게 된다.</p>
+    <div class="callout analogy"><strong>시소 위의 두 사람</strong><p>두 사람이 시소 양 끝에 앉아 있다. 둘 다 똑같이 무거운 배낭을 메면(공통 잡음) 시소는 기울지 않는다. 시소는 두 사람의 <b>무게 차이</b>에만 반응하기 때문이다. 차동 수신기가 바로 이 시소다. 다만 한 사람만 배낭을 더 무겁게 메면 기운다. 꼬임은 두 사람이 번갈아 자리를 바꿔 앉게 해서, 배낭 무게가 결국 양쪽에 똑같이 나뉘게 만든다.</p></div>
+    <div class="sim" id="sim-diff">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>꼬임과 차동 수신: 잡음은 어디로 사라지나</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cv-diff"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>외부 잡음 세기 <output id="df-noise-out"></output></span><input type="range" id="df-noise" min="0" max="3" step="0.1" value="1.5"></label>
+          <label class="ctrl"><span>꼬임 수 (그림 구간) <output id="df-tw-out"></output></span><input type="range" id="df-tw" min="0" max="12" step="1" value="0"></label>
+          <label class="check"><input type="checkbox" id="df-diff" checked> 차동 수신 (A − B)</label>
+          <p class="scale-note" style="margin:6px 0 0">끄면 선 A 하나만 접지 기준으로 읽는다(단일 종단).</p>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">수신기에 남은 잡음</span><span class="v" id="o-df-res">—</span></div>
+        <div class="stat"><span class="k">신호 대 잡음비</span><span class="v" id="o-df-snr">—</span></div>
+        <div class="stat"><span class="k">비트 오류 (최근 200비트)</span><span class="v" id="o-df-err">—</span></div>
+        <div class="stat"><span class="k">잡음 억제</span><span class="v" id="o-df-cmr">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 차동 수신을 끄고 잡음을 키우면 비트가 틀리기 시작한다. 차동을 켜면 대부분 사라지지만 꼬임이 0이면 조금 남는다. 꼬임을 늘려 보자. 단순화 모델: 잡음원에 가까운 선 A가 B보다 25% 더 큰 잡음을 받고, 꼬임 하나마다 불균형이 상쇄되어 남는 비율이 1/(1+1.5×꼬임 수)로 준다고 가정했다. 실제 랜선은 쌍마다 꼬임 간격을 다르게 해(대략 1~2 cm) 쌍끼리의 누화도 줄인다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">외부 잡음이 두 선에 <b>정확히 같은 크기로</b> 실린다면, 차동 수신기 출력에 남는 잡음은?</p><p class="wi-hint">위 시뮬레이터에서 꼬임을 최대로 하고 차동 수신을 켜 보자.</p><div class="opts">
+      <button class="opt">두 선의 잡음이 더해져 두 배가 된다</button>
+      <button class="opt" data-correct>거의 0이 된다 — A − B에서 같은 잡음은 빼면 사라진다</button>
+      <button class="opt">절반으로 줄어든다</button>
+    </div><div class="quiz-exp">(신호 + 잡음) − (−신호 + 잡음) = 2 × 신호. 잡음은 지워지고 신호는 오히려 두 배가 된다. 그래서 USB, HDMI, PCIe, SerDes(16장) 같은 고속 신호는 거의 모두 차동 쌍으로 보낸다. 현실에서는 두 선의 불균형 때문에 완전히 0이 되지는 않는다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="cables">
+    <h2>동축 케이블과 UTP 카테고리</h2>
+    <p>구리선에는 두 가족이 있다. <span class="term">동축 케이블</span><span class="en">(coaxial cable)</span>은 가운데 심선을 절연체와 원통형 금속 그물(차폐)이 감싼 구조다. 전기장이 심선과 차폐 사이에 갇혀 있어 밖으로 새거나 바깥 잡음이 들어오기 어렵고, 높은 주파수(수 GHz)까지 잘 보낸다. TV 안테나선, 케이블 TV, 초기 이더넷(10BASE5·10BASE2)이 동축을 썼다. 다만 굵고 뻣뻣하며 비싸다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 260" style="min-width:560px" role="img" aria-label="UTP 케이블과 동축 케이블의 단면">
+        <text x="200" y="22" text-anchor="middle" class="t" style="font-weight:700">UTP (비차폐 꼬임쌍선) 단면</text>
+        <text x="600" y="22" text-anchor="middle" class="t" style="font-weight:700">동축 케이블 단면</text>
+        <circle cx="200" cy="135" r="95" class="f-surface" stroke="var(--border)" stroke-width="6"/>
+        <g stroke-width="2">
+          <circle cx="160" cy="95" r="17" fill="var(--accent)"/><circle cx="185" cy="78" r="17" fill="var(--bg-elev)" stroke="var(--accent)"/>
+          <circle cx="240" cy="95" r="17" fill="var(--warn)"/><circle cx="215" cy="78" r="17" fill="var(--bg-elev)" stroke="var(--warn)"/>
+          <circle cx="160" cy="175" r="17" fill="var(--ok)"/><circle cx="185" cy="192" r="17" fill="var(--bg-elev)" stroke="var(--ok)"/>
+          <circle cx="240" cy="175" r="17" fill="var(--accent-2)"/><circle cx="215" cy="192" r="17" fill="var(--bg-elev)" stroke="var(--accent-2)"/>
+        </g>
+        <path d="M150 135 H250 M200 110 V160" stroke="var(--text-faint)" stroke-width="3"/>
+        <text x="200" y="250" text-anchor="middle" class="t-dim" style="font-size:12px">쌍 4개 · 쌍마다 꼬임 간격이 다름 · 가운데 십자 칸막이(Cat6)</text>
+        <circle cx="600" cy="135" r="95" class="f-surface" stroke="var(--border)" stroke-width="6"/>
+        <circle cx="600" cy="135" r="78" fill="none" stroke="var(--text-dim)" stroke-width="7" stroke-dasharray="3 3"/>
+        <circle cx="600" cy="135" r="72" fill="color-mix(in srgb, var(--accent) 10%, transparent)"/>
+        <circle cx="600" cy="135" r="14" fill="var(--warn)"/>
+        <g class="t" style="font-size:12px">
+          <path d="M600 135 L690 60" class="s-line" stroke-width="1"/><text x="694" y="56">심선(구리)</text>
+          <path d="M640 160 L705 205" class="s-line" stroke-width="1"/><text x="708" y="210">절연체</text>
+          <path d="M545 80 L505 50" class="s-line" stroke-width="1"/><text x="420" y="46">차폐 그물망</text>
+        </g>
+        <text x="600" y="250" text-anchor="middle" class="t-dim" style="font-size:12px">전기장이 심선과 차폐 사이에 갇힌다 · 75 Ω(방송) / 50 Ω(무선 장비)</text>
+      </svg></div>
+      <figcaption><b>그림 4-1.</b> UTP와 동축 케이블의 단면. UTP는 꼬임과 차동 신호로 잡음을 상쇄하고, 동축은 금속 차폐로 잡음을 막는다. 같은 문제를 기하학(꼬임)과 차폐라는 서로 다른 방법으로 푼다.</figcaption>
+    </figure>
+    <p>사무실과 집의 랜선은 <span class="term">UTP</span><span class="en">(unshielded twisted pair)</span>, 차폐 없는 꼬임쌍선 4쌍이다. 얇고 싸고 잘 휘며, 끝에 RJ45 플러그를 단다. UTP는 성능에 따라 <b>카테고리</b><span class="en">(category)</span>로 등급을 매긴다. 카테고리 숫자가 높을수록 꼬임이 촘촘하고 선이 굵고 제작 공차가 엄격해서, 더 높은 주파수까지 신호를 보장한다.</p>
+    <div class="table-wrap"><table class="cu-tbl">
+      <thead><tr><th>등급</th><th class="num">보장 대역폭</th><th>대표 이더넷</th><th class="num">최대 거리</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td>Cat3</td><td class="num">16 MHz</td><td>10BASE-T (10 Mbps)</td><td class="num">100 m</td><td>옛 전화·LAN 배선</td></tr>
+        <tr><td>Cat5e</td><td class="num">100 MHz</td><td>1000BASE-T, 2.5GBASE-T</td><td class="num">100 m</td><td>가장 흔한 가정용 랜선</td></tr>
+        <tr><td>Cat6</td><td class="num">250 MHz</td><td>1G, 5G, 10GBASE-T(약 55 m)</td><td class="num">100 m</td><td>쌍 사이 칸막이로 누화 감소</td></tr>
+        <tr><td>Cat6A</td><td class="num">500 MHz</td><td>10GBASE-T</td><td class="num">100 m</td><td>바깥 케이블과의 누화(외부 누화)까지 규정</td></tr>
+        <tr><td>Cat8</td><td class="num">2,000 MHz</td><td>25G/40GBASE-T</td><td class="num">30 m</td><td>차폐형. 데이터센터 랙 사이용</td></tr>
+        <tr><td>동축 RG-6</td><td class="num">~3 GHz</td><td>케이블 TV, DOCSIS</td><td class="num">수백 m(증폭기로 연장)</td><td>75 Ω</td></tr>
+      </tbody>
+    </table></div>
+    <p>“100 m”는 거의 모든 BASE-T 이더넷의 약속이다. 정확히는 고정 배선 90 m + 양 끝 패치 코드 10 m. 이 거리 안에서 감쇠와 누화가 규정 이내라는 뜻이다. 100 m가 넘는 구간은 스위치를 중간에 두거나 광섬유(5장)를 쓴다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="loss">
+    <h2>감쇠와 누화: 높은 주파수의 대가</h2>
+    <p>구리선을 지나는 신호는 점점 약해진다. 이것을 <span class="term">감쇠</span><span class="en">(attenuation, 삽입 손실)</span>라 하고 보통 100 m당 dB로 나타낸다(dB는 2장). 감쇠는 주파수가 높을수록 커진다. 가장 큰 원인은 <span class="term">표피 효과</span><span class="en">(skin effect)</span>다. 교류 전류는 주파수가 높을수록 도체의 겉면으로만 몰려 흐른다. 구리에서 전류가 흐르는 두께(표피 깊이)는 1 MHz에서 약 66 µm, 100 MHz에서 약 6.6 µm에 불과하다. 단면 대부분을 놀리고 얇은 껍질로만 흐르니 저항이 커져, 감쇠가 대략 √주파수에 비례해 늘어난다. 여기에 절연체가 에너지를 빨아먹는 유전 손실(주파수에 비례)이 더해진다.</p>
+    <p>또 하나의 적은 <span class="term">누화</span><span class="en">(crosstalk)</span>, 옆 쌍의 신호가 전자기적으로 새어 드는 현상이다. 내 송신기 바로 옆에서 새어 드는 것을 <b>NEXT</b>(near-end crosstalk, 근단 누화), 먼 끝에서 새어 드는 것을 <b>FEXT</b>(far-end, 원단 누화)라 한다. NEXT가 특히 고약한데, 내 송신 신호는 갓 나온 강한 신호인데 상대에게서 오는 수신 신호는 100 m를 지나 약해져 있기 때문이다. 감쇠가 누화보다 커지면, 즉 받을 신호가 새어 든 잡음보다 작아지면 그 주파수는 쓸 수 없다. 이 여유를 <b>ACR</b>(attenuation-to-crosstalk ratio)이라 한다.</p>
+    <div class="sim" id="sim-att">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>케이블 길이·주파수 → 받는 신호의 크기</h3></div>
+      <div class="sim-view"><canvas id="cv-att"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>케이블</span><div class="seg" id="at-cab"><button data-value="c5e" class="on">Cat5e</button><button data-value="c6">Cat6</button><button data-value="c6a">Cat6A</button><button data-value="c8">Cat8</button><button data-value="rg6">동축 RG-6</button></div></div>
+        <label class="ctrl"><span>길이 <output id="at-len-out"></output></span><input type="range" id="at-len" min="1" max="200" value="100"></label>
+        <label class="ctrl"><span>주파수 <output id="at-f-out"></output></span><input type="range" id="at-f" min="0" max="3.3" step="0.01" value="2"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">감쇠 (삽입 손실)</span><span class="v" id="o-at-il">—</span></div>
+        <div class="stat"><span class="k">남은 전압 진폭</span><span class="v" id="o-at-amp">—</span></div>
+        <div class="stat"><span class="k">NEXT (클수록 좋음)</span><span class="v" id="o-at-next">—</span></div>
+        <div class="stat"><span class="k">ACR = NEXT − 감쇠</span><span class="v" id="o-at-acr">—</span></div>
+        <div class="stat"><span class="k">표피 깊이</span><span class="v" id="o-at-skin">—</span></div>
+      </div>
+      <div class="sim-note">그래프의 실선은 받는 신호 크기(0 dB = 보낸 그대로), 점선은 옆 쌍에서 새어 든 NEXT 잡음의 크기다. 실선이 점선 아래로 내려가면(빨간 영역) 신호가 잡음에 묻힌다. 해볼 것: Cat5e를 200 m로 늘려 보고, 같은 주파수에서 Cat6A와 비교해 보자. 감쇠 식은 TIA-568 규격의 한계값 근사식(100 m 기준 a√f + bf + c/√f)이고 Cat8과 동축 값은 대략치다. 실제 이더넷은 DSP로 NEXT의 대부분을 지우므로(아래 1000BASE-T 절) 이 그래프보다 훨씬 높은 주파수까지 쓴다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="coding">
+    <h2>라인 코딩: 비트를 전압 모양으로</h2>
+    <p>비트를 선에 싣는 가장 단순한 방법은 1이면 +V, 0이면 −V를 비트 시간 동안 유지하는 것이다. 이것이 <span class="term">NRZ</span><span class="en">(non-return-to-zero)</span>다. 단순하지만 문제가 두 가지 있다.</p>
+    <ul>
+      <li><b>직류 균형</b>: 1이 길게 이어지면 평균 전압이 한쪽으로 쏠린다(직류 성분). 이더넷 선 양 끝에는 기기를 전기적으로 분리하는 변압기가 있어 직류를 통과시키지 못하므로, 쏠린 신호는 기준선이 흘러내려(기저선 방황) 판정이 틀린다.</li>
+      <li><b>클럭 복원</b>: 받는 쪽은 따로 박자 신호를 받지 않고, 신호가 바뀌는 순간(전이)을 보고 박자를 맞춘다. 0이 1,000개 이어지면 전이가 없어 박자를 잃는다.</li>
+    </ul>
+    <p>그래서 비트를 그대로 싣지 않고 정해진 규칙으로 바꿔 싣는데, 이것이 <span class="term">라인 코딩</span><span class="en">(line coding)</span>이다. 10 Mbps 이더넷(10BASE-T)은 비트마다 가운데에서 반드시 뒤집히는 <span class="term">맨체스터 부호</span><span class="en">(Manchester code)</span>를 썼다. 전이가 넘치고 직류가 0이지만 신호가 두 배 빨리 바뀌어 대역폭을 두 배 쓴다. 100BASE-TX는 4비트를 5비트로 바꾸는 <b>4B5B</b>로 전이를 보장한 뒤 3단계(−,0,+)를 돌아가며 오르내리는 <b>MLT-3</b>로 주파수를 낮췄다. 광 이더넷과 PCIe 1·2세대는 8비트를 10비트로 바꾸는 <span class="term">8b/10b</span>로 직류 균형과 전이를 동시에 보장했다(대신 20% 손해). 요즘 고속 링크는 손해가 3%뿐인 64b/66b와 무작위화(스크램블)를 쓴다.</p>
+    <p>속도를 올리는 또 다른 방법은 한 번에 여러 비트를 싣는 것이다. 전압을 4단계로 나누면 한 심볼에 2비트(<b>PAM-4</b>), 5단계면 1000BASE-T의 PAM-5, 16단계면 10GBASE-T의 PAM-16이다. 같은 박자(심볼 속도, 단위 baud)로 더 많은 비트를 보내지만, 단계 사이 간격이 좁아져 잡음에 약해진다(2장의 섀넌 한계).</p>
+    <div class="sim" id="sim-code">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>라인 코딩 파형 그리기</h3></div>
+      <div class="sim-controls" style="border-top:0">
+        <label class="ctrl"><span>비트열 (0과 1, 최대 32개)</span><input type="text" id="lc-bits" value="1011000000001101" maxlength="32"></label>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn" id="lc-rand">무작위</button><button class="btn" id="lc-zero">0만 잔뜩</button></div></div>
+        <div class="ctrl"><span>수치를 볼 부호</span><div class="seg" id="lc-sel"><button data-value="nrz" class="on">NRZ</button><button data-value="nrzi">NRZI</button><button data-value="man">맨체스터</button><button data-value="mlt">MLT-3</button><button data-value="pam">PAM-4</button></div></div>
+      </div>
+      <div class="sim-view"><canvas id="cv-code"></canvas></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">평균 전압 (직류 성분)</span><span class="v" id="o-lc-dc">—</span></div>
+        <div class="stat"><span class="k">전이 없는 최장 구간</span><span class="v" id="o-lc-run">—</span></div>
+        <div class="stat"><span class="k">비트당 전이 수</span><span class="v" id="o-lc-tr">—</span></div>
+        <div class="stat"><span class="k">비트당 심볼 (대역폭 부담)</span><span class="v" id="o-lc-sym">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: “0만 잔뜩”을 눌러 NRZ와 맨체스터의 전이를 비교하자. NRZ는 평탄한 선이 이어져 박자를 잃지만 맨체스터는 매 비트 뒤집힌다. 규칙: NRZI는 1에서 뒤집고 0에서 유지, 맨체스터는 IEEE 802.3 방식(0 = 높→낮, 1 = 낮→높), MLT-3는 1에서 다음 단계로(0,+,0,−…) 이동, PAM-4는 그레이 부호(00→−3, 01→−1, 11→+1, 10→+3). NRZI와 MLT-3도 0이 길게 이어지면 전이가 사라지므로 실제로는 4B5B나 스크램블과 함께 쓴다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="eye">
+    <h2>눈 모양 그림: 신호 품질을 한눈에</h2>
+    <p>받는 쪽은 각 비트 시간의 한가운데쯤에서 전압을 재고 “기준보다 높으면 1”로 판정한다. 그런데 실제 선을 지난 신호는 반듯한 사각형이 아니다. 대역폭이 모자라면 모서리가 둥글어지고 앞 비트의 꼬리가 다음 비트로 번진다(심볼 간 간섭, ISI). 잡음이 위아래로 흔들고, 박자가 조금씩 어긋나는 <b>지터</b><span class="en">(jitter)</span>가 좌우로 흔든다.</p>
+    <p>이를 한 번에 보는 도구가 <span class="term">눈 모양 그림</span><span class="en">(eye diagram)</span>이다. 무작위 비트 파형을 두 비트 시간 길이로 잘라 모두 겹쳐 그린다. 1과 0의 궤적 사이에 눈처럼 빈 공간이 생기는데, 눈이 크게 뜨여 있을수록 판정이 쉽다. 눈의 높이는 잡음 여유, 폭은 박자 여유다. 고속 링크 엔지니어는 이 눈을 보며 하루를 보낸다(16장).</p>
+    <div class="sim" id="sim-eye">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>눈이 감기는 세 가지 이유</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cv-eye"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>부호</span><div class="seg" id="ey-mod"><button data-value="2" class="on">NRZ</button><button data-value="4">PAM-4</button></div></div>
+          <label class="ctrl"><span>채널 대역폭 (비트 속도 대비) <output id="ey-bw-out"></output></span><input type="range" id="ey-bw" min="0.15" max="2" step="0.05" value="0.8"></label>
+          <label class="ctrl"><span>잡음 σ <output id="ey-n-out"></output></span><input type="range" id="ey-n" min="0" max="0.25" step="0.005" value="0.03"></label>
+          <label class="ctrl"><span>지터 σ (UI) <output id="ey-j-out"></output></span><input type="range" id="ey-j" min="0" max="0.15" step="0.005" value="0.02"></label>
+          <label class="check"><input type="checkbox" id="ey-ffe"> 송신 프리엠퍼시스</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">눈 높이 (잡음 없을 때)</span><span class="v" id="o-ey-h">—</span></div>
+        <div class="stat"><span class="k">눈 폭</span><span class="v" id="o-ey-w">—</span></div>
+        <div class="stat"><span class="k">Q 값</span><span class="v" id="o-ey-q">—</span></div>
+        <div class="stat"><span class="k">추정 비트 오류율</span><span class="v" id="o-ey-ber">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 대역폭을 0.3 아래로 줄이면 비트들이 서로 번져 눈이 닫힌다. 이때 프리엠퍼시스(전이 직후를 더 세게 보내 고주파를 미리 키우는 기법)를 켜 보자. 같은 조건에서 PAM-4는 눈이 세 개이고 각각의 높이가 NRZ의 1/3이라 잡음에 훨씬 약하다. 모델: 무작위 비트 400개, 1차 저역 통과 필터(차단 주파수 = 대역폭 × 비트 속도), 가우스 잡음과 전이 시점 지터. 오류율은 Q로 어림한 값(BER ≈ ½·erfc(Q/√2))이다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="ethernet-phy">
+    <h2>이더넷 물리 계층의 비밀</h2>
+    <p>10BASE-T와 100BASE-TX는 4쌍 중 2쌍만 썼다. 한 쌍은 보내기, 한 쌍은 받기. 1999년의 <b>1000BASE-T</b>는 대담한 방법을 썼다. Cat5e의 100 MHz 대역에서 1 Gbps를 내려고 <b>네 쌍 모두로, 양방향을 동시에</b> 보낸다. 쌍마다 초당 1억 2,500만 심볼(125 Mbaud), 심볼당 2비트로 쌍당 250 Mbps, 4쌍이면 1 Gbps. 5단계 전압(PAM-5)은 2비트에 필요한 4단계보다 하나 많은데, 남는 여유를 오류 정정 부호(트렐리스 부호)에 쓴다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 270" style="min-width:600px" role="img" aria-label="1000BASE-T의 4쌍 양방향 전송과 에코 제거">
+        <defs><marker id="cu-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <rect x="20" y="20" width="180" height="230" rx="12" class="f-acc-soft"/><text x="110" y="42" text-anchor="middle" class="t" style="font-weight:700">PHY 칩 A</text>
+        <rect x="600" y="20" width="180" height="230" rx="12" class="f-acc-soft"/><text x="690" y="42" text-anchor="middle" class="t" style="font-weight:700">PHY 칩 B</text>
+        <g class="t" style="font-size:11.5px">
+          <g transform="translate(0,0)">
+            <rect x="36" y="58" width="70" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="71" y="80" text-anchor="middle">송신</text>
+            <rect x="120" y="58" width="66" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="153" y="74" text-anchor="middle">하이브리드</text><text x="153" y="88" text-anchor="middle" class="t-dim" style="font-size:10px">+에코 제거</text>
+          </g>
+          <g transform="translate(0,48)"><rect x="36" y="58" width="70" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="71" y="80" text-anchor="middle">송신</text><rect x="120" y="58" width="66" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="153" y="80" text-anchor="middle">하이브리드</text></g>
+          <g transform="translate(0,96)"><rect x="36" y="58" width="70" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="71" y="80" text-anchor="middle">송신</text><rect x="120" y="58" width="66" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="153" y="80" text-anchor="middle">하이브리드</text></g>
+          <g transform="translate(0,144)"><rect x="36" y="58" width="70" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="71" y="80" text-anchor="middle">송신</text><rect x="120" y="58" width="66" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="153" y="80" text-anchor="middle">하이브리드</text></g>
+          <g transform="translate(580,0)"><rect x="34" y="58" width="66" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="67" y="80" text-anchor="middle">하이브리드</text><rect x="114" y="58" width="70" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="149" y="80" text-anchor="middle">수신</text></g>
+          <g transform="translate(580,48)"><rect x="34" y="58" width="66" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="67" y="80" text-anchor="middle">하이브리드</text><rect x="114" y="58" width="70" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="149" y="80" text-anchor="middle">수신</text></g>
+          <g transform="translate(580,96)"><rect x="34" y="58" width="66" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="67" y="80" text-anchor="middle">하이브리드</text><rect x="114" y="58" width="70" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="149" y="80" text-anchor="middle">수신</text></g>
+          <g transform="translate(580,144)"><rect x="34" y="58" width="66" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="67" y="80" text-anchor="middle">하이브리드</text><rect x="114" y="58" width="70" height="36" rx="6" class="f-elev" stroke="var(--border)"/><text x="149" y="80" text-anchor="middle">수신</text></g>
+        </g>
+        <g stroke-width="3" fill="none">
+          <path d="M186 76 H614" stroke="var(--accent)"/><path d="M186 124 H614" stroke="var(--warn)"/><path d="M186 172 H614" stroke="var(--ok)"/><path d="M186 220 H614" stroke="var(--accent-2)"/>
+        </g>
+        <g>
+          <path d="M300 66 H380" class="s-acc" marker-end="url(#cu-a)"/><path d="M500 86 H420" class="s-acc" marker-end="url(#cu-a)"/>
+        </g>
+        <g class="t" style="font-size:11.5px" text-anchor="middle">
+          <text x="400" y="104" class="t-dim">쌍 1: 양쪽이 동시에 250 Mbps씩</text>
+          <text x="400" y="152" class="t-dim">쌍 2</text><text x="400" y="200" class="t-dim">쌍 3</text><text x="400" y="248" class="t-dim">쌍 4 · PAM-5 · 125 Mbaud</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 4-2.</b> 1000BASE-T. 4쌍 모두가 양방향으로 동시에 쓰인다. 하이브리드 회로와 에코 제거기가 같은 선 위에서 내가 보낸 신호(에코)를 빼내고, 옆 3쌍에서 새어 든 누화(NEXT)도 디지털 신호 처리로 계산해 지운다. 받는 신호는 수십 dB 약한데도 이렇게 골라낸다.</figcaption>
+    </figure>
+    <p>한 선에서 양방향을 동시에 쓰면, 내 송신 신호가 내 수신기로도 그대로 들어온다. 그것도 100 m를 지나 약해진 상대 신호보다 훨씬 크게. 1000BASE-T 칩은 자기가 무엇을 보냈는지 알고 있으므로, 그 신호가 선의 반사와 하이브리드의 누설을 거쳐 어떤 모양으로 돌아올지 적응 필터로 계산해 빼낸다. 이것이 <span class="term">에코 제거</span><span class="en">(echo cancellation)</span>다. 옆 쌍 세 개의 NEXT도 같은 방식으로 지운다. 2006년의 10GBASE-T는 여기서 더 나아가 쌍마다 800 Mbaud, PAM-16 계열 부호와 강력한 LDPC 오류 정정을 쓴다. 대신 DSP가 무거워져 초기 칩은 포트당 수 W를 먹었고, 지금도 같은 10G 광 모듈보다 전력과 지연이 크다. 데이터센터 서버 연결에 구리 10GBASE-T보다 광이나 짧은 직결 구리 케이블(DAC)이 많이 쓰이는 이유다(20장).</p>
+    <div class="table-wrap"><table class="cu-tbl">
+      <thead><tr><th>규격</th><th>연도</th><th>케이블</th><th>쌍</th><th>부호</th><th class="num">쌍당 심볼 속도</th></tr></thead>
+      <tbody>
+        <tr><td>10BASE-T</td><td>1990</td><td>Cat3</td><td>2 (단방향씩)</td><td>맨체스터</td><td class="num">20 Mbaud(10 MHz)</td></tr>
+        <tr><td>100BASE-TX</td><td>1995</td><td>Cat5</td><td>2 (단방향씩)</td><td>4B5B + MLT-3</td><td class="num">125 Mbaud</td></tr>
+        <tr><td>1000BASE-T</td><td>1999</td><td>Cat5e</td><td>4 (양방향)</td><td>PAM-5 + 트렐리스</td><td class="num">125 Mbaud</td></tr>
+        <tr><td>2.5G/5GBASE-T</td><td>2016</td><td>Cat5e / Cat6</td><td>4 (양방향)</td><td>PAM-16(DSQ128) + LDPC</td><td class="num">200 / 400 Mbaud</td></tr>
+        <tr><td>10GBASE-T</td><td>2006</td><td>Cat6A</td><td>4 (양방향)</td><td>PAM-16(DSQ128) + LDPC</td><td class="num">800 Mbaud</td></tr>
+        <tr><td>25G/40GBASE-T</td><td>2016</td><td>Cat8 (30 m)</td><td>4 (양방향)</td><td>PAM-16 + LDPC</td><td class="num">2 / 3.2 Gbaud</td></tr>
+      </tbody>
+    </table></div>
+    <p>구리선의 또 다른 장점은 <b>전기도 함께 보낼 수 있다</b>는 것이다. <span class="term">PoE</span><span class="en">(Power over Ethernet)</span>는 랜선 쌍에 약 44~57 V 직류를 함께 실어, 천장의 무선 AP나 보안 카메라를 전원선 없이 랜선 하나로 동작시킨다. 데이터는 변압기를 거쳐 교류처럼 지나가고, 전력은 변압기 가운데 탭으로 공통 모드로 실리므로 서로 방해하지 않는다. 광섬유는 흉내 낼 수 없는 구리만의 무기다.</p>
+    <div class="table-wrap"><table class="cu-tbl">
+      <thead><tr><th>표준</th><th>통칭</th><th class="num">스위치 출력</th><th class="num">기기가 받는 전력</th><th>사용 쌍</th><th>예</th></tr></thead>
+      <tbody>
+        <tr><td>802.3af (2003)</td><td>PoE</td><td class="num">15.4 W</td><td class="num">12.95 W</td><td>2쌍</td><td>IP 전화기, 소형 카메라</td></tr>
+        <tr><td>802.3at (2009)</td><td>PoE+</td><td class="num">30 W</td><td class="num">25.5 W</td><td>2쌍</td><td>Wi-Fi AP, PTZ 카메라</td></tr>
+        <tr><td>802.3bt Type 3 (2018)</td><td>PoE++</td><td class="num">60 W</td><td class="num">51 W</td><td>4쌍</td><td>Wi-Fi 6E/7 AP, 소형 기지국</td></tr>
+        <tr><td>802.3bt Type 4 (2018)</td><td>PoE++</td><td class="num">90 W</td><td class="num">71.3 W</td><td>4쌍</td><td>디지털 사이니지, 노트북</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="lastmile">
+    <h2>마지막 1마일: 모뎀에서 DSL, 케이블까지</h2>
+    <p>통신사 건물(전화국)에서 각 가정까지의 마지막 구간을 <span class="term">가입자 회선</span><span class="en">(last mile, local loop)</span>이라 한다. 망 전체에서 가장 길고 가장 많고 가장 바꾸기 비싼 부분이다. 그래서 인터넷 초기에는 이미 깔린 전화선을 어떻게든 재활용했다.</p>
+    <p><b>다이얼업 모뎀</b>: 전화망은 목소리 대역(약 300~3,400 Hz)만 통과시키고 이를 초당 8,000번, 8비트씩(64 kbps) 디지털로 바꾼다. 모뎀은 비트를 이 대역 안의 소리로 바꿔(변조, 12장) 전화를 걸 듯 보냈다. 1998년의 V.90/V.92가 내려받기 최대 56 kbps로 사실상 끝이었다. 전화망의 64 kbps 디지털 통로 자체가 천장이었기 때문이다. 접속 중에는 전화도 쓸 수 없었다.</p>
+    <p><span class="term">DSL</span><span class="en">(digital subscriber line)</span>은 발상을 바꿨다. 전화선 구리 자체는 수 MHz까지 신호를 보낼 수 있는데, 대역을 3.4 kHz로 자르는 것은 전화국 교환기 쪽이다. 그러니 전화국의 교환기를 거치지 않고, 선 양 끝에 DSL 장비(DSLAM)를 달아 목소리 위의 높은 주파수를 데이터로 쓰면 된다. 목소리 대역과 데이터 대역은 주파수로 나뉘어 있으므로(<b>주파수 분할</b><span class="en">(FDD)</span>) 분배기(스플리터)로 갈라 전화와 인터넷을 동시에 쓴다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 270" style="min-width:600px" role="img" aria-label="전화선 위 DSL 주파수 배치">
+        <path d="M60 220 H770" class="s-axis"/>
+        <g class="t-mono" style="font-size:10.5px" text-anchor="middle">
+          <path d="M60 220 v5 M192 220 v5 M324 220 v5 M456 220 v5 M588 220 v5 M720 220 v5" class="s-axis"/>
+          <text x="60" y="238">1k</text><text x="192" y="238">10k</text><text x="324" y="238">100k</text><text x="456" y="238">1M</text><text x="588" y="238">10M</text><text x="720" y="238">100M</text>
+        </g>
+        <text x="415" y="258" text-anchor="middle" class="t-dim" style="font-size:12px">주파수 (Hz, 로그 눈금)</text>
+        <g class="t" style="font-size:12px">
+          <text x="8" y="66" style="font-weight:700">ADSL2+</text>
+          <text x="8" y="126" style="font-weight:700">VDSL2</text>
+          <text x="8" y="186" style="font-weight:700">G.fast</text>
+        </g>
+        <g>
+          <rect x="62" y="48" width="68" height="28" rx="4" class="f-surface" stroke="var(--text-dim)"/>
+          <rect x="245" y="48" width="96" height="28" rx="4" fill="color-mix(in srgb, var(--warn) 30%, transparent)" stroke="var(--warn)"/>
+          <rect x="343" y="48" width="158" height="28" rx="4" fill="color-mix(in srgb, var(--accent) 30%, transparent)" stroke="var(--accent)"/>
+          <rect x="62" y="108" width="68" height="28" rx="4" class="f-surface" stroke="var(--text-dim)"/>
+          <rect x="245" y="108" width="96" height="28" rx="3" fill="color-mix(in srgb, var(--warn) 30%, transparent)" stroke="var(--warn)"/>
+          <rect x="343" y="108" width="189" height="28" rx="3" fill="color-mix(in srgb, var(--accent) 30%, transparent)" stroke="var(--accent)"/>
+          <rect x="532" y="108" width="19" height="28" rx="3" fill="color-mix(in srgb, var(--warn) 30%, transparent)" stroke="var(--warn)"/>
+          <rect x="551" y="108" width="28" height="28" rx="3" fill="color-mix(in srgb, var(--accent) 30%, transparent)" stroke="var(--accent)"/>
+          <rect x="579" y="108" width="20" height="28" rx="3" fill="color-mix(in srgb, var(--warn) 30%, transparent)" stroke="var(--warn)"/>
+          <rect x="599" y="108" width="22" height="28" rx="3" fill="color-mix(in srgb, var(--accent) 30%, transparent)" stroke="var(--accent)"/>
+          <rect x="62" y="168" width="68" height="28" rx="4" class="f-surface" stroke="var(--text-dim)"/>
+          <rect x="502" y="168" width="222" height="28" rx="4" fill="color-mix(in srgb, var(--accent-2) 25%, transparent)" stroke="var(--accent-2)"/>
+        </g>
+        <g class="t" style="font-size:11px" text-anchor="middle">
+          <text x="96" y="66">전화</text><text x="96" y="126">전화</text><text x="96" y="186">전화</text>
+          <text x="293" y="66">올림</text><text x="422" y="66">내림 (~2.2 MHz)</text>
+          <text x="293" y="126">올림</text><text x="437" y="126">내림</text>
+          <text x="613" y="160" class="t-dim" style="font-size:10.5px">17.7 MHz까지 올림·내림 교대</text>
+          <text x="613" y="186">시간 분할 (TDD) ~106 MHz</text>
+        </g>
+        <text x="420" y="24" text-anchor="middle" class="t-dim" style="font-size:12px">높은 주파수를 쓸수록 빠르지만, 높은 주파수일수록 거리에 따라 빨리 죽는다</text>
+      </svg></div>
+      <figcaption><b>그림 4-3.</b> 전화선 위의 주파수 배치(대략). 맨 아래 목소리 대역 위에 올림(주황)과 내림(파랑) 대역을 나눠 쓴다. ADSL2+는 약 2.2 MHz까지, VDSL2(17a)는 17.7 MHz까지, G.fast는 106 MHz(이후 212 MHz)까지 쓰며 올림·내림을 시간으로 나눈다. 각 대역은 수천 개의 좁은 부반송파로 쪼개 쓴다(DMT, 12장의 OFDM과 같은 원리).</figcaption>
+    </figure>
+    <p>여기서 감쇠 그래프를 떠올리자. 높은 주파수는 거리에 따라 훨씬 빨리 약해진다. 전화국에서 2 km 떨어진 집에서는 수 MHz 이상의 대역이 잡음에 묻혀 사실상 쓸모가 없다. 그래서 DSL은 거리에 극도로 민감하다. 더 빠른 DSL은 모두 더 높은 주파수를 쓰므로 <b>더 짧은 선</b>을 요구한다. 통신사는 광섬유를 동네 함체나 아파트 지하까지 끌어오고, 거기서부터 남은 수백 m만 구리를 쓰는 방식(FTTC·FTTB)으로 대응했다. 2000년대 한국 아파트 단지에 VDSL과 “광랜”(건물까지 광, 세대까지 UTP 이더넷)이 빠르게 깔린 것도 이 덕분이다.</p>
+    <div class="sim" id="sim-dsl">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>전화국까지 거리 → DSL 내려받기 속도</h3></div>
+      <div class="sim-view"><canvas id="cv-dsl"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>전화국(또는 동네 함체)까지 선로 길이 <output id="ds-len-out"></output></span><input type="range" id="ds-len" min="0.05" max="5" step="0.05" value="0.8"></label>
+        <label class="check"><input type="checkbox" id="ds-xt" checked> 이웃 회선의 누화(FEXT)</label>
+        <label class="check"><input type="checkbox" id="ds-vec"> 벡터링 (누화 제거)</label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">ADSL2+</span><span class="v" id="o-ds-a">—</span></div>
+        <div class="stat"><span class="k">VDSL2 17a</span><span class="v" id="o-ds-v">—</span></div>
+        <div class="stat"><span class="k">VDSL2 35b</span><span class="v" id="o-ds-v35">—</span></div>
+        <div class="stat"><span class="k">G.fast 106 MHz</span><span class="v" id="o-ds-g">—</span></div>
+        <div class="stat"><span class="k">선로 감쇠 @ 1 / 10 MHz</span><span class="v" id="o-ds-att">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 거리를 0.1 km에서 3 km까지 움직이며 곡선이 무너지는 모양을 보자. 2 km 넘으면 VDSL2도 ADSL2+와 거의 같아진다. 높은 주파수 대역이 이미 다 죽었기 때문이다. 벡터링은 한 케이블 묶음 속 모든 회선의 신호를 함께 계산해 서로의 누화를 미리 빼 주는 기술이다. 모델(대략): 0.5 mm 전화선 감쇠 ≈ 2 + 19√f + 0.45f dB/km(f는 MHz), 부반송파마다 섀넌 식으로 비트를 싣고(여유 12.8 dB), 각 기술의 대역·송신 세기를 반영했다. 실제 속도는 선로 상태, 묶음 속 회선 수, 장비 설정에 따라 크게 다르다. G.fast는 올림·내림 합계에서 내림 비율 75%를 가정했다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">전화국에서 2.5 km 떨어진 집이 ADSL2+에서 VDSL2로 바꾸면 내려받기 속도는 어떻게 될까?</p><p class="wi-hint">위 시뮬레이터에서 거리를 2.5 km로 맞춰 보자.</p><div class="opts">
+      <button class="opt">약 6배 빨라진다 — VDSL2의 최고 속도가 훨씬 높으니까</button>
+      <button class="opt" data-correct>거의 그대로다 — 먼 거리에서는 VDSL2가 추가로 쓰는 높은 주파수가 감쇠로 다 죽는다</button>
+      <button class="opt">오히려 0이 된다 — VDSL2는 1 km 넘으면 연결이 안 된다</button>
+    </div><div class="quiz-exp">VDSL2의 “최대 100 Mbps 이상”은 수백 m 이내의 이야기다. 수 km에서는 쓸 수 있는 대역이 ADSL2+와 비슷한 낮은 주파수뿐이라 속도도 비슷하다. 빠른 DSL을 쓰려면 기술을 바꾸는 것보다 광섬유를 집 가까이 끌어오는 것이 핵심이다.</div></div>
+    <p><b>케이블 모뎀</b>은 케이블 TV용 동축망을 쓴다. 동축은 전화선보다 손실이 훨씬 작아 1 GHz 이상을 쓸 수 있다. 표준 이름은 <span class="term">DOCSIS</span>다. DOCSIS 3.0(2006)은 6 MHz TV 채널 하나에 256-QAM으로 약 38 Mbps를 싣고 채널 여러 개를 묶어(본딩) 속도를 올렸고, DOCSIS 3.1(2013)은 OFDM으로 내려받기 최대 10 Gbps, DOCSIS 4.0은 1.8 GHz 대역과 동시 양방향(FDX)으로 올리기도 수 Gbps까지 노린다. 다만 동축망은 동네 수백 가구가 한 선을 나눠 쓰는 구조(광-동축 혼합, HFC)라서, 저녁 시간에 이웃이 모두 영상을 보면 속도가 떨어진다. 대역폭을 공유하는 대신 설치비가 싸다.</p>
+    <p>DSL의 마지막 진화인 <b>G.fast</b>(2014)는 106~212 MHz까지 써서 100 m 이내에서 합계 1 Gbps 가까이를 낸다. 하지만 그 거리라면 차라리 광섬유를 끝까지 끌어오는 것과 비용 차이가 크지 않다. 감쇠는 주파수와 거리에 따라 늘어나고, 구리는 그 물리를 피할 수 없다. 결국 가입자망의 정답은 <b>FTTH</b>(Fiber To The Home), 집까지 광섬유다. 한국은 세계에서 FTTH 보급률이 가장 높은 나라 중 하나다. 다음 장(5장)에서 그 유리실의 이야기를 이어 간다.</p>
+    <div class="table-wrap"><table class="cu-tbl">
+      <thead><tr><th>기술</th><th>매체</th><th class="num">최대 내려받기(대표값)</th><th>실용 거리</th><th>특징</th></tr></thead>
+      <tbody>
+        <tr><td>V.92 다이얼업</td><td>전화망</td><td class="num">56 kbps</td><td>전화 되는 곳 어디나</td><td>통화 중 전화 불가</td></tr>
+        <tr><td>ADSL2+</td><td>전화선</td><td class="num">24 Mbps</td><td>~3~5 km</td><td>비대칭, 2.2 MHz</td></tr>
+        <tr><td>VDSL2 17a / 35b</td><td>전화선</td><td class="num">~100 / ~300 Mbps</td><td>~0.5 km 이내</td><td>벡터링 필요</td></tr>
+        <tr><td>G.fast</td><td>전화선·동축</td><td class="num">~1 Gbps (합계)</td><td>~0.1~0.3 km</td><td>TDD, 건물 안 배선용</td></tr>
+        <tr><td>DOCSIS 3.1</td><td>동축 (HFC)</td><td class="num">최대 10 Gbps</td><td>노드에서 수백 m~1 km</td><td>이웃과 공유</td></tr>
+        <tr><td>FTTH (GPON/XGS-PON)</td><td>광섬유</td><td class="num">2.5 / 10 Gbps (공유)</td><td>~20 km</td><td>5장</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="tline">
+    <h2>전송선로와 반사: 선이 길어지면 생기는 일</h2>
+    <p>전선은 신호를 순식간에 전하는 것처럼 보이지만, 실제로 신호는 파동으로 선을 따라 흐른다. 랜선에서의 속도는 빛의 약 65~70%, 1 m를 가는 데 약 5 ns. 100 MHz 신호의 한 파장은 선 안에서 약 2 m다. 선의 길이가 파장에 비해 무시할 수 없을 만큼 길어지면 선은 단순한 도선이 아니라 <b>전송선로</b><span class="en">(transmission line)</span>로 다뤄야 한다.</p>
+    <p>전송선로에는 <span class="term">특성 임피던스</span><span class="en">(characteristic impedance)</span>가 있다. 선의 굵기, 간격, 절연체가 정하는 “파동이 느끼는 저항” 같은 값으로, UTP 차동 쌍은 100 Ω, 방송용 동축은 75 Ω, 무선 장비 동축은 50 Ω이다. 파동이 임피던스가 다른 곳(커넥터, 끝, 다른 케이블)을 만나면 일부가 되돌아온다. 반사 비율은 Γ = (Z<sub>L</sub> − Z<sub>0</sub>) / (Z<sub>L</sub> + Z<sub>0</sub>). 50 Ω 장비에 75 Ω 케이블을 물리면 Γ = 0.2, 전압의 20%(전력의 4%)가 되돌아와 에코가 된다. 그래서 고속 회로는 선 끝을 같은 저항으로 막아(<span class="term">임피던스 정합</span><span class="en">(impedance matching)</span>) 반사를 없앤다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 210" style="min-width:560px" role="img" aria-label="임피던스 불연속에서 생기는 반사">
+        <defs><marker id="cu-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+        <marker id="cu-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--bad)"/></marker></defs>
+        <rect x="40" y="95" width="400" height="22" rx="4" fill="color-mix(in srgb, var(--accent) 18%, transparent)" stroke="var(--accent)"/>
+        <rect x="440" y="89" width="320" height="34" rx="4" fill="color-mix(in srgb, var(--warn) 18%, transparent)" stroke="var(--warn)"/>
+        <path d="M440 70 V140" stroke="var(--bad)" stroke-width="2" stroke-dasharray="4 3"/>
+        <g class="t" style="font-size:12.5px" text-anchor="middle">
+          <text x="240" y="150">Z₀ = 50 Ω 선</text><text x="600" y="150">Z = 75 Ω 선</text>
+          <text x="440" y="62" style="fill:var(--bad)">임피던스 불연속</text>
+        </g>
+        <path d="M70 50 q 15 -22 30 0 t 30 0 t 30 0 t 30 0" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+        <path d="M200 40 H330" class="s-acc" marker-end="url(#cu-b)"/><text x="265" y="32" text-anchor="middle" class="t" style="font-size:12px">들어가는 파동 (100%)</text>
+        <path d="M500 50 q 15 -18 30 0 t 30 0 t 30 0" fill="none" stroke="var(--warn)" stroke-width="2.5"/>
+        <path d="M610 40 H720" stroke="var(--warn)" stroke-width="2" marker-end="url(#cu-b)"/><text x="665" y="32" text-anchor="middle" class="t" style="font-size:12px">통과 (전압 120%)</text>
+        <path d="M330 175 q 10 -8 20 0 t 20 0 t 20 0" fill="none" stroke="var(--bad)" stroke-width="2"/>
+        <path d="M310 185 H180" stroke="var(--bad)" stroke-width="2" marker-end="url(#cu-c)"/><text x="245" y="203" text-anchor="middle" class="t" style="font-size:12px;fill:var(--bad)">반사 Γ = (75−50)/(75+50) = 0.2</text>
+      </svg></div>
+      <figcaption><b>그림 4-4.</b> 특성 임피던스가 바뀌는 지점에서 파동 일부가 되돌아온다. 반사된 신호는 다음 비트와 겹쳐 눈을 감기게 한다. 랜선 규격이 커넥터 품질과 케이블 임피던스 공차(100 Ω ± 15%)를 엄격히 정하는 이유다. 칩 내부와 보드 위의 신호 무결성은 16장에서 깊이 다룬다.</figcaption>
+    </figure>
+    <div class="callout tip"><strong>케이블 테스터는 반사를 본다</strong><p>네트워크 케이블 인증 장비나 일부 스위치의 “케이블 진단” 기능은 선에 펄스를 쏘고 반사가 돌아오는 시간을 잰다(TDR, 시간 영역 반사 측정). 반사까지 걸린 시간 × 신호 속도 ÷ 2 = 끊어지거나 눌린 지점까지의 거리다. 벽 속 어디가 끊어졌는지 벽을 뜯지 않고 알 수 있다.</p></div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li><b>꼬임쌍선</b>은 차동 신호(+V/−V)로 보내고 받는 쪽에서 두 선의 차이만 본다. 공통 잡음은 빼면 사라지고, 꼬임은 두 선의 잡음 불균형을 번갈아 상쇄한다.</li>
+      <li><b>동축</b>은 차폐로, <b>UTP</b>는 꼬임으로 잡음을 막는다. UTP는 Cat5e(100 MHz)·Cat6(250)·Cat6A(500)·Cat8(2,000 MHz, 30 m)으로 등급을 나누고, BASE-T는 대부분 100 m를 약속한다.</li>
+      <li><b>감쇠</b>는 거리에 비례하고 주파수가 높을수록(표피 효과로 대략 √f) 커진다. <b>누화</b>(NEXT·FEXT)가 감쇠된 신호보다 커지면 그 주파수는 쓸 수 없다.</li>
+      <li><b>라인 코딩</b>은 직류 균형과 클럭 복원을 위해 비트를 바꿔 싣는다: 맨체스터, 4B5B+MLT-3, 8b/10b, 64b/66b. 여러 단계(PAM-4·5·16)는 같은 박자에 더 많은 비트를 싣지만 잡음에 약하다.</li>
+      <li><b>눈 모양 그림</b>은 대역폭 부족(ISI), 잡음, 지터가 판정 여유를 어떻게 줄이는지 한눈에 보여 준다.</li>
+      <li><b>1000BASE-T</b>는 4쌍 양방향 + 에코·NEXT 제거로 Cat5e에서 1 Gbps를 낸다. <b>PoE</b>는 같은 선으로 최대 90 W(802.3bt)를 보낸다.</li>
+      <li>다이얼업(56 kbps) → ADSL → VDSL → G.fast로 갈수록 높은 주파수를 쓰고, 그만큼 짧은 거리를 요구한다. 케이블 모뎀(DOCSIS)은 동축을 이웃과 공유한다. 결국 가입자망은 <b>광(FTTH)</b>으로 간다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>랜선의 두 가닥을 서로 꼬는 가장 중요한 이유는?</p><div class="opts">
+        <button class="opt">선이 엉키지 않게 정리하려고</button>
+        <button class="opt">구리의 양을 줄여 값을 낮추려고</button>
+        <button class="opt" data-correct>두 선이 외부 잡음을 고르게 받게 해서, 차동 수신에서 잡음이 상쇄되게 하려고</button>
+        <button class="opt">신호 속도를 빛의 속도에 가깝게 하려고</button>
+      </div><div class="quiz-exp">꼬면 두 선이 번갈아 잡음원에 가까워져 잡음이 양쪽에 똑같이 실린다. 차동 수신기는 두 선의 차이만 보므로 같은 잡음은 지워진다. 자기 신호가 밖으로 뿌리는 잡음도 줄어든다.</div></div>
+      <div class="quiz-q"><p>같은 케이블에서 신호 주파수를 높이면 감쇠가 커지는 주된 물리적 이유는?</p><div class="opts">
+        <button class="opt" data-correct>표피 효과로 전류가 도체 겉면에만 흘러 실효 저항이 커지기 때문</button>
+        <button class="opt">높은 주파수는 빛보다 느리게 가기 때문</button>
+        <button class="opt">구리 원자가 높은 주파수를 흡수해 녹기 때문</button>
+        <button class="opt">케이블이 길어지기 때문</button>
+      </div><div class="quiz-exp">주파수가 높을수록 전류가 흐르는 표피 깊이가 얇아져(100 MHz에서 약 6.6 µm) 저항이 커진다. 감쇠는 대략 √f에 비례해 늘고, 유전 손실도 주파수와 함께 커진다.</div></div>
+      <div class="quiz-q"><p>10BASE-T가 쓴 맨체스터 부호의 장점과 단점을 바르게 짝지은 것은?</p><div class="opts">
+        <button class="opt">장점: 대역폭 절약 / 단점: 직류 성분이 생김</button>
+        <button class="opt">장점: 한 심볼에 2비트 / 단점: 잡음에 약함</button>
+        <button class="opt">장점: 오류 정정 / 단점: 지연이 큼</button>
+        <button class="opt" data-correct>장점: 매 비트 전이가 있어 클럭 복원이 쉽고 직류가 0 / 단점: 신호가 두 배 자주 바뀌어 대역폭을 두 배 씀</button>
+      </div><div class="quiz-exp">맨체스터는 비트마다 가운데에서 뒤집히므로 박자를 잃지 않고 평균이 0이다. 대신 같은 비트 속도에 두 배 빠른 신호 변화가 필요하다.</div></div>
+      <div class="quiz-q"><p>1000BASE-T가 Cat5e 4쌍으로 1 Gbps를 내는 방법으로 옳은 것은?</p><div class="opts">
+        <button class="opt">2쌍은 보내기, 2쌍은 받기로 쓰고 쌍당 500 Mbps를 보낸다</button>
+        <button class="opt" data-correct>4쌍 모두 양방향 동시에, 쌍당 125 Mbaud × 2비트(PAM-5)로 보내고 에코를 DSP로 지운다</button>
+        <button class="opt">한 쌍에 1 GHz 신호를 보낸다</button>
+        <button class="opt">광섬유로 바꿔 보낸다</button>
+      </div><div class="quiz-exp">250 Mbps × 4쌍 = 1 Gbps를 양방향 동시에 보낸다. 같은 선 위에서 내가 보낸 신호(에코)와 옆 쌍의 누화를 적응 필터로 계산해 뺀다.</div></div>
+      <div class="quiz-q"><p>눈 모양 그림(eye diagram)에서 눈이 위아래로 좁아지는 원인이 <b>아닌</b> 것은?</p><div class="opts">
+        <button class="opt">채널 대역폭이 부족해 앞 비트가 다음 비트로 번짐(ISI)</button>
+        <button class="opt">잡음</button>
+        <button class="opt">PAM-4처럼 단계 수를 늘림</button>
+        <button class="opt" data-correct>송신 데이터를 무작위로 섞음(스크램블)</button>
+      </div><div class="quiz-exp">스크램블은 0과 1을 고르게 섞어 직류 균형과 전이를 돕는 기법으로, 눈을 닫지 않는다. ISI·잡음은 눈을 닫고, PAM-4는 같은 진폭을 세 칸으로 나누므로 눈 하나의 높이가 1/3이 된다.</div></div>
+      <div class="quiz-q"><p>VDSL2가 ADSL2+보다 훨씬 빠른 속도를 내려면 무엇이 필요한가?</p><div class="opts">
+        <button class="opt">더 굵은 전화선으로 바꿔야 한다</button>
+        <button class="opt">전화를 해지해야 한다</button>
+        <button class="opt" data-correct>전화국 장비(또는 광으로 연결된 함체)까지 구리선 길이가 짧아야 한다</button>
+        <button class="opt">공유기를 Wi-Fi 7로 바꿔야 한다</button>
+      </div><div class="quiz-exp">VDSL2의 추가 속도는 높은 주파수 대역에서 나오는데, 이 대역은 거리에 따라 빨리 감쇠한다. 수백 m 이내여야 효과가 크다. 그래서 통신사는 광섬유를 집 가까이 끌어온다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  /* ================= 1. 차동 신호 ================= */
+  const dfNoise = NB.range("df-noise", (v) => v.toFixed(1), () => dfStats());
+  const dfTw = NB.range("df-tw", (v) => v + "번", () => dfStats());
+  $("df-diff").addEventListener("change", () => dfStats());
+  const DFB = 200, dfBits = []; { const r = NB.rng(11); for (let i = 0; i < DFB; i++) dfBits.push(r() < 0.5 ? 0 : 1); }
+  // 잡음 파형: 여러 사인 + 무작위 (시간 t에서)
+  const dfNoiseAt = (t) => 0.55 * Math.sin(t * 2.1) + 0.35 * Math.sin(t * 5.3 + 1) + 0.25 * Math.sin(t * 13.7 + 2) + 0.18 * Math.sin(t * 31 + 0.3);
+  const dfImb = () => 0.25 / (1 + 1.5 * dfTw());
+  let dfT = 0;
+  function dfStats() {
+    const N = dfNoise(), diff = $("df-diff").checked, imb = dfImb();
+    // 잡음 rms (가우스 근사): 사인들의 rms
+    const nrms = Math.sqrt((0.55 ** 2 + 0.35 ** 2 + 0.25 ** 2 + 0.18 ** 2) / 2);
+    const res = diff ? N * imb * nrms : N * 1.25 * nrms; // 차동: 불균형만 남음 / 단일: 선 A 잡음 그대로
+    const sig = diff ? 1 : 0.5; // 차동은 2V 스윙의 반 = 1, 단일 종단은 0.5
+    const snr = res > 0 ? 20 * Math.log10(sig / res) : Infinity;
+    let err = 0;
+    for (let i = 0; i < DFB; i++) {
+      const s = dfBits[i] ? 1 : -1, n = dfNoiseAt(i * 0.37 + 5) * N;
+      const a = s * 0.5 + 1.25 * n, b = -s * 0.5 + (1.25 - imb) * n, v = diff ? a - b : a;
+      if ((v > 0 ? 1 : 0) !== dfBits[i]) err++;
+    }
+    NB.stat("o-df-res", N === 0 ? "0" : NB.fmt(res, 2) + " V");
+    NB.stat("o-df-snr", isFinite(snr) ? snr.toFixed(1) + " dB" : "∞");
+    NB.stat("o-df-err", `<span style="color:${err ? "var(--bad)" : "var(--ok)"}">${err}</span>`);
+    NB.stat("o-df-cmr", diff ? (20 * Math.log10(1.25 / imb)).toFixed(0) + " dB" : "0 dB");
+    dfCv.redraw();
+  }
+  const dfCv = NB.canvas($("cv-diff"), (ctx, w, h) => {
+    const P = NB.palette(), N = dfNoise(), T = dfTw(), diff = $("df-diff").checked, imb = dfImb();
+    const narrow = w < 460, L = narrow ? 8 : 70, R = w - 10;
+    // 케이블 그림
+    const cy = 42, amp = 9;
+    NB.text(ctx, "⚡ 잡음원", L, 12, { size: 11.5, color: P.warn, bold: true });
+    for (let k = 0; k < 7; k++) { const x = L + 70 + k * ((R - L - 70) / 7); ctx.strokeStyle = P.warn; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(x, 6); ctx.lineTo(x - 4, 14); ctx.lineTo(x + 2, 16); ctx.lineTo(x - 2, 24); ctx.stroke(); ctx.globalAlpha = 1; }
+    const wire = (sign, col) => { ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.beginPath(); for (let x = L; x <= R; x += 2) { const ph = T ? Math.sin(((x - L) / (R - L)) * Math.PI * T) : 1; const y = cy - sign * amp * ph; x === L ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); };
+    wire(1, P.accent); wire(-1, P.accent2); ctx.lineWidth = 1;
+    if (!narrow) { NB.text(ctx, "선 A", 8, cy - amp, { size: 11, color: P.accent }); NB.text(ctx, "선 B", 8, cy + amp, { size: 11, color: P.accent2 }); }
+    // 파형 3개
+    const rows = [["선 A 전압", P.accent], ["선 B 전압", P.accent2], [diff ? "수신: A − B" : "수신: A (접지 기준)", P.ok]];
+    const top = 72, rh = (h - top - 8) / 3, nb = narrow ? 12 : 20, bw = (R - L) / nb;
+    rows.forEach(([lab, col], r) => {
+      const y0 = top + r * rh, mid = y0 + rh / 2, sc = rh * 0.2;
+      ctx.strokeStyle = P.grid; ctx.beginPath(); ctx.moveTo(L, mid); ctx.lineTo(R, mid); ctx.stroke();
+      NB.text(ctx, lab, narrow ? L + 2 : 8, narrow ? y0 + 8 : mid, { size: narrow ? 10.5 : 11, color: col, bold: true });
+      ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.beginPath();
+      for (let x = L; x <= R; x += 1.5) {
+        const bi = Math.floor((x - L) / bw), bit = dfBits[(bi + Math.floor(dfT * 2)) % DFB], s = bit ? 1 : -1;
+        const n = dfNoiseAt((x - L) * 0.03 + dfT * 3) * N;
+        const a = s * 0.5 + 1.25 * n, b = -s * 0.5 + (1.25 - imb) * n;
+        let v = r === 0 ? a : r === 1 ? b : diff ? a - b : a;
+        v = NB.clamp(v, -2.4, 2.4);
+        const y = mid - v * sc; x === L ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke(); ctx.lineWidth = 1;
+      if (r === 2) { for (let i = 0; i < nb; i++) { const bit = dfBits[(i + Math.floor(dfT * 2)) % DFB]; NB.text(ctx, String(bit), L + (i + 0.5) * bw, y0 + rh - 4, { align: "center", size: 10, mono: true, color: P.faint, base: "bottom" }); } }
+    });
+  }, { aspect: 0.62, minHeight: 300, maxHeight: 380 });
+  NB.loop($("cv-diff"), (dt) => { dfT += dt * 0.25; dfCv.redraw(); });
+  dfStats();
+
+  /* ================= 2. 감쇠·누화 ================= */
+  const CAB = {
+    c5e: { n: "Cat5e", a: 1.967, b: 0.023, c: 0.05, next: 35.3, bw: 100, max: 100 },
+    c6: { n: "Cat6", a: 1.808, b: 0.017, c: 0.2, next: 44.3, bw: 250, max: 100 },
+    c6a: { n: "Cat6A", a: 1.82, b: 0.0091, c: 0.25, next: 44.3, bw: 500, max: 100 },
+    c8: { n: "Cat8", a: 1.8, b: 0.01, c: 0.25, next: 50, bw: 2000, max: 30 },
+    rg6: { n: "RG-6", a: 0.62, b: 0.0015, c: 0, next: null, bw: 3000, max: 300 },
+  };
+  const atCab = NB.seg("at-cab", () => atUpd());
+  const atLen = NB.range("at-len", (v) => v + " m", () => atUpd());
+  const atF = NB.range("at-f", (v) => NB.si(Math.pow(10, v) * 1e6, "Hz"), () => atUpd());
+  const IL = (c, f, L) => (c.a * Math.sqrt(f) + c.b * f + (c.c ? c.c / Math.sqrt(f) : 0)) * L / 100;
+  const NX = (c, f) => (c.next == null ? null : c.next - 15 * Math.log10(f / 100));
+  function atUpd() {
+    const c = CAB[atCab()], L = atLen(), f = Math.pow(10, atF());
+    const il = IL(c, f, L), nx = NX(c, f);
+    NB.stat("o-at-il", il.toFixed(1) + " dB");
+    NB.stat("o-at-amp", (Math.pow(10, -il / 20) * 100).toPrecision(2) + "%");
+    NB.stat("o-at-next", nx == null ? "차폐로 무시" : nx.toFixed(1) + " dB");
+    NB.stat("o-at-acr", nx == null ? "—" : `<span style="color:${nx - il > 0 ? "var(--ok)" : "var(--bad)"}">${(nx - il).toFixed(1)} dB</span>`);
+    const sk = 66.1 / Math.sqrt(f * 1e6) * 1000; // µm... 66.1 mm/√Hz → mm; ×1000 → µm
+    NB.stat("o-at-skin", NB.fmt(sk, 2) + " µm");
+    atCv.redraw();
+  }
+  const atCv = NB.canvas($("cv-att"), (ctx, w, h) => {
+    const P = NB.palette(), c = CAB[atCab()], L = atLen(), fc = Math.pow(10, atF());
+    const ilD = [], nxD = [];
+    for (let i = 0; i <= 200; i++) { const f = Math.pow(10, (i / 200) * 3.3); ilD.push([f, -IL(c, f, L)]); if (c.next != null) nxD.push([f, -NX(c, f)]); }
+    const bands = [];
+    if (c.next != null) { let s = null; for (let i = 0; i <= 200; i++) { const f = Math.pow(10, (i / 200) * 3.3); const bad = IL(c, f, L) > NX(c, f); if (bad && s == null) s = f; if ((!bad || i === 200) && s != null) { bands.push({ x0: s, x1: f, color: "color-mix(in srgb, " + P.bad + " 14%, transparent)" }); s = null; } } }
+    NB.chart(ctx, { x: 52, y: 14, w: w - 52 - 16, h: h - 14 - 44 }, {
+      x: [1, 2000], y: [-100, 0], logX: true, xLabel: "주파수 (MHz, 로그 눈금)", yLabel: "받는 신호 (dB)", xFmt: (v) => String(v),
+      bands,
+      series: [{ data: ilD, color: P.accent, width: 2.4 }, ...(nxD.length ? [{ data: nxD, color: P.warn, width: 1.8, dash: [6, 4] }] : [])],
+      vlines: [{ x: c.bw, color: P.ok, label: c.n + " 보장 " + c.bw + " MHz" }, { x: fc, color: P.bad, dash: [2, 3] }],
+      points: [{ x: fc, y: -IL(c, fc, L), color: P.bad, r: 5 }],
+    });
+    const x = 64, y = h - 70;
+    ctx.fillStyle = P.accent; ctx.fillRect(x, y, 16, 3); NB.text(ctx, "받는 신호 (" + L + " m)", x + 22, y + 1, { size: 11, color: P.dim });
+    if (nxD.length) { ctx.fillStyle = P.warn; ctx.fillRect(x, y + 16, 16, 3); NB.text(ctx, "새어 든 NEXT 잡음", x + 22, y + 17, { size: 11, color: P.dim }); }
+  }, { aspect: 0.48, minHeight: 280, maxHeight: 380 });
+  atUpd();
+
+  /* ================= 3. 라인 코딩 ================= */
+  const lcSel = NB.seg("lc-sel", () => lcUpd());
+  const getBits = () => { const s = $("lc-bits").value.replace(/[^01]/g, ""); return s.length ? [...s].map(Number) : [0]; };
+  $("lc-bits").addEventListener("input", () => lcUpd());
+  $("lc-rand").onclick = () => { let s = ""; for (let i = 0; i < 24; i++) s += Math.random() < 0.5 ? "0" : "1"; $("lc-bits").value = s; lcUpd(); };
+  $("lc-zero").onclick = () => { $("lc-bits").value = "1000000000000000000001"; lcUpd(); };
+  // 각 부호: 반 비트 단위 레벨 배열(레벨 -1..1) 반환, PAM은 심볼당 2비트
+  function encode(bits, k) {
+    const out = []; // [t0, t1, level] in bit units
+    if (k === "nrz") bits.forEach((b, i) => out.push([i, i + 1, b ? 1 : -1]));
+    if (k === "nrzi") { let lv = -1; bits.forEach((b, i) => { if (b) lv = -lv; out.push([i, i + 1, lv]); }); }
+    if (k === "man") bits.forEach((b, i) => { out.push([i, i + 0.5, b ? -1 : 1]); out.push([i + 0.5, i + 1, b ? 1 : -1]); });
+    if (k === "mlt") { const seq = [0, 1, 0, -1]; let st = 0; bits.forEach((b, i) => { if (b) st = (st + 1) % 4; out.push([i, i + 1, seq[st]]); }); }
+    if (k === "pam") { const G = { "00": -1, "01": -1 / 3, "11": 1 / 3, "10": 1 }; for (let i = 0; i < bits.length; i += 2) { const p = "" + bits[i] + (bits[i + 1] == null ? 0 : bits[i + 1]); out.push([i, i + 2, G[p]]); } }
+    return out;
+  }
+  const CODES = [["nrz", "NRZ"], ["nrzi", "NRZI"], ["man", "맨체스터"], ["mlt", "MLT-3"], ["pam", "PAM-4"]];
+  function lcStats(bits, k) {
+    const e = encode(bits, k), n = Math.max(bits.length, e[e.length - 1][1]);
+    let dc = 0; e.forEach(([a, b, l]) => (dc += l * (b - a))); dc /= n;
+    let tr = 0, best = 0, last = e[0][2], start = 0;
+    e.forEach(([a, b, l], i) => { if (i && l !== last) { tr++; best = Math.max(best, a - start); start = a; } last = l; });
+    best = Math.max(best, n - start);
+    return { dc, tr: tr / bits.length, run: best };
+  }
+  const lcCv = NB.canvas($("cv-code"), (ctx, w, h) => {
+    const P = NB.palette(), bits = getBits(), sel = lcSel();
+    const narrow = w < 500, L = narrow ? 60 : 90, R = w - 10, bw = (R - L) / Math.max(bits.length, 1);
+    const top = 26, rh = (h - top - 6) / CODES.length;
+    // 비트 눈금
+    for (let i = 0; i <= bits.length; i++) { const x = L + i * bw; ctx.strokeStyle = P.grid; ctx.beginPath(); ctx.moveTo(x, top - 4); ctx.lineTo(x, h - 4); ctx.stroke(); }
+    bits.forEach((b, i) => NB.text(ctx, String(b), L + (i + 0.5) * bw, 12, { align: "center", size: narrow ? 10 : 12, mono: true, bold: true, color: b ? P.accent : P.dim }));
+    CODES.forEach(([k, nm], r) => {
+      const y0 = top + r * rh, mid = y0 + rh / 2, amp = rh * 0.34, on = k === sel;
+      if (on) { ctx.fillStyle = P.grid; ctx.fillRect(0, y0, w, rh); }
+      NB.text(ctx, nm, 8, mid, { size: narrow ? 10.5 : 12, bold: on, color: on ? P.text : P.dim });
+      ctx.strokeStyle = P.grid; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(L, mid); ctx.lineTo(R, mid); ctx.stroke(); ctx.setLineDash([]);
+      const e = encode(bits, k);
+      ctx.strokeStyle = on ? P.accent : P.series[r % 6]; ctx.lineWidth = on ? 2.6 : 1.8; ctx.beginPath();
+      e.forEach(([a, b, l], i) => { const x0 = L + Math.min(a, bits.length) * bw, x1 = L + Math.min(b, bits.length) * bw, y = mid - l * amp; if (i === 0) ctx.moveTo(x0, y); else ctx.lineTo(x0, y); ctx.lineTo(x1, y); });
+      ctx.stroke(); ctx.lineWidth = 1;
+    });
+  }, { aspect: 0.5, minHeight: 300, maxHeight: 400 });
+  function lcUpd() {
+    const bits = getBits(), k = lcSel(), s = lcStats(bits, k);
+    NB.stat("o-lc-dc", (s.dc >= 0 ? "+" : "") + s.dc.toFixed(2) + (Math.abs(s.dc) > 0.3 ? ' <small style="color:var(--bad)">쏠림</small>' : ""));
+    NB.stat("o-lc-run", NB.fmt(s.run, 3) + " 비트" + (s.run >= 6 ? ' <small style="color:var(--bad)">박자 위험</small>' : ""));
+    NB.stat("o-lc-tr", s.tr.toFixed(2));
+    NB.stat("o-lc-sym", { nrz: "1", nrzi: "1", man: "2 (반 비트씩)", mlt: "1 (주파수 ↓)", pam: "0.5" }[k]);
+    lcCv.redraw();
+  }
+  lcUpd();
+
+  /* ================= 4. 눈 모양 그림 ================= */
+  const eyMod = NB.seg("ey-mod", () => eyUpd());
+  const eyBw = NB.range("ey-bw", (v) => v.toFixed(2) + "×", () => eyUpd());
+  const eyN = NB.range("ey-n", (v) => v.toFixed(3), () => eyUpd());
+  const eyJ = NB.range("ey-j", (v) => v.toFixed(3), () => eyUpd());
+  $("ey-ffe").addEventListener("change", () => eyUpd());
+  const S = 32, NBITS = 400;
+  let EY = null;
+  function erfc(x) { const t = 1 / (1 + 0.5 * Math.abs(x)); const y = t * Math.exp(-x * x - 1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277))))))))); return x >= 0 ? y : 2 - y; }
+  function eyCompute() {
+    const M = Number(eyMod()), bw = eyBw(), sn = eyN(), sj = eyJ(), ffe = $("ey-ffe").checked;
+    const r = NB.rng(42), rn = () => { let u = r() || 1e-9, v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+    const sym = []; for (let i = 0; i < NBITS; i++) sym.push(Math.floor(r() * M));
+    const lev = sym.map((s) => (M === 2 ? (s ? 1 : -1) : -1 + (2 * s) / 3));
+    // 프리엠퍼시스: x_k - a x_{k-1}, 정규화
+    const a = ffe ? 0.3 : 0;
+    const tx = lev.map((v, i) => (v - a * (i ? lev[i - 1] : 0)) / (1 + a));
+    // 지터: 각 경계 위치 흔들기
+    const edge = []; for (let i = 0; i <= NBITS; i++) edge.push(i + sj * rn());
+    const len = NBITS * S, x = new Float32Array(len);
+    let k = 0;
+    for (let n = 0; n < len; n++) { const t = n / S; while (k < NBITS - 1 && t >= edge[k + 1]) k++; x[n] = tx[k]; }
+    // 1차 저역 통과 (차단 주파수 fc = bw × 비트속도)
+    const al = 1 - Math.exp((-2 * Math.PI * bw) / S);
+    const y = new Float32Array(len); let st = tx[0];
+    for (let n = 0; n < len; n++) { st += al * (x[n] - st); y[n] = st; }
+    // 깨끗한 신호로 눈 열림 계산(잡음 제외), 그 후 잡음 더함
+    const lvls = M === 2 ? [-1, 1] : [-1, -1 / 3, 1 / 3, 1];
+    let bestH = -9, bestP = 0; const openAt = new Float32Array(S);
+    for (let p = 0; p < S; p++) {
+      let worst = 9;
+      for (let j = 0; j < M - 1; j++) {
+        let lo = 9, hi = -9; // 위쪽 레벨의 최솟값, 아래쪽 레벨의 최댓값
+        for (let i = 4; i < NBITS - 2; i++) { const v = y[i * S + p]; if (sym[i] === j + 1) lo = Math.min(lo, v); if (sym[i] === j) hi = Math.max(hi, v); }
+        worst = Math.min(worst, lo - hi);
+      }
+      openAt[p] = worst; if (worst > bestH) { bestH = worst; bestP = p; }
+    }
+    let wcount = 0; for (let p = 0; p < S; p++) if (openAt[p] > 0) wcount++;
+    const yn = new Float32Array(len); for (let n = 0; n < len; n++) yn[n] = y[n] + sn * rn();
+    const spacing = 2 / (M - 1);
+    const Q = sn > 0 ? Math.max(0, bestH) / 2 / sn : Infinity;
+    let ber = !isFinite(Q) ? (bestH > 0 ? 0 : 0.5) : 0.5 * erfc(Q / Math.SQRT2);
+    if (bestH <= 0) ber = Math.max(ber, 0.05);
+    EY = { yn, M, bestH, bestP, width: wcount / S, Q, ber, spacing };
+  }
+  const eyCv = NB.canvas($("cv-eye"), (ctx, w, h) => {
+    if (!EY) return;
+    const P = NB.palette();
+    const L = 40, R = w - 10, T = 14, B = h - 26, sx = (R - L) / (2 * S), mid = (T + B) / 2, sy = (B - T) / 2 / 1.5;
+    ctx.strokeStyle = P.grid;
+    for (let i = 0; i <= 4; i++) { const x = L + (i * (R - L)) / 4; ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, B); ctx.stroke(); }
+    [-1, 0, 1].forEach((v) => { ctx.beginPath(); ctx.moveTo(L, mid - v * sy); ctx.lineTo(R, mid - v * sy); ctx.stroke(); });
+    ctx.strokeStyle = P.accent; ctx.globalAlpha = 0.12; ctx.lineWidth = 1.2;
+    const off = EY.bestP - S / 2; // 최적 판정점이 가운데 오도록
+    for (let i = 3; i < NBITS - 3; i++) {
+      ctx.beginPath();
+      for (let n = 0; n <= 2 * S; n++) { const idx = i * S + off - S / 2 + n; if (idx < 0 || idx >= EY.yn.length) continue; const px = L + n * sx, py = mid - EY.yn[idx] * sy; n ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1; ctx.lineWidth = 1;
+    // 판정점
+    const cx = L + S * sx;
+    ctx.strokeStyle = P.bad; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(cx, T); ctx.lineTo(cx, B); ctx.stroke(); ctx.setLineDash([]);
+    NB.text(ctx, "판정 시점", cx + 4, B + 12, { size: 10.5, color: P.bad });
+    NB.text(ctx, "−1 UI", L, B + 12, { size: 10.5, color: P.faint, align: "center" });
+    NB.text(ctx, "+1 UI", R, B + 12, { size: 10.5, color: P.faint, align: "right" });
+    NB.text(ctx, "+1", L - 6, mid - sy, { size: 10.5, color: P.faint, align: "right" });
+    NB.text(ctx, "−1", L - 6, mid + sy, { size: 10.5, color: P.faint, align: "right" });
+    if (EY.bestH <= 0) NB.text(ctx, "눈이 닫혔다!", (L + R) / 2, T + 10, { size: 14, bold: true, color: P.bad, align: "center" });
+  }, { aspect: 0.62, minHeight: 280, maxHeight: 400 });
+  function eyUpd() {
+    eyCompute();
+    const pct = Math.max(0, EY.bestH) / EY.spacing * 100;
+    NB.stat("o-ey-h", EY.bestH > 0 ? pct.toFixed(0) + "% <small>(레벨 간격 대비)</small>" : '<span style="color:var(--bad)">닫힘</span>');
+    NB.stat("o-ey-w", (EY.width * 100).toFixed(0) + "% UI");
+    NB.stat("o-ey-q", isFinite(EY.Q) ? EY.Q.toFixed(1) : "∞");
+    NB.stat("o-ey-ber", EY.ber === 0 ? "≈ 0" : EY.ber < 1e-15 ? "&lt; 10⁻¹⁵" : EY.ber.toExponential(1));
+    eyCv.redraw();
+  }
+  eyUpd();
+
+  /* ================= 5. DSL 거리-속도 ================= */
+  const dsLen = NB.range("ds-len", (v) => v.toFixed(2) + " km", () => dsUpd());
+  $("ds-xt").addEventListener("change", () => dsUpd());
+  $("ds-vec").addEventListener("change", () => dsUpd());
+  const att = (f) => 2 + 19 * Math.sqrt(f) + 0.45 * f; // dB/km, f MHz
+  const V17 = [[0.138, 3.75], [5.2, 8.5], [12, 17.664]];
+  const TECH = [
+    { k: "a", n: "ADSL2+", bands: [[0.138, 2.208]], df: 0.0043125, sym: 4000, psd: -40, ds: 1, cap: 15, max: 24 },
+    { k: "v", n: "VDSL2 17a", bands: V17, df: 0.0043125 * 2, sym: 4000 * 2, psd: -55, lowpsd: -40, ds: 1, cap: 15, max: 150 },
+    { k: "v35", n: "VDSL2 35b", bands: [...V17, [24.89, 35.328]], df: 0.008625 * 2, sym: 8000 * 2, psd: -55, lowpsd: -40, ds: 1, cap: 15, max: 300 },
+    { k: "g", n: "G.fast", bands: [[2.2, 106]], df: 0.05175 * 2, sym: 48000 * 2, psd: -68, ds: 0.75, cap: 12, max: 1000 },
+  ];
+  // (계산량을 줄이려 부반송파 2개를 하나로 묶어 계산: df와 sym을 2배)
+  function dslRate(t, L, xt) {
+    let r = 0;
+    for (const [a, b] of t.bands) for (let f = a; f < b; f += t.df) {
+      const ps = t.lowpsd && f < 2.2 ? t.lowpsd : t.psd, rx = ps - att(f) * L;
+      let n = -140;
+      if (xt) { const fext = rx - (48 - 20 * Math.log10(f) - 10 * Math.log10(Math.max(L, 0.01))); n = 10 * Math.log10(Math.pow(10, n / 10) + Math.pow(10, fext / 10)); }
+      const bb = Math.min(t.cap, Math.log2(1 + Math.pow(10, (rx - n - 12.8) / 10)));
+      if (bb >= 1) r += Math.floor(bb) * t.sym;
+    }
+    return Math.min(t.max, (r * t.ds) / 1e6);
+  }
+  let dsCurves = null, dsKey = "";
+  function dsCompute() {
+    const xt = $("ds-xt").checked && !$("ds-vec").checked, key = String(xt);
+    if (key === dsKey) return; dsKey = key;
+    dsCurves = TECH.map((t) => { const d = []; for (let i = 0; i <= 100; i++) { const L = 0.02 + (i / 100) * 4.98; d.push([L, Math.max(0.05, dslRate(t, L, xt))]); } return d; });
+  }
+  const dsCv = NB.canvas($("cv-dsl"), (ctx, w, h) => {
+    dsCompute();
+    const P = NB.palette(), L = dsLen(), cols = [P.warn, P.accent, P.accent2, P.ok];
+    NB.chart(ctx, { x: 56, y: 14, w: w - 56 - 16, h: h - 14 - 44 }, {
+      x: [0, 5], y: [0.1, 1000], logY: true, xLabel: "선로 길이 (km)", yLabel: "내려받기 (Mbps, 로그)", yFmt: (v) => String(v),
+      series: TECH.map((t, i) => ({ data: dsCurves[i], color: cols[i], width: 2.2 })),
+      vlines: [{ x: L, color: P.bad, dash: [3, 3] }],
+      points: TECH.map((t, i) => ({ x: L, y: Math.max(0.1, dslRate(t, L, $("ds-xt").checked && !$("ds-vec").checked)), color: cols[i], r: 4 })),
+    });
+    const narrow = w < 480;
+    TECH.forEach((t, i) => { const x = narrow ? 64 + (i % 2) * 110 : w - 130, y = narrow ? h - 78 + Math.floor(i / 2) * 15 : 24 + i * 16; ctx.fillStyle = cols[i]; ctx.fillRect(x, y - 1, 14, 3); NB.text(ctx, t.n, x + 18, y, { size: 11, color: P.dim }); });
+  }, { aspect: 0.5, minHeight: 290, maxHeight: 400 });
+  function dsUpd() {
+    const L = dsLen(), xt = $("ds-xt").checked && !$("ds-vec").checked;
+    const ids = ["o-ds-a", "o-ds-v", "o-ds-v35", "o-ds-g"];
+    TECH.forEach((t, i) => { const r = dslRate(t, L, xt); NB.stat(ids[i], r < 0.1 ? "연결 불가" : NB.fmt(r, 3) + " Mbps"); });
+    NB.stat("o-ds-att", (att(1) * L).toFixed(0) + " / " + (att(10) * L).toFixed(0) + " dB");
+    dsCv.redraw();
+  }
+  dsUpd();
+})();
+</script>
+</body>
+</html>

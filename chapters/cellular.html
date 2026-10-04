@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>이동통신: 1G에서 6G까지 · NetworkBook</title>
+<meta name="description" content="셀로 쪼개 주파수를 재사용하는 셀룰러의 원리, 핸드오버, 1G부터 5G까지의 세대 변화와 한국의 상용화 역사, 기지국과 코어망(5GC) 구조, SIM 인증, 5G 뉴멀로지와 자원 그리드, 저대역·3.5 GHz·밀리미터파, Massive MIMO와 O-RAN, 네트워크 슬라이싱, TDD와 FDD, 6G 전망을 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .cl-tbl td:first-child { white-space: nowrap; font-weight: 700; }
+  .cl-tbl td.num { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+  .cl-tbl tr.hl td { background: var(--accent-soft); }
+</style>
+</head>
+<body data-chapter="cellular">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 14</div>
+    <h1>이동통신: 1G에서 6G까지</h1>
+    <p class="lead">KTX를 타고 시속 300 km로 달리면서도 영상 통화는 끊기지 않는다. 그 사이 휴대폰은 수십 개의 기지국을 갈아탔다. 서울에만 수천만 대의 휴대폰이 있는데, 통신사가 가진 주파수는 고작 수백 MHz다. 이 좁은 주파수로 어떻게 그 많은 사람이 동시에 통화하고 동영상을 볼 수 있을까? 답은 “땅을 작은 칸으로 쪼개고, 같은 주파수를 멀리 떨어진 칸에서 다시 쓰는 것”이다. 이 장에서는 셀룰러라는 아이디어에서 출발해 5G의 구조와 6G의 방향까지 따라간다.</p>
+    <ul class="objectives">
+      <li>셀을 작게 쪼개 주파수를 재사용하는 원리와, 재사용 계수가 용량과 간섭을 맞바꾸는 관계를 설명한다.</li>
+      <li>핸드오버의 히스테리시스와 트리거 시간이 핑퐁과 끊김 사이에서 어떻게 균형을 잡는지 체험한다.</li>
+      <li>1G(아날로그)에서 5G NR까지 다중 접속 방식과 서비스가 어떻게 바뀌었는지, 한국의 상용화 이정표와 함께 정리한다.</li>
+      <li>단말(UE) → 기지국(gNB) → 코어망(5GC: AMF·SMF·UPF) → 인터넷으로 이어지는 구조와 SIM/eSIM 인증을 이해한다.</li>
+      <li>5G의 뉴멀로지(부반송파 간격)와 슬롯 길이, 지연의 관계를 자원 그리드로 본다.</li>
+      <li>저대역·3.5 GHz·밀리미터파의 커버리지와 용량 차이, Massive MIMO·O-RAN·네트워크 슬라이싱·TDD/FDD를 설명한다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="cell">
+    <h2>셀룰러: 땅을 칸으로 나눠 주파수를 다시 쓴다</h2>
+    <p>초기의 이동 전화(1940~70년대)는 도시 한가운데 높은 탑에 강력한 송신기 하나를 세우고 도시 전체를 덮었다. 채널이 수십 개뿐이라 한 도시에서 동시에 통화할 수 있는 사람도 수십 명이었고, 가입 대기자가 줄을 섰다. 1947년 벨 연구소가 내놓은 해법이 <span class="term">셀</span><span class="en">(cell)</span>이다. 출력이 약한 기지국을 여러 곳에 세워 각자 작은 구역(셀)만 맡게 하고, <b>서로 충분히 떨어진 셀에서는 같은 주파수를 다시 쓴다</b>. 이것이 <span class="term">주파수 재사용</span><span class="en">(frequency reuse)</span>이고, “셀룰러(cellular, 세포 모양의)”라는 이름이 여기서 왔다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 260" style="min-width:600px" role="img" aria-label="큰 송신탑 하나와 작은 셀 여러 개 비교">
+        <text x="190" y="22" text-anchor="middle" class="t" style="font-weight:700">큰 탑 하나: 도시 전체가 채널 N개를 나눠 씀</text>
+        <text x="600" y="22" text-anchor="middle" class="t" style="font-weight:700">작은 셀 여러 개: 떨어진 셀끼리 같은 채널 재사용</text>
+        <circle cx="190" cy="140" r="100" class="f-acc-soft"/>
+        <path d="M184 140 L190 90 L196 140 Z" fill="var(--text-dim)"/><path d="M178 100 q12 -12 24 0 M172 92 q18 -18 36 0" fill="none" stroke="var(--accent)" stroke-width="2"/>
+        <text x="190" y="170" text-anchor="middle" class="t-mono">채널 N개</text>
+        <text x="190" y="190" text-anchor="middle" class="t-mono">동시 통화 N명</text>
+        <g transform="translate(600,140)">
+          <polygon points="0,-34 29.4,-17 29.4,17 0,34 -29.4,17 -29.4,-17" class="f-acc-soft"/><text x="0" y="5" text-anchor="middle" class="t" style="font-weight:700">A</text>
+          <polygon points="58.9,-34 88.3,-17 88.3,17 58.9,34 29.4,17 29.4,-17" class="f-acc2-soft"/><text x="58.9" y="5" text-anchor="middle" class="t">B</text>
+          <polygon points="-58.9,-34 -29.4,-17 -29.4,17 -58.9,34 -88.3,17 -88.3,-17" class="f-surface"/><text x="-58.9" y="5" text-anchor="middle" class="t">C</text>
+          <polygon points="29.4,-85 58.9,-68 58.9,-34 29.4,-17 0,-34 0,-68" class="f-surface"/><text x="29.4" y="-46" text-anchor="middle" class="t">C</text>
+          <polygon points="-29.4,-85 0,-68 0,-34 -29.4,-17 -58.9,-34 -58.9,-68" class="f-acc2-soft"/><text x="-29.4" y="-46" text-anchor="middle" class="t">B</text>
+          <polygon points="29.4,17 58.9,34 58.9,68 29.4,85 0,68 0,34" class="f-surface"/><text x="29.4" y="56" text-anchor="middle" class="t">C</text>
+          <polygon points="-29.4,17 0,34 0,68 -29.4,85 -58.9,68 -58.9,34" class="f-acc2-soft"/><text x="-29.4" y="56" text-anchor="middle" class="t">B</text>
+          <polygon points="117.8,-34 147.2,-17 147.2,17 117.8,34 88.3,17 88.3,-17" class="f-surface"/><text x="117.8" y="5" text-anchor="middle" class="t">C</text>
+          <polygon points="-117.8,-34 -88.3,-17 -88.3,17 -117.8,34 -147.2,17 -147.2,-17" class="f-acc2-soft"/><text x="-117.8" y="5" text-anchor="middle" class="t">B</text>
+          <polygon points="88.3,-85 117.8,-68 117.8,-34 88.3,-17 58.9,-34 58.9,-68" class="f-acc-soft"/><text x="88.3" y="-46" text-anchor="middle" class="t" style="font-weight:700">A</text>
+          <polygon points="-88.3,85 -58.9,68 -58.9,34 -88.3,17 -117.8,34 -117.8,68" class="f-acc-soft"/><text x="-88.3" y="56" text-anchor="middle" class="t" style="font-weight:700">A</text>
+        </g>
+        <text x="600" y="252" text-anchor="middle" class="t-dim">채널을 3묶음(A·B·C)으로 나눠도 셀이 많으면 전체 동시 통화는 셀 수 × N/3</text>
+      </svg></div>
+      <figcaption><b>그림 14-1.</b> 셀룰러의 핵심 아이디어. 같은 글자(같은 주파수 묶음)를 쓰는 셀은 서로 떨어져 있어 간섭이 약하다. 셀을 더 작게, 더 많이 만들수록 같은 주파수로 더 많은 사람을 받을 수 있다. 셀을 육각형으로 그리는 것은 빈틈없이 평면을 채우면서 원에 가장 가까운 모양이기 때문이다.</figcaption>
+    </figure>
+    <p>같은 주파수 묶음을 몇 개의 셀마다 다시 쓰는지를 <b>재사용 계수</b> N이라 한다. 육각형 격자에서 가능한 값은 N = i² + ij + j² 꼴(1, 3, 4, 7, 9, 12 …)이다. N이 크면 같은 주파수 셀 사이 거리 D가 멀어져 간섭이 줄지만(D = R√(3N), R은 셀 반지름), 각 셀이 쓸 수 있는 채널은 1/N로 준다. 1G 아날로그 휴대폰은 깨끗한 음성을 위해 신호 대 간섭비 약 18 dB가 필요했고, 그래서 N = 7을 썼다. 반면 LTE와 5G는 강력한 오류 정정과 간섭 조정 덕분에 <b>모든 셀이 같은 주파수를 쓰는 N = 1</b>로 동작한다.</p>
+    <div class="sim" id="sim-hex">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>육각 셀과 주파수 재사용</h3></div>
+      <div class="sim-view"><canvas id="cv-hex" style="cursor:pointer"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>재사용 계수 N</span><div class="seg" id="hx-n"><button data-value="1">1 (LTE·5G)</button><button data-value="3">3</button><button data-value="4">4 (GSM)</button><button data-value="7" class="on">7 (1G)</button></div></div>
+        <label class="ctrl"><span>셀 반지름 R (셀 분할) <output id="hx-r-out"></output></span><input type="range" id="hx-r" min="0" max="8" value="5"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">셀 하나가 쓰는 채널</span><span class="v" id="o-hx-ch">—</span></div>
+        <div class="stat"><span class="k">같은 주파수 셀 거리 D</span><span class="v" id="o-hx-d">—</span></div>
+        <div class="stat"><span class="k">신호 대 간섭비 (근사)</span><span class="v" id="o-hx-sir">—</span></div>
+        <div class="stat"><span class="k">도시 100 km² 동시 통화</span><span class="v" id="o-hx-cap">—</span></div>
+      </div>
+      <div class="sim-note">같은 색·글자의 셀이 같은 주파수 묶음을 쓴다. 셀을 눌러 그 묶음을 강조하면, 가장 가까운 같은 주파수 셀 6개까지 점선이 그어진다. 가정: 사업자 전체 채널 168개, 경로 손실 지수 4, 첫째 고리의 간섭 셀 6개만 고려(SIR ≈ (D/R)⁴ ÷ 6), 셀 면적 = 2.6R². 해볼 것: ① N을 7 → 3으로 줄이면 셀당 채널은 두 배 넘게 늘지만 간섭이 커진다. ② N은 그대로 두고 R을 1/2로 줄이면 SIR은 그대로인데 용량은 4배가 된다. 이것이 셀 분할이다.</div>
+    </div>
+    <p>두 번째 해볼 것이 셀룰러의 진짜 힘이다. 셀 반지름을 절반으로 줄이면(<span class="term">셀 분할</span><span class="en">(cell splitting)</span>) 같은 면적에 셀이 4배가 되고 용량도 4배가 된다. 간섭은 거리의 <b>비율</b> D/R로 정해지므로 그대로다. 주파수를 더 사지 않고도 기지국을 촘촘히 세워 용량을 늘리는 것, 이것이 지난 40년간 이동통신 용량이 늘어난 가장 큰 원천이다. 도심의 작은 기지국(스몰 셀)과 건물 안 중계기가 바로 이 원리다.</p>
+    <div class="callout analogy"><strong>동네 택배 대리점</strong><p>전국을 거대한 물류 센터 하나가 배달하면 트럭(주파수)이 금방 모자란다. 대신 동네마다 작은 대리점(기지국)을 두고, 서로 멀리 떨어진 대리점끼리는 같은 번호의 트럭을 써도 길에서 마주칠 일이 없다. 주문이 많은 동네는 대리점을 둘로 쪼갠다(셀 분할). 고객이 이사하면 담당 대리점이 바뀐다(핸드오버). 대리점들은 본사 허브(코어망)에 묶여 있다.</p></div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">재사용 계수를 7에서 3으로 줄였다(셀 크기는 그대로). 무슨 일이 일어날까?</p><p class="wi-hint">육각 셀 시뮬레이터에서 N을 7과 3으로 바꿔 보자.</p><div class="opts">
+      <button class="opt">셀당 채널도 늘고 간섭도 줄어든다</button><button class="opt" data-correct>셀당 채널은 2배 넘게 늘지만, 같은 주파수 셀이 가까워져 신호 대 간섭비가 약 7 dB 나빠진다</button><button class="opt">아무 변화가 없다</button><button class="opt">셀당 채널이 줄어든다</button>
+    </div><div class="quiz-exp">N = 7이면 D/R = 4.6, N = 3이면 D/R = 3이다. 경로 손실 지수 4에서 간섭비는 (4.6/3)⁴ ≈ 5.4배(약 7.4 dB) 나빠진다. 그 대신 채널을 7묶음이 아니라 3묶음으로 나누니 셀당 채널은 7/3배가 된다. 디지털 변조와 오류 정정이 나빠진 간섭비를 견딜 수 있게 되면서 재사용 계수는 점점 작아졌다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="handover">
+    <h2>핸드오버: 달리는 휴대폰의 바통 터치</h2>
+    <p>셀이 작을수록 움직이는 사용자는 자주 셀 경계를 넘는다. 통화나 데이터를 끊지 않고 담당 기지국을 바꾸는 것을 <span class="term">핸드오버</span><span class="en">(handover)</span>라 한다. 휴대폰은 지금 기지국(서빙 셀)과 이웃 기지국의 기준 신호 세기(RSRP)를 계속 재서 보고하고, 핸드오버 결정은 <b>기지국</b>이 내린다(Wi-Fi 로밍은 단말이 결정했다, 13장).</p>
+    <p>단순히 “이웃이 더 세지면 바로 옮긴다”로 하면 문제가 생긴다. 신호 세기는 건물 그늘(섀도잉)과 측정 잡음 때문에 오르내리므로, 두 기지국 경계에서 A → B → A → B로 쓸데없이 왔다 갔다 하는 <b>핑퐁</b>이 생긴다. 핸드오버 한 번마다 신호 교환과 짧은 끊김이 따르니 낭비다. 그래서 LTE·5G는 두 가지 브레이크를 건다.</p>
+    <ul>
+      <li><b>히스테리시스</b>(hysteresis): 이웃이 지금 셀보다 <b>몇 dB 이상</b> 세야 한다(이벤트 A3의 오프셋).</li>
+      <li><b>트리거 시간</b>(TTT, time-to-trigger): 그 조건이 <b>일정 시간(수십~수천 ms) 계속</b> 유지되어야 보고한다.</li>
+    </ul>
+    <p>브레이크를 너무 세게 걸면 반대 문제가 생긴다. 이미 이웃 셀이 훨씬 센데도 옛 셀을 붙잡고 있다가, 옛 셀 신호가 간섭에 묻혀 연결이 끊어진다(무선 링크 실패, RLF). 빠르게 움직일수록 같은 TTT 동안 더 멀리 가 버리므로 위험이 크다.</p>
+    <div class="sim" id="sim-ho">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>두 기지국 사이를 지나가기: 핑퐁 vs 끊김</h3></div>
+      <div class="sim-view"><canvas id="cv-ho"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>히스테리시스 <output id="ho-h-out"></output></span><input type="range" id="ho-h" min="0" max="10" step="0.5" value="3"></label>
+        <label class="ctrl"><span>트리거 시간 TTT <output id="ho-t-out"></output></span><input type="range" id="ho-t" min="0" max="6" value="3"></label>
+        <div class="ctrl"><span>이동 속도</span><div class="seg" id="ho-v"><button data-value="5">걷기 5 km/h</button><button data-value="60" class="on">차 60 km/h</button><button data-value="300">KTX 300 km/h</button></div></div>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn" id="ho-new">다른 길 (섀도잉 새로)</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">핸드오버 횟수</span><span class="v" id="o-ho-n">—</span></div>
+        <div class="stat"><span class="k">핑퐁 (1초 안에 되돌아감)</span><span class="v" id="o-ho-pp">—</span></div>
+        <div class="stat"><span class="k">연결 끊김 (RLF)</span><span class="v" id="o-ho-rlf">—</span></div>
+        <div class="stat"><span class="k">신호 불량 시간</span><span class="v" id="o-ho-out">—</span></div>
+      </div>
+      <div class="sim-note">곡선은 길을 따라 측정한 두 기지국의 RSRP(파랑 A, 보라 B), 아래 띠는 그 순간의 서빙 셀이다. ▲는 핸드오버(주황 = 핑퐁), ✕는 연결 끊김. 해볼 것: ① 히스테리시스 0, TTT 0이면 걷는 속도에서 경계 부근 핑퐁이 쏟아진다. ② 히스테리시스 8 dB 이상, TTT 1,280 ms에 KTX 속도면 핸드오버가 늦어 끊긴다. ③ 3 dB·320 ms 근처가 대체로 균형점이다. 가정: 기지국 간격 1.6 km, 경로 손실 128.1 + 37.6·log₁₀(d km) dB, 섀도잉 표준편차 4 dB(상관 거리 40 m), 측정 잡음 2.5 dB, 서빙 셀 SINR이 −8 dB 아래로 0.5초 넘게 머물면 끊김으로 보고 가장 센 셀에 다시 접속.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">TTT를 1,280 ms, 히스테리시스를 6 dB로 고정했다. 걷는 사람과 KTX 승객 중 연결이 끊길 위험이 큰 쪽은?</p><p class="wi-hint">핸드오버 시뮬레이터에서 속도만 바꿔 보자.</p><div class="opts">
+      <button class="opt">걷는 사람 — 경계에 오래 머물러서</button><button class="opt" data-correct>KTX 승객 — 1.28초 동안 약 100 m를 가 버려, 그사이 옛 셀 신호가 간섭에 묻힌다</button><button class="opt">둘 다 같다 — TTT는 시간이니까</button>
+    </div><div class="quiz-exp">TTT는 시간 단위지만 신호 세기는 거리에 따라 변한다. 시속 300 km면 1.28초에 107 m를 이동해, 조건을 확인하는 동안 두 신호 차이가 훨씬 벌어진다. 그래서 고속철도 노선에는 핸드오버 변수를 따로 조정한 전용 셀을 깔고, 5G는 이동 속도에 따라 TTT를 줄이는 기능(속도 의존 스케일링)을 쓴다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="generations">
+    <h2>세대의 역사: 1G에서 5G까지</h2>
+    <p>이동통신은 대략 10년마다 한 세대씩 바뀌었다. 세대를 가르는 기준은 속도보다 <b>여러 사용자가 주파수를 나눠 쓰는 방법(다중 접속)</b>이다. 1G는 주파수를 잘게 나눠 한 사람에게 한 칸씩(FDMA), 2G GSM은 시간을 나눠(TDMA), 2G IS-95와 3G는 서로 다른 부호를 곱해 같은 주파수·같은 시간을 함께(CDMA), 4G와 5G는 수많은 부반송파를 시간·주파수 칸으로 잘라 나눠 준다(OFDMA, 12장).</p>
+    <div class="table-wrap"><table class="cl-tbl">
+      <thead><tr><th>세대</th><th>대표 기술</th><th>다중 접속</th><th>대표 속도</th><th>새로 생긴 것</th><th>한국</th></tr></thead>
+      <tbody>
+        <tr><td>1G</td><td>AMPS (아날로그)</td><td>FDMA, 30 kHz 채널</td><td class="num">음성만</td><td>들고 다니는 전화</td><td>1984 차량 전화, 1988 휴대 전화</td></tr>
+        <tr><td>2G</td><td>GSM / IS-95 CDMA</td><td>TDMA / CDMA</td><td class="num">9.6~64 kbps</td><td>디지털 음성, 문자(SMS), 암호화</td><td><b>1996년 1월 세계 최초 CDMA 상용화</b></td></tr>
+        <tr><td>3G</td><td>WCDMA(HSPA) / CDMA2000</td><td>CDMA (5 MHz)</td><td class="num">384 kbps → 수십 Mbps</td><td>모바일 인터넷, 영상 통화, 스마트폰</td><td>2003년 말 WCDMA, 2006 HSDPA</td></tr>
+        <tr><td>4G</td><td>LTE / LTE-Advanced</td><td>OFDMA (상향 SC-FDMA)</td><td class="num">75 Mbps → 1 Gbps+</td><td>모든 것이 IP (음성도 VoLTE), 모바일 동영상</td><td>2011년 7월 LTE</td></tr>
+        <tr class="hl"><td>5G</td><td>NR (New Radio)</td><td>OFDMA + 뉴멀로지, Massive MIMO</td><td class="num">수백 Mbps ~ 수 Gbps</td><td>eMBB · URLLC · mMTC, 네트워크 슬라이싱</td><td><b>2019년 4월 3일 세계 최초 상용화</b></td></tr>
+        <tr><td>6G</td><td>IMT-2030 (표준화 중)</td><td>OFDMA 계열 + AI</td><td class="num">목표 수백 Gbps</td><td>AI 네이티브, 비지상망 통합, 통신+센싱</td><td>2030년경 목표</td></tr>
+      </tbody>
+    </table></div>
+    <p>5G는 처음부터 세 가지 서로 다른 쓰임새를 목표로 설계되었다. <b>eMBB</b>(초고속 모바일 브로드밴드: 피크 20 Gbps, 체감 100 Mbps 목표), <span class="term">URLLC</span><span class="en">(Ultra-Reliable Low-Latency Communication)</span>(무선 구간 지연 1 ms, 신뢰도 99.999%: 공장 로봇, 원격 제어), <b>mMTC</b>(대규모 사물 통신: 1 km²당 100만 대 기기). 하나의 망으로 이렇게 다른 요구를 맞추려고 나온 것이 뒤에서 볼 뉴멀로지와 네트워크 슬라이싱이다.</p>
+    <div class="callout deep"><strong>한국과 CDMA</strong><p>1990년대 초 세계는 유럽의 GSM이 대세였지만, 한국 정부와 업계는 미국 퀄컴의 CDMA 기술을 택해 1996년 세계 최초로 상용화했다. 이 모험은 국내 휴대폰 제조사와 장비 산업이 크게 자라는 계기가 되었다. 이후 한국은 2011년 LTE를 빠르게 전국망으로 깔았고, 2019년 4월 3일 밤 11시 세계 최초 5G 스마트폰 상용 서비스를 시작했다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="architecture">
+    <h2>망의 구조: 휴대폰에서 인터넷까지</h2>
+    <p>휴대폰 신호가 인터넷에 닿기까지는 크게 세 구간을 지난다. 전파 구간인 <b>무선 접속망</b>(RAN), 기지국을 통신사 건물로 잇는 <b>전송망</b>(대부분 광케이블, 5장), 그리고 가입자 인증·이동성·과금·인터넷 관문을 맡는 <span class="term">코어망</span><span class="en">(core network)</span>이다. 기지국의 이름은 4G에서 eNB(evolved Node B), 5G에서 <span class="term">gNB</span>(next generation Node B)다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 330" style="min-width:640px" role="img" aria-label="5G 망 구조: 단말, 기지국, 전송망, 5G 코어(AMF, SMF, UPF), 인터넷">
+        <defs><marker id="cl-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker><marker id="cl-a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"/></marker></defs>
+        <text x="60" y="22" text-anchor="middle" class="t-dim">단말</text><text x="215" y="22" text-anchor="middle" class="t-dim">무선 접속망 (RAN)</text><text x="380" y="22" text-anchor="middle" class="t-dim">전송망</text><text x="580" y="22" text-anchor="middle" class="t-dim">5G 코어 (5GC)</text><text x="745" y="22" text-anchor="middle" class="t-dim">외부망</text>
+        <rect x="14" y="196" width="92" height="74" rx="12" class="f-elev"/><text x="60" y="224" text-anchor="middle" class="t" style="font-weight:700">UE</text><text x="60" y="242" text-anchor="middle" class="t-mono">휴대폰</text><text x="60" y="258" text-anchor="middle" class="t-mono">SIM/eSIM</text>
+        <g fill="none" stroke="var(--accent)" stroke-width="2" opacity=".7"><path d="M112 222 q10 12 0 24"/><path d="M122 214 q16 20 0 40"/></g>
+        <rect x="140" y="160" width="150" height="140" rx="12" class="f-acc-soft"/><text x="215" y="182" text-anchor="middle" class="t" style="font-weight:700">gNB (기지국)</text>
+        <rect x="152" y="192" width="126" height="26" rx="6" class="f-elev"/><text x="215" y="210" text-anchor="middle" class="t-mono">RU · 안테나+RF</text>
+        <rect x="152" y="226" width="126" height="26" rx="6" class="f-elev"/><text x="215" y="244" text-anchor="middle" class="t-mono">DU · 실시간 처리</text>
+        <rect x="152" y="260" width="126" height="26" rx="6" class="f-elev"/><text x="215" y="278" text-anchor="middle" class="t-mono">CU · 상위 계층</text>
+        <text x="215" y="318" text-anchor="middle" class="t-dim">RU↔DU: 프론트홀</text>
+        <path d="M290 250 H460" class="s-acc" marker-end="url(#cl-a)"/><text x="375" y="243" text-anchor="middle" class="t-mono">백홀 (광)</text><text x="375" y="268" text-anchor="middle" class="t-dim">사용자 데이터</text>
+        <path d="M290 175 C350 120, 400 110, 460 110" fill="none" stroke="var(--accent-2)" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#cl-a2)"/><text x="360" y="118" text-anchor="middle" class="t-dim">제어 신호</text>
+        <rect x="460" y="40" width="240" height="270" rx="14" fill="none" stroke="var(--border)" stroke-width="1.5"/>
+        <text x="580" y="60" text-anchor="middle" class="t-dim">제어 평면 (서비스 기반 구조)</text>
+        <rect x="474" y="70" width="100" height="44" rx="8" class="f-acc2-soft"/><text x="524" y="90" text-anchor="middle" class="t" style="font-weight:700">AMF</text><text x="524" y="106" text-anchor="middle" class="t-mono">접속·이동성</text>
+        <rect x="586" y="70" width="100" height="44" rx="8" class="f-acc2-soft"/><text x="636" y="90" text-anchor="middle" class="t" style="font-weight:700">SMF</text><text x="636" y="106" text-anchor="middle" class="t-mono">세션·IP 할당</text>
+        <rect x="474" y="122" width="100" height="44" rx="8" class="f-surface"/><text x="524" y="142" text-anchor="middle" class="t" style="font-weight:700">AUSF·UDM</text><text x="524" y="158" text-anchor="middle" class="t-mono">인증·가입자 DB</text>
+        <rect x="586" y="122" width="100" height="44" rx="8" class="f-surface"/><text x="636" y="142" text-anchor="middle" class="t" style="font-weight:700">PCF·NSSF</text><text x="636" y="158" text-anchor="middle" class="t-mono">정책·슬라이스</text>
+        <line x1="470" y1="186" x2="690" y2="186" stroke="var(--border)" stroke-dasharray="4 4"/>
+        <text x="580" y="204" text-anchor="middle" class="t-dim">사용자 평면</text>
+        <rect x="490" y="224" width="180" height="56" rx="10" class="f-acc-soft"/><text x="580" y="248" text-anchor="middle" class="t" style="font-weight:700">UPF</text><text x="580" y="266" text-anchor="middle" class="t-mono">패킷 관문 · 터널 끝</text>
+        <path d="M636 114 V224" fill="none" stroke="var(--accent-2)" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <path d="M670 252 H720" class="s-acc" marker-end="url(#cl-a)"/>
+        <rect x="720" y="214" width="70" height="76" rx="12" class="f-surface"/><text x="755" y="248" text-anchor="middle" class="t" style="font-weight:700">인터넷</text><text x="755" y="266" text-anchor="middle" class="t-mono">DN</text>
+        <text x="580" y="326" text-anchor="middle" class="t-dim">4G(EPC)와 대응: MME→AMF, S/P-GW→SMF+UPF, HSS→UDM</text>
+      </svg></div>
+      <figcaption><b>그림 14-2.</b> 5G 망 구조. 사용자 데이터(실선)는 휴대폰 → gNB → 백홀 → UPF → 인터넷으로 흐른다. 제어 신호(점선)는 AMF가 받아 인증(AUSF·UDM), 세션(SMF), 정책(PCF)을 처리한다. 5G 코어는 기능들이 HTTP API로 서로 부르는 소프트웨어 서비스(서비스 기반 구조)로 만들어져 클라우드 서버 위에서 돈다(21장).</figcaption>
+    </figure>
+    <p>코어망의 일은 셋으로 나눠 보면 쉽다. <span class="term">AMF</span><span class="en">(Access and Mobility Management Function)</span>는 “이 휴대폰이 누구이고 지금 어느 기지국 근처에 있는가”를 관리한다. 전화가 올 때 휴대폰을 깨우는(페이징) 일도 여기서 시작한다. <b>SMF</b>(Session Management Function)는 데이터 세션을 만들고 IP 주소를 준다. <span class="term">UPF</span><span class="en">(User Plane Function)</span>는 실제 사용자 패킷이 지나가는 관문이다. 휴대폰이 기지국을 갈아타도 IP 주소가 바뀌지 않는 이유는, 패킷이 기지국과 UPF 사이의 <b>터널</b>(GTP-U)에 싸여 다니고 핸드오버 때 터널의 기지국 쪽 끝만 바뀌기 때문이다.</p>
+    <h3>SIM과 eSIM: 휴대폰이 “나”임을 증명하는 법</h3>
+    <p><span class="term">SIM 카드</span><span class="en">(Subscriber Identity Module)</span>는 작은 보안 칩이다. 가입자 번호(IMSI, 5G에서는 SUPI)와 <b>128비트 비밀 키 K</b>가 들어 있고, K는 카드 밖으로 절대 나오지 않는다. 통신사의 가입자 DB(UDM)에도 같은 K가 있다. 접속할 때 망은 무작위 수(RAND)를 보내고, SIM은 K로 계산한 응답(RES)을 돌려준다. 망은 자기 계산과 비교해 맞으면 통과시킨다. 이때 망도 자기 진짜임을 증명하는 토큰(AUTN)을 함께 보내므로 휴대폰은 가짜 기지국을 가려낼 수 있다(3G부터의 상호 인증). 양쪽은 같은 계산에서 암호 키도 얻는다. 5G에서는 가입자 번호마저 통신사의 공개 키로 암호화(SUCI)해 보내 추적을 막는다.</p>
+    <p><b>eSIM</b>은 카드를 빼고 꽂는 대신 휴대폰 기판에 붙은 칩(eUICC)에 통신사 프로필을 인터넷으로 내려받는다. QR 코드를 찍으면 통신사 서버(SM-DP+)가 암호화된 프로필을 보내 준다. 한국에서도 2022년 9월부터 eSIM 서비스가 시작되어 한 휴대폰에 번호 두 개를 쓰는 듀얼 SIM이 흔해졌다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="numerology">
+    <h2>자원 그리드와 뉴멀로지: 시간과 주파수의 바둑판</h2>
+    <p>LTE와 5G의 하향 링크는 12장의 OFDM 위에서 여러 사용자를 <b>시간 × 주파수 바둑판</b>으로 나눠 쓴다(OFDMA). 바둑판 한 칸(부반송파 1개 × 심볼 1개)을 자원 요소(RE)라 하고, 부반송파 12개 × 한 슬롯을 묶은 것이 스케줄링의 기본 단위인 <span class="term">자원 블록</span><span class="en">(resource block, RB)</span>이다. 기지국의 스케줄러는 1 ms보다 짧은 간격마다 “이 RB들은 철수, 저 RB들은 영희”처럼 칸을 배정한다. 채널 상태가 좋은 사용자에게 더 높은 MCS를, 급한 데이터에 먼저 칸을 준다.</p>
+    <p>LTE는 부반송파 간격이 15 kHz 하나뿐이었다. 5G는 이를 15 × 2<sup>μ</sup> kHz(15, 30, 60, 120 kHz …)로 고를 수 있게 했고, 이 선택을 <span class="term">뉴멀로지</span><span class="en">(numerology)</span>라 한다. 간격을 두 배로 넓히면 OFDM 심볼 길이는 반이 되고(심볼 길이 = 1/간격), 14개 심볼로 이뤄진 <b>슬롯도 반</b>이 된다. 슬롯이 짧을수록 “다음 전송 기회”가 빨리 오므로 지연이 준다. 대신 심볼 앞의 보호 구간(순환 전치, CP)도 짧아져 멀리서 반사되어 늦게 오는 신호(다중 경로, 11장)를 견디는 능력이 떨어진다.</p>
+    <div class="sim" id="sim-num">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>뉴멀로지를 바꾸면 바둑판 모양이 바뀐다</h3></div>
+      <div class="sim-view"><canvas id="cv-num"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>부반송파 간격 (μ)</span><div class="seg" id="nm-mu"><button data-value="0">15 kHz (μ=0)</button><button data-value="1" class="on">30 kHz (μ=1)</button><button data-value="2">60 kHz (μ=2)</button><button data-value="3">120 kHz (μ=3)</button></div></div>
+        <label class="check"><input type="checkbox" id="nm-mini"> 미니 슬롯 (심볼 2개 단위로 즉시 전송, URLLC)</label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">슬롯 길이 (14 심볼)</span><span class="v" id="o-nm-slot">—</span></div>
+        <div class="stat"><span class="k">심볼 / CP 길이</span><span class="v" id="o-nm-sym">—</span></div>
+        <div class="stat"><span class="k">CP가 견디는 경로 차</span><span class="v" id="o-nm-cp">—</span></div>
+        <div class="stat"><span class="k">무선 구간 지연 (대략)</span><span class="v" id="o-nm-lat">—</span></div>
+        <div class="stat"><span class="k">최대 채널 폭 · 쓰임</span><span class="v" id="o-nm-bw" style="font-size:14px">—</span></div>
+      </div>
+      <div class="sim-note">그림은 같은 넓이(1 ms × 720 kHz)를 자른 바둑판이다. 칸 하나의 넓이(시간 × 주파수)는 언제나 같다. 간격이 넓어지면 칸이 “가로로 좁고 세로로 긴” 모양이 될 뿐이다. 진한 색 = 한 사용자에게 배정한 한 번의 전송(RB 1개 × 1 슬롯 또는 미니 슬롯). 가정: 무선 구간 지연 ≈ (평균 대기 0.5 + 전송 1 + 단말·기지국 처리 1.5) × 전송 단위 길이, 재전송 없음. 실제로는 스케줄링 요청과 재전송이 더해진다.</div>
+    </div>
+    <p>한국의 3.5 GHz 5G는 30 kHz(슬롯 0.5 ms, 100 MHz 폭에 RB 273개)를, 밀리미터파 28 GHz는 120 kHz(슬롯 0.125 ms)를 쓴다. 높은 주파수일수록 셀이 작아 다중 경로의 지연 차가 짧고, 발진기의 위상 잡음이 커서 넓은 부반송파 간격이 오히려 유리하기 때문이다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="spectrum">
+    <h2>주파수 대역: 멀리 가는 전파와 많이 싣는 전파</h2>
+    <p>11장에서 본 대로 주파수가 높을수록 같은 안테나 크기에서 경로 손실이 크고, 벽과 몸과 나뭇잎을 잘 못 뚫는다. 대신 높은 대역에는 넓은 빈 주파수가 남아 있다. 이동통신 사업자는 그래서 세 층의 대역을 섞어 쓴다.</p>
+    <ul>
+      <li><b>저대역</b>(1 GHz 아래, 700~900 MHz): 멀리 가고 건물 안 깊숙이 들어간다. 폭은 10~20 MHz로 좁다. 전국 커버리지와 실내의 기본 연결을 맡는다.</li>
+      <li><b>중대역</b>(1.8~2.6 GHz의 LTE, 그리고 <b>3.5 GHz</b>의 5G): 5G의 주력이다. 한국 통신 3사는 3.5 GHz 대역에서 각각 약 100 MHz씩을 쓴다. 커버리지와 용량의 균형이 좋고, Massive MIMO로 손실을 메운다.</li>
+      <li><span class="term">밀리미터파</span><span class="en">(mmWave)</span>(24 GHz 이상, 예: 28 GHz): 수백 MHz~GHz 폭을 쓸 수 있어 용량은 압도적이지만 셀 반경이 수백 m 이하이고 사람 몸이나 유리창에도 크게 약해진다. 한국은 2018년 28 GHz를 할당했지만 기지국 구축이 부진해 2022~2023년 통신 3사의 할당이 모두 취소되었다. 경기장·공항 같은 밀집 지역의 특수 용도로 남아 있다.</li>
+    </ul>
+    <div class="sim" id="sim-band">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>대역별 셀 반경과 용량</h3></div>
+      <div class="sim-view"><canvas id="cv-band"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>대역</span><div class="seg" id="bd-b"><button data-value="0">800 MHz (LTE)</button><button data-value="1">1.8 GHz (LTE)</button><button data-value="2" class="on">3.5 GHz (5G)</button><button data-value="3">28 GHz (5G)</button></div></div>
+        <div class="ctrl"><span>환경</span><div class="seg" id="bd-env"><button data-value="u" class="on">도심</button><button data-value="s">교외</button></div></div>
+        <label class="check"><input type="checkbox" id="bd-in"> 건물 안 사용자까지 덮기</label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">셀 반경</span><span class="v" id="o-bd-r">—</span></div>
+        <div class="stat"><span class="k">서울(605 km²)에 필요한 셀</span><span class="v" id="o-bd-n">—</span></div>
+        <div class="stat"><span class="k">셀 용량 (평균, 하향)</span><span class="v" id="o-bd-cap">—</span></div>
+        <div class="stat"><span class="k">1 km²당 용량</span><span class="v" id="o-bd-dens">—</span></div>
+      </div>
+      <div class="sim-note">그림은 같은 3 km × 2 km 동네를 그 대역의 셀로 덮은 모습이다(점 = 기지국). 해볼 것: ① 800 MHz는 셀 하나가 동네를 다 덮지만 용량이 작다. ② 28 GHz는 1 km²당 용량이 압도적이지만 셀이 수십 배 필요하고, “건물 안”을 켜면 반경이 급격히 준다. 가정: 최대 허용 경로 손실 148 dB, 경로 손실 지수 3.5(도심)/3.0(교외), 밀리미터파는 빔포밍 이득 +15 dB·인체·수목 손실 −10 dB·지수 4.0/3.4, 실내 침투 손실 10/13/17/35 dB, 셀 평균 주파수 효율 1.5/2/7(Massive MIMO)/3 bps/Hz, TDD 하향 비율 75%.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="basestation">
+    <h2>기지국 안: 안테나, RRU/AAU, BBU, 그리고 O-RAN</h2>
+    <p>건물 옥상이나 철탑의 기지국은 세 부분으로 되어 있다. 꼭대기의 <b>안테나</b>와 그 바로 뒤의 <b>RRU</b>(원격 무선 장치: 증폭기·필터·주파수 변환, 18장)가 전파를 다루고, 아래쪽 함체나 통신사 건물의 <b>BBU</b>(기저대역 장치)가 변조·부호화·스케줄링 같은 디지털 처리를 한다. 둘 사이는 광섬유 <b>프론트홀</b>(CPRI/eCPRI)로 잇는다. 5G 중대역에서는 안테나와 RRU를 한 상자로 합친 <b>AAU</b>(능동 안테나 장치)를 쓰는데, 안에 송수신기 64개(64T64R)와 안테나 소자 약 200개가 들어 있다. 이것이 12장의 빔포밍과 MU-MIMO를 실제로 하는 <span class="term">Massive MIMO</span>다. 한 셀에서 여러 사용자에게 서로 다른 빔을 동시에 쏘아 같은 주파수를 공간적으로 재사용한다. 셀룰러의 주파수 재사용을 셀 안에서 한 번 더 하는 셈이다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 300" style="min-width:620px" role="img" aria-label="기지국 내부: AAU, 프론트홀, DU, CU, 백홀, O-RAN의 개방 인터페이스와 RIC">
+        <defs><marker id="cl-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <path d="M90 290 L120 120 L150 290" fill="none" stroke="var(--text-dim)" stroke-width="2"/><path d="M100 230 H140 M106 180 H134" stroke="var(--text-dim)" stroke-width="1.5"/>
+        <rect x="70" y="30" width="100" height="90" rx="8" class="f-acc-soft"/>
+        <g fill="var(--accent)" opacity=".75"><circle cx="84" cy="44" r="3"/><circle cx="98" cy="44" r="3"/><circle cx="112" cy="44" r="3"/><circle cx="126" cy="44" r="3"/><circle cx="140" cy="44" r="3"/><circle cx="154" cy="44" r="3"/><circle cx="84" cy="58" r="3"/><circle cx="98" cy="58" r="3"/><circle cx="112" cy="58" r="3"/><circle cx="126" cy="58" r="3"/><circle cx="140" cy="58" r="3"/><circle cx="154" cy="58" r="3"/><circle cx="84" cy="72" r="3"/><circle cx="98" cy="72" r="3"/><circle cx="112" cy="72" r="3"/><circle cx="126" cy="72" r="3"/><circle cx="140" cy="72" r="3"/><circle cx="154" cy="72" r="3"/></g>
+        <text x="120" y="96" text-anchor="middle" class="t" style="font-weight:700">AAU</text><text x="120" y="112" text-anchor="middle" class="t-mono">64T64R</text>
+        <g fill="none" stroke="var(--accent)" stroke-width="2" opacity=".6"><path d="M172 50 L250 20 L250 60 Z"/><path d="M172 70 L260 70 L250 100 Z"/></g>
+        <text x="262" y="44" class="t-dim">빔 1 → 사용자 A</text><text x="268" y="92" class="t-dim">빔 2 → 사용자 B</text>
+        <path d="M170 110 C220 160, 260 200, 300 200" fill="none" stroke="var(--accent)" stroke-width="2.5" marker-end="url(#cl-b)"/>
+        <text x="236" y="150" class="t-mono" style="fill:var(--accent)">프론트홀 (eCPRI, 광)</text>
+        <rect x="300" y="170" width="150" height="110" rx="12" fill="none" stroke="var(--border)" stroke-dasharray="5 4"/><text x="375" y="190" text-anchor="middle" class="t-dim">BBU (기저대역)</text>
+        <rect x="314" y="200" width="122" height="32" rx="8" class="f-elev"/><text x="375" y="221" text-anchor="middle" class="t" style="font-weight:700">DU · 실시간 L1/L2</text>
+        <rect x="314" y="240" width="122" height="32" rx="8" class="f-elev"/><text x="375" y="261" text-anchor="middle" class="t" style="font-weight:700">CU · L3/PDCP</text>
+        <path d="M450 256 H520" class="s-acc" marker-end="url(#cl-b)"/><text x="485" y="248" text-anchor="middle" class="t-mono">백홀</text>
+        <rect x="520" y="232" width="90" height="48" rx="10" class="f-surface"/><text x="565" y="261" text-anchor="middle" class="t" style="font-weight:700">코어망</text>
+        <rect x="490" y="30" width="290" height="160" rx="14" class="f-acc2-soft"/>
+        <text x="635" y="54" text-anchor="middle" class="t" style="font-weight:700">O-RAN · 가상화(vRAN)</text>
+        <text x="506" y="82" class="t-dim">• RU·DU·CU 사이 인터페이스를 공개 표준으로</text>
+        <text x="506" y="104" class="t-dim">  → 서로 다른 회사 장비를 섞어 쓸 수 있다</text>
+        <text x="506" y="128" class="t-dim">• DU·CU를 범용 서버 위 소프트웨어로(vRAN)</text>
+        <text x="506" y="152" class="t-dim">• RIC: AI 앱(xApp)이 빔·자원 배분을 최적화</text>
+        <text x="506" y="176" class="t-dim">• 여러 기지국의 BBU를 한 곳에 모으면 C-RAN</text>
+        <path d="M450 210 C480 200, 500 195, 520 190" fill="none" stroke="var(--accent-2)" stroke-dasharray="4 3" stroke-width="1.5"/>
+      </svg></div>
+      <figcaption><b>그림 14-3.</b> 기지국의 내부. 안테나와 RF는 하늘 가까이, 디지털 처리(DU·CU)는 아래나 멀리 떨어진 건물에 둔다. O-RAN은 이 사이를 표준 인터페이스로 열어, 한 회사 장비로 통째로 묶이던 기지국을 부품처럼 조합하고 소프트웨어로 바꾸려는 흐름이다.</figcaption>
+    </figure>
+    <p>전통적으로 기지국은 한 제조사의 RRU와 BBU를 전용 인터페이스로 묶은 “블랙박스”였다. <span class="term">O-RAN</span><span class="en">(Open RAN)</span>은 이 연결을 공개 규격(O-RAN 프론트홀 7.2x 분할 등)으로 바꾸고, DU·CU 기능을 일반 서버의 소프트웨어로 돌리는(vRAN) 흐름이다. 데이터센터처럼 서버와 소프트웨어를 갈아 끼우며 기능을 추가하고, RIC라는 제어기 위의 AI 앱이 빔과 자원 배분을 실시간으로 조정한다. 다만 무선 신호 처리의 실시간 요구가 까다로워 성능·전력 효율은 전용 칩(17·18장) 기반 장비와 아직 경쟁 중이다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="slicing">
+    <h2>네트워크 슬라이싱, 그리고 TDD와 FDD</h2>
+    <p>공장의 로봇 팔 제어(지연 수 ms, 절대 끊기면 안 됨), 경기장의 4K 영상(대역폭), 수만 개 수도 계량기(아주 작은 데이터, 배터리 10년)는 원하는 것이 전혀 다르다. <span class="term">네트워크 슬라이싱</span><span class="en">(network slicing)</span>은 물리적으로 하나인 5G 망을 여러 개의 독립된 논리 망(슬라이스)으로 잘라 각자에게 맞는 성능을 보장한다. 무선 자원(RB·뉴멀로지)의 몫, 전송망의 우선순위, 코어의 전용 UPF(지연이 중요하면 공장 가까운 에지에 둔다)를 슬라이스마다 따로 잡는다. 휴대폰은 접속할 때 원하는 슬라이스 번호(S-NSSAI)를 요청하고, 코어의 NSSF가 이를 고른다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 220" style="min-width:600px" role="img" aria-label="하나의 물리망을 eMBB, URLLC, mMTC 슬라이스로 나누기">
+        <rect x="150" y="20" width="520" height="180" rx="16" fill="none" stroke="var(--border)" stroke-width="1.5"/><text x="410" y="40" text-anchor="middle" class="t-dim">하나의 물리망: 같은 기지국 · 같은 광케이블 · 같은 데이터센터</text>
+        <g class="t" style="font-weight:700"><text x="20" y="80">4K 영상</text><text x="20" y="130">로봇 제어</text><text x="20" y="180">계량기 10만 대</text></g>
+        <rect x="160" y="62" width="500" height="26" rx="13" class="f-acc-soft"/><text x="410" y="80" text-anchor="middle" class="t">eMBB 슬라이스 — 넓은 대역폭, 중앙 UPF</text>
+        <rect x="160" y="112" width="500" height="26" rx="13" fill="color-mix(in srgb, var(--bad) 16%, transparent)" stroke="var(--bad)"/><text x="410" y="130" text-anchor="middle" class="t">URLLC 슬라이스 — 미니 슬롯, 최우선, 공장 옆 에지 UPF</text>
+        <rect x="160" y="162" width="500" height="26" rx="13" fill="color-mix(in srgb, var(--ok) 16%, transparent)" stroke="var(--ok)"/><text x="410" y="180" text-anchor="middle" class="t">mMTC 슬라이스 — 작은 데이터, 대량 접속, 절전</text>
+        <g class="t-mono"><text x="680" y="80">≥100 Mbps</text><text x="680" y="130">≤ 수 ms</text><text x="680" y="180">100만/km²</text></g>
+      </svg></div>
+      <figcaption><b>그림 14-4.</b> 네트워크 슬라이싱. 고속도로 하나에 버스 전용 차로, 구급차 차로, 화물차 차로를 그어 서로 방해하지 않게 하는 것과 같다. 차선을 칠하는 일은 소프트웨어(SDN, 21장)가 한다.</figcaption>
+    </figure>
+    <h3>상향과 하향을 나누는 두 방법</h3>
+    <p>휴대폰은 받기(하향, DL)와 보내기(상향, UL)를 모두 해야 한다. 나누는 방법은 둘이다. <b>FDD</b>(주파수 분할 이중)는 서로 떨어진 두 주파수 대역을 짝지어 하나는 하향, 하나는 상향에 늘 쓴다. LTE의 1.8 GHz처럼 “20 + 20 MHz” 식으로 표기한다. <b>TDD</b>(시간 분할 이중)는 한 대역을 시간으로 나눠 슬롯마다 하향(D)·상향(U)·전환(S)을 번갈아 쓴다. 3.5 GHz 5G는 TDD다. 짝지은 대역이 필요 없고, 인터넷 트래픽처럼 하향이 훨씬 많을 때 하향 비율을 크게 잡을 수 있다. 또 같은 주파수로 오가니 상향에서 잰 채널을 하향 빔포밍에 그대로 쓸 수 있어(채널 상호성) Massive MIMO와 궁합이 좋다. 대신 상향 슬롯이 올 때까지 기다려야 해서 지연이 늘고, 이웃 기지국끼리 D/U 시점을 정확히 맞춰야 서로 간섭하지 않는다(GPS 시각 동기, 15장).</p>
+    <div class="sim" id="sim-tdd">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>TDD 슬롯 패턴과 FDD 비교</h3></div>
+      <div class="sim-view"><canvas id="cv-tdd"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>TDD 패턴 (슬롯 0.5 ms, 30 kHz)</span><div class="seg" id="td-p"><button data-value="DDDSU" class="on">DDDSU</button><button data-value="DDDDDDDSUU">DDDDDDDSUU</button><button data-value="DDSUU">DDSUU</button><button data-value="DSUUU">DSUUU (상향 중심)</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">하향 : 상향 시간</span><span class="v" id="o-td-ratio">—</span></div>
+        <div class="stat"><span class="k">하향 최대 (100 MHz)</span><span class="v" id="o-td-dl">—</span></div>
+        <div class="stat"><span class="k">상향 최대</span><span class="v" id="o-td-ul">—</span></div>
+        <div class="stat"><span class="k">상향 기회까지 최대 대기</span><span class="v" id="o-td-wait">—</span></div>
+      </div>
+      <div class="sim-note">위: TDD 한 대역에서 10 ms 동안의 슬롯(D 하향, U 상향, S = 하향 10심볼 + 전환 보호 2 + 상향 2). 아래: FDD는 두 대역이 늘 하향·상향을 동시에 한다. 해볼 것: 패턴을 상향 중심으로 바꾸면 CCTV·방송 중계처럼 올리는 트래픽이 많은 곳(예: 공장 전용 5G)에 맞출 수 있다. 가정: 100 MHz·4계층·256-QAM 하향의 연속 최대 약 2.3 Gbps, 상향은 단말 2계층으로 그 절반, 제어·기준 신호 오버헤드 포함 근사.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="sixg">
+    <h2>6G 전망: 2030년의 이동통신</h2>
+    <p>국제전기통신연합(ITU)은 6G를 <b>IMT-2030</b>이라는 이름으로 준비하고 있고, 표준 단체 3GPP는 2025년 무렵부터 6G 연구를 시작해 2030년 전후 상용화를 목표로 한다. 아직 정해지지 않은 부분이 많지만, 방향은 대체로 다음 네 가지로 모인다.</p>
+    <ul>
+      <li><b>새 주파수</b>: 3.5 GHz와 밀리미터파 사이의 <b>7~24 GHz</b>(“상위 중대역”, FR3)가 유력한 주력 후보다. 커버리지와 폭의 절충점이다. 더 멀리는 100~300 GHz의 <b>서브테라헤르츠</b>로 근거리 초고속(수백 Gbps)을 노린다. 다만 이 대역은 대기 흡수와 반도체 출력의 한계가 커서(18·19장) 실내·근거리 용도가 중심이 될 것이다.</li>
+      <li><b>AI 네이티브</b>: 지금까지 사람이 설계한 변조·채널 추정·스케줄링 일부를 학습된 신경망이 맡고, 망 운영 자체를 AI가 자동화한다. 5G의 O-RAN·RIC가 그 예고편이다.</li>
+      <li><b>비지상망(NTN) 통합</b>: 저궤도 위성과 고고도 비행체를 이동통신 표준 안으로 넣어, 바다·사막·재난 지역에서도 같은 휴대폰이 그대로 연결되게 한다. 5G Release 17에서 이미 시작되었다. 자세한 이야기는 다음 15장에서 한다.</li>
+      <li><b>통신 + 센싱</b>(ISAC): 기지국 전파의 반사를 레이더처럼 분석해 드론·차량·사람의 움직임을 감지한다. 통신망이 거대한 감지기가 된다.</li>
+    </ul>
+    <div class="callout tip"><strong>세대 숫자보다 중요한 것</strong><p>체감 속도를 정하는 것은 세대 이름보다 <b>내 위치의 대역과 셀 혼잡도</b>다. 같은 “5G” 표시라도 3.5 GHz 셀 가장자리에서 사람이 몰리면 LTE보다 느릴 수 있다. 또 5G 초기에는 제어 신호를 LTE 코어가 맡는 비단독(NSA) 방식으로 시작했고, 5G 코어까지 쓰는 단독(SA) 방식으로 넘어가야 슬라이싱과 URLLC 같은 진짜 5G 기능이 열린다.</p></div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>셀룰러는 땅을 <b>셀</b>로 쪼개 떨어진 셀에서 같은 주파수를 <b>재사용</b>한다. 재사용 계수 N이 크면 간섭이 줄고 셀당 채널도 준다(D = R√(3N)). LTE·5G는 N = 1.</li>
+      <li><b>셀 분할</b>은 D/R을 그대로 둔 채 셀 수를 늘려 같은 주파수로 용량을 키운다. 이동통신 용량 증가의 가장 큰 원천이다.</li>
+      <li><b>핸드오버</b>는 기지국이 결정한다. 히스테리시스와 TTT가 작으면 핑퐁, 크면 늦은 핸드오버로 연결이 끊긴다. 빠를수록 늦은 핸드오버가 위험하다.</li>
+      <li>세대는 다중 접속으로 갈린다: <b>1G FDMA(아날로그) → 2G TDMA/CDMA → 3G WCDMA → 4G OFDMA(전부 IP) → 5G NR(eMBB·URLLC·mMTC)</b>. 한국은 1996 CDMA, 2011 LTE, 2019년 4월 세계 최초 5G.</li>
+      <li>망은 <b>UE → gNB → 전송망 → 5GC(AMF·SMF·UPF 등) → 인터넷</b>. SIM의 비밀 키 K로 망과 단말이 서로를 인증하고 암호 키를 얻는다. eSIM은 프로필을 내려받는다.</li>
+      <li>5G <b>뉴멀로지</b>: 부반송파 간격 15·30·60·120 kHz에 따라 슬롯이 1·0.5·0.25·0.125 ms. 짧을수록 지연이 줄지만 CP가 짧아 다중 경로에 약해진다.</li>
+      <li><b>저대역</b>은 커버리지, <b>3.5 GHz</b>는 5G 주력(커버리지·용량 균형), <b>밀리미터파</b>는 용량↑ 커버리지↓. 기지국은 AAU(Massive MIMO)·DU·CU로 나뉘고 <b>O-RAN</b>이 이를 개방·가상화한다.</li>
+      <li><b>슬라이싱</b>은 한 망을 용도별 논리 망으로 자르고, <b>TDD</b>는 한 대역을 시간으로, <b>FDD</b>는 두 대역으로 상·하향을 나눈다. 6G는 7~24 GHz·서브THz, AI 네이티브, 위성 통합(15장)을 향한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>재사용 계수는 그대로 두고 셀 반지름을 절반으로 줄이면(셀 분할) 어떻게 되나?</p><div class="opts">
+        <button class="opt">간섭이 4배 커져 용량이 줄어든다</button><button class="opt">아무것도 바뀌지 않는다</button><button class="opt" data-correct>D/R 비율이 같아 간섭 수준은 비슷하고, 셀이 4배가 되어 용량도 약 4배가 된다</button><button class="opt">주파수를 4배 더 사야 한다</button>
+      </div><div class="quiz-exp">같은 주파수 셀 사이 거리 D도 R에 비례해 줄어 D/R이 그대로이므로 간섭비는 유지된다. 면적당 셀 수가 1/R²로 늘어 용량도 그만큼 는다.</div></div>
+      <div class="quiz-q"><p>핸드오버에서 히스테리시스와 트리거 시간(TTT)을 너무 크게 잡으면 생기는 문제는?</p><div class="opts">
+        <button class="opt" data-correct>이웃 셀이 훨씬 센데도 옛 셀에 머물다 간섭에 묻혀 연결이 끊긴다</button><button class="opt">두 셀 사이를 자꾸 왔다 갔다 하는 핑퐁이 늘어난다</button><button class="opt">IP 주소가 바뀐다</button><button class="opt">SIM 인증을 다시 해야 한다</button>
+      </div><div class="quiz-exp">브레이크가 너무 세면 핸드오버가 늦어진다(late handover). 핑퐁은 반대로 값이 너무 작을 때 생긴다.</div></div>
+      <div class="quiz-q"><p>5G 코어망에서 사용자의 실제 데이터 패킷이 인터넷으로 나가는 관문 역할을 하는 기능은?</p><div class="opts">
+        <button class="opt">AMF</button><button class="opt">AUSF</button><button class="opt">NSSF</button><button class="opt" data-correct>UPF</button>
+      </div><div class="quiz-exp">UPF(User Plane Function)가 사용자 평면의 관문이다. AMF는 접속·이동성, SMF는 세션, AUSF·UDM은 인증과 가입자 정보, NSSF는 슬라이스 선택을 맡는다.</div></div>
+      <div class="quiz-q"><p>5G에서 부반송파 간격을 30 kHz에서 120 kHz로 바꾸면?</p><div class="opts">
+        <button class="opt">슬롯이 4배 길어져 지연이 늘어난다</button><button class="opt" data-correct>슬롯이 0.5 ms → 0.125 ms로 짧아져 지연이 줄지만, CP도 짧아져 긴 다중 경로에 약해진다</button><button class="opt">한 칸(RE)의 시간 × 주파수 넓이가 4배가 된다</button><button class="opt">아무 차이가 없다</button>
+      </div><div class="quiz-exp">심볼 길이는 부반송파 간격에 반비례한다. 간격 ×4 → 심볼·슬롯·CP 모두 ÷4. 그래서 120 kHz는 셀이 작은 밀리미터파에 쓴다.</div></div>
+      <div class="quiz-q"><p>28 GHz 밀리미터파에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt">벽을 잘 뚫어 실내 커버리지에 가장 좋다</button><button class="opt">대역폭이 좁아 속도가 LTE보다 느리다</button><button class="opt">셀 반경이 수십 km라 시골에 적합하다</button><button class="opt" data-correct>수백 MHz 이상의 넓은 폭으로 용량은 크지만 셀이 작고 몸·유리·나뭇잎에 크게 약해진다</button>
+      </div><div class="quiz-exp">주파수가 높을수록 경로·침투 손실이 크다. 넓은 폭 덕분에 용량은 크지만 기지국을 매우 촘촘히 세워야 한다. 한국에서는 구축 부진으로 2022~2023년 통신 3사의 28 GHz 할당이 취소되었다.</div></div>
+      <div class="quiz-q"><p>TDD 방식의 장점으로 가장 알맞은 것은?</p><div class="opts">
+        <button class="opt">상향과 하향을 동시에 보내 지연이 가장 작다</button><button class="opt" data-correct>짝지은 두 대역 없이 한 대역에서 하향·상향 시간 비율을 트래픽에 맞게 정할 수 있고, 채널 상호성으로 빔포밍에 유리하다</button><button class="opt">이웃 기지국과 시간을 맞출 필요가 없다</button><button class="opt">주파수 재사용이 필요 없다</button>
+      </div><div class="quiz-exp">TDD는 한 대역을 시간으로 나눈다. 비대칭 트래픽에 맞추기 쉽고 상·하향 채널이 같아 Massive MIMO에 좋다. 대신 상향 슬롯을 기다리는 지연과 기지국 간 시각 동기가 필요하다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------- 1. 육각 셀 재사용 ---------- */
+  const IJ = { 1: [1, 0], 3: [1, 1], 4: [2, 0], 7: [2, 1] };
+  const RS = [0.2, 0.3, 0.5, 0.7, 1, 1.5, 2, 3, 5];
+  const CH_TOTAL = 168;
+  const hxN = NB.seg("hx-n", () => { hxSel = null; hxUpdate(); });
+  const hxR = NB.range("hx-r", (v) => RS[v] + " km", () => hxUpdate());
+  const K = 4, cells = [];
+  for (let q = -K; q <= K; q++) for (let r = -K; r <= K; r++) if (Math.abs(q + r) <= K) cells.push({ q, r, d: Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r)) });
+  cells.sort((a, b) => a.d - b.d || a.q - b.q || a.r - b.r);
+  let hxSel = null, cls = [], hxGeom = null;
+  function classify() {
+    const N = Number(hxN()), [i, j] = IJ[N], map = {};
+    const mod = (a) => ((a % N) + N) % N;
+    cls = cells.map((c) => { const key = mod(c.q * (i + j) + c.r * j) + "," + mod(i * c.r - j * c.q); if (!(key in map)) map[key] = Object.keys(map).length; return map[key]; });
+  }
+  function hxUpdate() {
+    classify();
+    const N = Number(hxN()), R = RS[hxR()], D = R * Math.sqrt(3 * N);
+    const sir = 10 * Math.log10(Math.pow(Math.sqrt(3 * N), 4) / 6);
+    const perCell = Math.floor(CH_TOTAL / N), nCells = Math.ceil(100 / (2.598 * R * R));
+    NB.stat("o-hx-ch", perCell + "개");
+    NB.stat("o-hx-d", D.toFixed(D < 1 ? 2 : 1) + " km <small style='color:var(--text-dim)'>(D/R " + Math.sqrt(3 * N).toFixed(2) + ")</small>");
+    const tag = sir >= 18 ? ["var(--ok)", "아날로그 음성 OK"] : sir >= 9 ? ["var(--warn)", "디지털이면 OK"] : ["var(--bad)", "간섭 조정 필수"];
+    NB.stat("o-hx-sir", `<span style="color:${tag[0]}">${sir.toFixed(1)} dB</span> <small style="color:var(--text-dim)">${tag[1]}</small>`);
+    NB.stat("o-hx-cap", NB.kn(nCells * perCell) + "명 <small style='color:var(--text-dim)'>(셀 " + NB.kn(nCells) + "개)</small>");
+    hxCv.redraw();
+  }
+  const hxCv = NB.canvas("#cv-hex", (ctx, w, h) => {
+    const P = NB.palette(); if (!cls.length) return;
+    const cols = [P.accent, P.accent2, P.warn, P.ok, P.bad, P.blue, P.dim];
+    const s = Math.min((w - 20) / (Math.sqrt(3) * (2 * K + 1)), (h - 20) / (3 * K + 2));
+    const cx = w / 2, cy = h / 2;
+    const pos = (c) => [cx + s * Math.sqrt(3) * (c.q + c.r / 2), cy + s * 1.5 * c.r];
+    hxGeom = { s, pos };
+    const selIdx = hxSel == null ? 0 : hxSel, selCls = cls[selIdx];
+    const hexPath = (x, y, k) => { ctx.beginPath(); for (let a = 0; a < 6; a++) { const t = Math.PI / 6 + (a * Math.PI) / 3; ctx.lineTo(x + k * Math.cos(t), y + k * Math.sin(t)); } ctx.closePath(); };
+    cells.forEach((c, idx) => {
+      const [x, y] = pos(c), on = cls[idx] === selCls;
+      hexPath(x, y, s * 0.97); ctx.fillStyle = cols[cls[idx] % cols.length]; ctx.globalAlpha = on ? 0.8 : 0.16; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.strokeStyle = on ? P.text : P.border; ctx.lineWidth = on ? 1.6 : 1; ctx.stroke();
+      if (s > 13) NB.text(ctx, "ABCDEFG"[cls[idx]], x, y, { align: "center", size: Math.min(14, s * 0.5), bold: on, color: on ? "#fff" : P.dim });
+    });
+    // 가장 가까운 같은 주파수 셀 6개
+    const sc = cells[selIdx], [sx, sy] = pos(sc);
+    const co = cells.map((c, idx) => ({ c, idx })).filter((o) => o.idx !== selIdx && cls[o.idx] === selCls).map((o) => { const [x, y] = pos(o.c); return { x, y, dd: Math.hypot(x - sx, y - sy) }; }).sort((a, b) => a.dd - b.dd);
+    const dmin = co.length ? co[0].dd : 0;
+    ctx.setLineDash([5, 4]); ctx.strokeStyle = P.text; ctx.lineWidth = 1.4;
+    co.filter((o) => o.dd < dmin * 1.01).forEach((o) => { ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(o.x, o.y); ctx.stroke(); });
+    ctx.setLineDash([]);
+    hexPath(sx, sy, s * 0.97); ctx.strokeStyle = P.text; ctx.lineWidth = 3; ctx.stroke();
+    if (co.length) { const o = co[0]; const mx = (sx + o.x) / 2, my = (sy + o.y) / 2; NB.box(ctx, mx - 16, my - 10, 32, 20, { fill: P.bg, stroke: P.border, text: "D", size: 12, bold: true, r: 5 }); }
+    NB.text(ctx, "N = " + hxN() + " · 셀을 눌러 주파수 묶음 선택", 10, 14, { size: 12, color: P.dim });
+    NB.text(ctx, "R = " + RS[hxR()] + " km", w - 10, 14, { align: "right", size: 12, mono: true, color: P.dim });
+  }, { aspect: 0.62, minHeight: 300, maxHeight: 460 });
+  $("cv-hex").addEventListener("click", (ev) => {
+    if (!hxGeom) return; const r = ev.target.getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top;
+    let best = -1, bd = 1e9; cells.forEach((c, idx) => { const [px, py] = hxGeom.pos(c); const d = Math.hypot(px - x, py - y); if (d < bd) { bd = d; best = idx; } });
+    if (bd < hxGeom.s) { hxSel = best; hxCv.redraw(); }
+  });
+  hxUpdate();
+
+  /* ---------- 2. 핸드오버 ---------- */
+  const TTTS = [0, 40, 160, 320, 640, 1280, 2560];
+  const hoH = NB.range("ho-h", (v) => v + " dB", () => hoRun());
+  const hoT = NB.range("ho-t", (v) => TTTS[v] + " ms", () => hoRun());
+  const hoV = NB.seg("ho-v", () => hoRun());
+  let hoSeed = 3, sh = null, ho = null;
+  const ISD = 1600, X0 = 100, X1 = 1500;
+  function shadow(seed) {
+    const rnd = NB.rng(seed), g = () => { let u = rnd() || 1e-9, v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+    const rho = Math.exp(-1 / 40), sd = 4, a = [], b = [];
+    let sa = g() * sd, sb = g() * sd;
+    for (let x = 0; x <= ISD; x++) { a.push(sa); b.push(sb); sa = rho * sa + Math.sqrt(1 - rho * rho) * sd * g(); sb = rho * sb + Math.sqrt(1 - rho * rho) * sd * g(); }
+    return { a, b };
+  }
+  const rsrp = (dm, s) => 15 - (128.1 + 37.6 * Math.log10(Math.max(0.02, dm / 1000))) + s;
+  const NOISE = -125.2;
+  function hoRun() {
+    if (!sh) sh = shadow(hoSeed);
+    const hyst = hoH(), ttt = TTTS[hoT()] / 1000, v = Number(hoV()) / 3.6, dt = 0.01;
+    const rnd = NB.rng(hoSeed * 7 + 1), g = () => { let u = rnd() || 1e-9, vv = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * vv); };
+    const mr = Math.exp(-dt / 0.1), msd = 2.5; let ma = 0, mb = 0;
+    let serv = 0, timer = 0, lastHO = -99, prevServ = -1, nHO = 0, nPP = 0, nRLF = 0, bad = 0, badT = 0, t = 0, inRlf = false;
+    const ev = [], servAt = new Array(ISD + 1).fill(-1);
+    for (let x = X0; x <= X1; x += v * dt, t += dt) {
+      const xi = Math.round(x);
+      ma = mr * ma + Math.sqrt(1 - mr * mr) * msd * g(); mb = mr * mb + Math.sqrt(1 - mr * mr) * msd * g();
+      const A = rsrp(x, sh.a[xi]), B = rsrp(ISD - x, sh.b[xi]);
+      const mS = (serv === 0 ? A + ma : B + mb), mN = (serv === 0 ? B + mb : A + ma);
+      if (mN > mS + hyst) { timer += dt; if (timer >= ttt) {
+        const to = 1 - serv; const pp = to === prevServ && t - lastHO < 1.0; if (pp) nPP++; nHO++;
+        ev.push({ x, k: pp ? "pp" : "ho" }); prevServ = serv; serv = to; lastHO = t; timer = 0; } }
+      else timer = 0;
+      const S = serv === 0 ? A : B, I = serv === 0 ? B : A;
+      const sinr = S - 10 * Math.log10(Math.pow(10, I / 10) + Math.pow(10, NOISE / 10));
+      if (sinr < -8) { bad += dt; badT += dt; if (bad > 0.5 && !inRlf) { nRLF++; inRlf = true; ev.push({ x, k: "rlf" }); prevServ = serv; serv = A > B ? 0 : 1; lastHO = t; badT += 0.5; } }
+      else { bad = 0; inRlf = false; }
+      servAt[xi] = inRlf ? 2 : serv;
+    }
+    ho = { ev, servAt };
+    NB.stat("o-ho-n", nHO + "회");
+    NB.stat("o-ho-pp", `<span style="color:${nPP ? "var(--warn)" : "inherit"}">${nPP}회</span>`);
+    NB.stat("o-ho-rlf", `<span style="color:${nRLF ? "var(--bad)" : "var(--ok)"}">${nRLF}회</span>`);
+    NB.stat("o-ho-out", badT < 0.05 ? "0초" : badT.toFixed(1) + "초");
+    hoCv.redraw();
+  }
+  $("ho-new").onclick = () => { hoSeed++; sh = null; hoRun(); };
+  const hoCv = NB.canvas("#cv-ho", (ctx, w, h) => {
+    const P = NB.palette(); if (!ho) return;
+    const small = w < 500;
+    const box = { x: small ? 44 : 56, y: 24, w: w - (small ? 56 : 74), h: h - 96 };
+    const da = [], db = [];
+    for (let x = X0; x <= X1; x += 4) { da.push([x / 1000, rsrp(x, sh.a[x])]); db.push([x / 1000, rsrp(ISD - x, sh.b[x])]); }
+    const res = NB.chart(ctx, box, { x: [X0 / 1000, X1 / 1000], y: [-125, -55], xFmt: (v) => v.toFixed(1), yFmt: (v) => v,
+      series: [{ data: da, color: P.accent, width: 2 }, { data: db, color: P.accent2, width: 2 }] });
+    NB.text(ctx, "RSRP (dBm)", box.x + 4, box.y - 12, { size: 11, color: P.dim });
+    NB.text(ctx, "기지국 A ←", box.x + 6, box.y + 10, { size: 12, bold: true, color: P.accent });
+    NB.text(ctx, "→ 기지국 B", box.x + box.w - 6, box.y + 10, { align: "right", size: 12, bold: true, color: P.accent2 });
+    // 서빙 셀 띠
+    const by = box.y + box.h + 22, bh = 14;
+    for (let x = X0; x < X1; x++) { const s = ho.servAt[x]; if (s < 0) continue; ctx.fillStyle = s === 0 ? P.accent : s === 1 ? P.accent2 : P.bad; ctx.fillRect(res.X(x / 1000), by, Math.max(1, res.X((x + 1) / 1000) - res.X(x / 1000)) + 0.5, bh); }
+    NB.text(ctx, "서빙", box.x - 6, by + bh / 2, { align: "right", size: 11, color: P.dim });
+    ho.ev.forEach((e) => {
+      const x = res.X(e.x / 1000);
+      if (e.k === "rlf") NB.text(ctx, "✕", x, by + bh + 12, { align: "center", size: 15, bold: true, color: P.bad });
+      else { ctx.fillStyle = e.k === "pp" ? P.warn : P.ok; ctx.beginPath(); ctx.moveTo(x, by + bh + 3); ctx.lineTo(x - 5, by + bh + 13); ctx.lineTo(x + 5, by + bh + 13); ctx.closePath(); ctx.fill(); }
+    });
+    NB.text(ctx, "위치 (km)", box.x + box.w / 2, h - 6, { align: "center", size: 11, color: P.dim, base: "bottom" });
+  }, { aspect: 0.5, minHeight: 320, maxHeight: 420 });
+  hoRun();
+
+  /* ---------- 3. 뉴멀로지 ---------- */
+  const nmMu = NB.seg("nm-mu", () => nmUpdate());
+  $("nm-mini").onchange = () => nmUpdate();
+  const BWMAX = ["50 MHz · LTE와 같은 간격, 저대역", "100 MHz · 3.5 GHz 5G 주력", "100/200 MHz · 일부 FR1·FR2", "400 MHz · 28 GHz 밀리미터파"];
+  function nmUpdate() {
+    const mu = Number(nmMu()), mini = $("nm-mini").checked;
+    const scs = 15 * Math.pow(2, mu), slot = 1 / Math.pow(2, mu), sym = 1000 / scs, cp = 4.69 / Math.pow(2, mu);
+    const unit = mini ? (slot * 2) / 14 : slot;
+    NB.stat("o-nm-slot", slot + " ms" + (mini ? " <small style='color:var(--text-dim)'>미니 " + (unit * 1000).toFixed(0) + " µs</small>" : ""));
+    NB.stat("o-nm-sym", sym.toFixed(1) + " / " + cp.toFixed(2) + " µs");
+    NB.stat("o-nm-cp", Math.round(cp * 300) + " m");
+    NB.stat("o-nm-lat", "≈ " + (unit * 3 < 1 ? Math.round(unit * 3 * 1000) + " µs" : (unit * 3).toFixed(1) + " ms"));
+    NB.stat("o-nm-bw", BWMAX[mu]);
+    nmCv.redraw();
+  }
+  const nmCv = NB.canvas("#cv-num", (ctx, w, h) => {
+    const P = NB.palette(), mu = Number(nmMu()), mini = $("nm-mini").checked, small = w < 500;
+    const nsym = 14 * Math.pow(2, mu), nsc = 48 / Math.pow(2, mu);
+    const gx = small ? 40 : 60, gy = 26, gw = w - gx - 14, gh = h - gy - 40;
+    const cw = gw / nsym, chh = gh / nsc;
+    ctx.fillStyle = P.surface; ctx.fillRect(gx, gy, gw, gh);
+    // 배정된 전송: 첫 RB(12 부반송파) × 슬롯 1 또는 미니슬롯
+    const rbRows = Math.min(nsc, 12), startSym = Math.round(nsym * 0.32 / (mini ? 1 : 14) ) * (mini ? 1 : 14);
+    const allocSym = mini ? 2 : 14, s0 = mini ? Math.min(nsym - 2, Math.round(nsym * 0.37)) : Math.min(nsym - 14, Math.floor(nsym / 14 / 2) * 14);
+    ctx.fillStyle = P.accent; ctx.globalAlpha = 0.85; ctx.fillRect(gx + s0 * cw, gy + gh - rbRows * chh, allocSym * cw, rbRows * chh); ctx.globalAlpha = 1;
+    // 다른 사용자들(장식)
+    ctx.fillStyle = P.accent2; ctx.globalAlpha = 0.35;
+    for (let k = 0; k < nsym / 14; k++) if (k * 14 !== s0 || mini) { const rows = Math.min(nsc - rbRows, 12); if (rows > 0) ctx.fillRect(gx + k * 14 * cw, gy + (k % 2 ? 0 : Math.max(0, gh - rbRows * chh - rows * chh)), 14 * cw, rows * chh); }
+    ctx.globalAlpha = 1;
+    // 격자
+    ctx.strokeStyle = P.border; ctx.lineWidth = 0.6;
+    if (cw > 2.5) for (let i = 0; i <= nsym; i++) { ctx.beginPath(); ctx.moveTo(gx + i * cw, gy); ctx.lineTo(gx + i * cw, gy + gh); ctx.stroke(); }
+    for (let j = 0; j <= nsc; j++) { ctx.beginPath(); ctx.moveTo(gx, gy + j * chh); ctx.lineTo(gx + gw, gy + j * chh); ctx.stroke(); }
+    ctx.strokeStyle = P.text; ctx.lineWidth = 2;
+    for (let k = 0; k <= nsym / 14; k++) { const x = gx + k * 14 * cw; ctx.beginPath(); ctx.moveTo(x, gy - 4); ctx.lineTo(x, gy + gh + 4); ctx.stroke(); }
+    const nslot = nsym / 14;
+    for (let k = 0; k < nslot; k++) if (cw * 14 > 26) NB.text(ctx, "슬롯 " + k, gx + (k + 0.5) * 14 * cw, gy - 10, { align: "center", size: 10.5, color: P.dim });
+    if (cw * 14 <= 26) NB.text(ctx, "슬롯 " + nslot + "개 (굵은 세로선)", gx + gw / 2, gy - 10, { align: "center", size: 10.5, color: P.dim });
+    NB.text(ctx, "← 1 ms →", gx + gw / 2, gy + gh + 14, { align: "center", size: 11, mono: true, color: P.dim });
+    NB.text(ctx, "부반송파 " + nsc + "개 × " + 15 * Math.pow(2, mu) + " kHz", gx + gw / 2, gy + gh + 30, { align: "center", size: 11, color: P.dim });
+    ctx.save(); ctx.translate(small ? 14 : 20, gy + gh / 2); ctx.rotate(-Math.PI / 2); NB.text(ctx, "주파수 720 kHz", 0, 0, { align: "center", size: 11, color: P.dim }); ctx.restore();
+    NB.text(ctx, mini ? "미니 슬롯 (2심볼)" : "RB 1개 × 슬롯 1개", gx + s0 * cw + allocSym * cw / 2, gy + gh - rbRows * chh - 9, { align: "center", size: 11, bold: true, color: P.accent });
+  }, { aspect: 0.42, minHeight: 260, maxHeight: 340 });
+  nmUpdate();
+
+  /* ---------- 4. 대역 비교 ---------- */
+  const BD = [
+    { n: "800 MHz", f: 800, bw: 10, se: 1.5, tdd: 1, pen: 10, mm: false },
+    { n: "1.8 GHz", f: 1800, bw: 20, se: 2, tdd: 1, pen: 13, mm: false },
+    { n: "3.5 GHz", f: 3500, bw: 100, se: 7, tdd: 0.75, pen: 17, mm: false },
+    { n: "28 GHz", f: 28000, bw: 800, se: 3, tdd: 0.75, pen: 35, mm: true },
+  ];
+  const bdB = NB.seg("bd-b", () => bdUpdate()), bdEnv = NB.seg("bd-env", () => bdUpdate());
+  $("bd-in").onchange = () => bdUpdate();
+  let bdR = 1;
+  function radiusOf(b, env, indoor) {
+    const fspl1 = 20 * Math.log10(b.f) - 27.55, n = b.mm ? (env === "u" ? 4 : 3.4) : env === "u" ? 3.5 : 3.0;
+    const budget = 148 + (b.mm ? 15 - 10 : 0) - (indoor ? b.pen : 0) - fspl1;
+    return Math.pow(10, budget / (10 * n));
+  }
+  function bdUpdate() {
+    const b = BD[Number(bdB())], R = radiusOf(b, bdEnv(), $("bd-in").checked);
+    bdR = R;
+    const area = 2.598 * Math.pow(R / 1000, 2), cap = b.bw * b.se * b.tdd; // Mbps
+    NB.stat("o-bd-r", R >= 1000 ? (R / 1000).toFixed(1) + " km" : Math.round(R) + " m");
+    NB.stat("o-bd-n", NB.kn(Math.ceil(605 / area)) + "개");
+    NB.stat("o-bd-cap", cap >= 1000 ? (cap / 1000).toFixed(1) + " Gbps" : Math.round(cap) + " Mbps");
+    const dens = cap / area;
+    NB.stat("o-bd-dens", dens >= 1000 ? (dens / 1000).toFixed(1) + " Gbps" : dens.toFixed(dens < 10 ? 1 : 0) + " Mbps");
+    bdCv.redraw();
+  }
+  const bdCv = NB.canvas("#cv-band", (ctx, w, h) => {
+    const P = NB.palette(), small = w < 500;
+    const mx = 10, my = 10, mw = w - 20, mh = h - 46, scale = Math.min(mw / 3000, mh / 2000);
+    const ox = mx + (mw - 3000 * scale) / 2, oy = my + (mh - 2000 * scale) / 2, W = 3000 * scale, H = 2000 * scale;
+    NB.rrect(ctx, ox, oy, W, H, 6); ctx.fillStyle = P.surface; ctx.fill(); ctx.strokeStyle = P.border; ctx.stroke();
+    // 거리 블록 장식
+    ctx.strokeStyle = P.grid; ctx.lineWidth = 1;
+    for (let x = 250; x < 3000; x += 250) { ctx.beginPath(); ctx.moveTo(ox + x * scale, oy); ctx.lineTo(ox + x * scale, oy + H); ctx.stroke(); }
+    for (let y = 250; y < 2000; y += 250) { ctx.beginPath(); ctx.moveTo(ox, oy + y * scale); ctx.lineTo(ox + W, oy + y * scale); ctx.stroke(); }
+    ctx.save(); NB.rrect(ctx, ox, oy, W, H, 6); ctx.clip();
+    const R = bdR, dx = Math.sqrt(3) * R, dy = 1.5 * R;
+    const col = [P.ok, P.warn, P.accent, P.accent2][Number(bdB())];
+    let count = 0;
+    for (let row = -1; row * dy < 2000 + R; row++) for (let c = -1; c * dx < 3000 + R; c++) {
+      const x = c * dx + (row % 2 ? dx / 2 : 0), y = row * dy;
+      if (x < -R || y < -R) continue;
+      const px = ox + x * scale, py = oy + y * scale, pr = R * scale;
+      ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fillStyle = col; ctx.globalAlpha = 0.13; ctx.fill(); ctx.globalAlpha = 0.7; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.beginPath(); ctx.arc(px, py, Math.max(1.5, Math.min(4, pr * 0.12)), 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill();
+      if (x >= 0 && x <= 3000 && y >= 0 && y <= 2000) count++;
+    }
+    ctx.restore();
+    // 축척
+    const bar = 500 * scale; ctx.strokeStyle = P.text; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ox, oy + H + 16); ctx.lineTo(ox + bar, oy + H + 16); ctx.stroke();
+    NB.text(ctx, "500 m", ox + bar + 6, oy + H + 16, { size: 11, mono: true, color: P.dim });
+    NB.text(ctx, "3 km × 2 km 동네 · " + BD[Number(bdB())].n + " 기지국 약 " + count + "곳", ox + W, oy + H + 16, { align: "right", size: small ? 10.5 : 12, color: P.dim });
+  }, { aspect: 0.6, minHeight: 260, maxHeight: 420 });
+  bdUpdate();
+
+  /* ---------- 5. TDD / FDD ---------- */
+  const tdP = NB.seg("td-p", () => tdUpdate());
+  let tdPat = "DDDSU";
+  function tdUpdate() {
+    tdPat = tdP(); const n = tdPat.length;
+    let dl = 0, ul = 0; for (const c of tdPat) { if (c === "D") dl += 1; else if (c === "U") ul += 1; else { dl += 10 / 14; ul += 2 / 14; } }
+    const dF = dl / n, uF = ul / n;
+    NB.stat("o-td-ratio", Math.round(dF * 100) + " : " + Math.round(uF * 100));
+    NB.stat("o-td-dl", (2.3 * dF).toFixed(2) + " Gbps");
+    NB.stat("o-td-ul", Math.round(1150 * uF) + " Mbps");
+    // 상향 기회까지 최대 대기 (U 또는 S 끝의 상향 심볼)
+    let maxGap = 0; for (let i = 0; i < n; i++) { let k = 0; while (k < n && tdPat[(i + k) % n] !== "U" && tdPat[(i + k) % n] !== "S") k++; maxGap = Math.max(maxGap, k); }
+    NB.stat("o-td-wait", (maxGap * 0.5 + 0.5).toFixed(1) + " ms <small style='color:var(--text-dim)'>FDD ≈ 0</small>");
+    tdCv.redraw();
+  }
+  const tdCv = NB.canvas("#cv-tdd", (ctx, w, h) => {
+    const P = NB.palette(), small = w < 500, n = tdPat.length;
+    const lx = small ? 8 : 90, x0 = lx + (small ? 0 : 0), W = w - x0 - 12, slots = 20, sw = W / slots;
+    const rowY = [small ? 30 : 34, small ? 112 : 112, small ? 150 : 150], rh = small ? 34 : 38;
+    if (!small) { NB.text(ctx, "TDD 3.5 GHz", 10, rowY[0] + rh / 2, { size: 12, bold: true }); NB.text(ctx, "FDD 하향", 10, rowY[1] + 14, { size: 12, bold: true }); NB.text(ctx, "FDD 상향", 10, rowY[2] + 14, { size: 12, bold: true }); }
+    else { NB.text(ctx, "TDD (한 대역)", x0, rowY[0] - 10, { size: 11, bold: true }); NB.text(ctx, "FDD (두 대역)", x0, rowY[1] - 10, { size: 11, bold: true }); }
+    for (let i = 0; i < slots; i++) {
+      const c = tdPat[i % n], x = x0 + i * sw;
+      if (c === "S") {
+        ctx.fillStyle = P.accent; ctx.fillRect(x + 1, rowY[0], (sw - 2) * 10 / 14, rh);
+        ctx.fillStyle = P.faint; ctx.fillRect(x + 1 + (sw - 2) * 10 / 14, rowY[0], (sw - 2) * 2 / 14, rh);
+        ctx.fillStyle = P.ok; ctx.fillRect(x + 1 + (sw - 2) * 12 / 14, rowY[0], (sw - 2) * 2 / 14, rh);
+      } else { ctx.fillStyle = c === "D" ? P.accent : P.ok; ctx.fillRect(x + 1, rowY[0], sw - 2, rh); }
+      NB.text(ctx, c, x + sw / 2, rowY[0] + rh / 2, { align: "center", size: small ? 10 : 12, bold: true, color: "#fff" });
+    }
+    ctx.fillStyle = P.accent; ctx.globalAlpha = 0.85; ctx.fillRect(x0 + 1, rowY[1], W - 2, 28); ctx.globalAlpha = 1;
+    ctx.fillStyle = P.ok; ctx.globalAlpha = 0.85; ctx.fillRect(x0 + 1, rowY[2], W - 2, 28); ctx.globalAlpha = 1;
+    NB.text(ctx, "하향 (예: 1.8 GHz 20 MHz) — 언제나", x0 + 8, rowY[1] + 14, { size: small ? 10.5 : 12, color: "#fff", bold: true });
+    NB.text(ctx, "상향 (짝지은 다른 20 MHz) — 언제나", x0 + 8, rowY[2] + 14, { size: small ? 10.5 : 12, color: "#fff", bold: true });
+    ctx.strokeStyle = P.axis; ctx.lineWidth = 1;
+    for (let i = 0; i <= slots; i += 2) { const x = x0 + i * sw; ctx.beginPath(); ctx.moveTo(x, rowY[0] + rh + 2); ctx.lineTo(x, rowY[0] + rh + 7); ctx.stroke(); if (!small || i % 4 === 0) NB.text(ctx, i * 0.5 + "", x, rowY[0] + rh + 16, { align: "center", size: 10, mono: true, color: P.dim }); }
+    NB.text(ctx, "ms", x0 + W, rowY[0] + rh + 28, { align: "right", size: 10, color: P.dim });
+    const lg = [[P.accent, "D 하향"], [P.ok, "U 상향"], [P.faint, "전환 보호"]];
+    let lxx = x0; lg.forEach(([c, t]) => { ctx.fillStyle = c; ctx.fillRect(lxx, h - 18, 10, 10); NB.text(ctx, t, lxx + 14, h - 13, { size: 11, color: P.dim }); lxx += (small ? 70 : 90); });
+  }, { aspect: 0.3, minHeight: 210, maxHeight: 240 });
+  tdUpdate();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>측정과 문제 해결 · NetworkBook</title>
+<meta name="description" content="지연의 네 가지 원인, ping과 traceroute 읽는 법, 대역폭-지연 곱, 큐잉 이론과 버퍼블로트, QoS와 토큰 버킷, 패킷 캡처, 아래 계층부터 따라가는 장애 추적, 가용성과 SLO까지 네트워크 운영의 기본기.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .tty { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; background: var(--surface); border-top: 1px solid var(--border); padding: 12px 16px; white-space: pre-wrap; word-break: break-all; min-height: 120px; max-height: 300px; overflow-y: auto; color: var(--text); }
+  .tty .p { color: var(--accent); font-weight: 700; }
+  .tty .e { color: var(--bad); }
+  .tty .g { color: var(--ok); }
+  .tty .d { color: var(--text-dim); }
+  .ts-cmds, .ts-guess { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ts-cmds .btn { font-family: var(--mono); font-size: 12.5px; padding: 6px 10px; }
+  .ts-guess .btn { font-size: 13px; padding: 6px 10px; }
+  .ts-guess .btn.right { border-color: var(--ok); color: var(--ok); font-weight: 700; }
+  .ts-guess .btn.wrong { border-color: var(--bad); color: var(--bad); }
+  .ts-msg { padding: 12px 18px; border-top: 1px solid var(--border); font-size: 15px; min-height: 48px; }
+  .av-grid { display: grid; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--border); grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); }
+  .av-row { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--surface); display: grid; gap: 6px; font-size: 13.5px; }
+  .av-row b { font-size: 14px; }
+  .av-row label { display: grid; gap: 2px; color: var(--text-dim); }
+  .av-row label span { display: flex; justify-content: space-between; }
+  .av-row output { font-family: var(--mono); color: var(--text); font-weight: 600; }
+</style>
+</head>
+<body data-chapter="ops">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 23</div>
+    <h1>측정과 문제 해결</h1>
+    <p class="lead">“인터넷이 느려요.” 네트워크 담당자가 가장 많이 듣는 말이다. 하지만 이 한마디 뒤에는 수십 가지 원인이 숨어 있다. 케이블이 빠졌을 수도, 주소록(DNS)이 고장 났을 수도, 공유기 안에 패킷이 줄을 서 있을 수도 있다. 의사가 청진기와 혈압계로 진단하듯, 네트워크도 재고 읽는 법이 있다. 이 장에서는 지연이 어디서 생기는지 분해하고, ping과 traceroute를 읽고, 큐가 왜 갑자기 막히는지 이해한 뒤, 직접 장애를 추적해 본다.</p>
+    <ul class="objectives">
+      <li>지연을 처리·큐잉·전송·전파 네 성분으로 나누고, 어떤 상황에서 무엇이 지배하는지 계산한다.</li>
+      <li>ping 결과의 RTT, 지터, 손실과 min/avg/max/mdev 통계를 해석한다.</li>
+      <li>traceroute의 원리와 별표(*), 중간 홉 지연의 착시를 이해한다.</li>
+      <li>대역폭-지연 곱으로 TCP 윈도우가 처리율을 어떻게 제한하는지 계산한다.</li>
+      <li>이용률이 1에 가까워질 때 대기 시간이 폭증하는 이유와 버퍼블로트, AQM(CoDel)을 안다.</li>
+      <li>QoS의 분류·우선순위·토큰 버킷 속도 제한이 트래픽 모양을 어떻게 바꾸는지 본다.</li>
+      <li>아래 계층부터 원인을 좁혀 가는 문제 해결 순서와 가용성·SLO·백분위 지연 지표를 익힌다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="delay">
+    <h2>지연의 네 가지 원인</h2>
+    <p>패킷 하나가 라우터 하나를 지나 다음 라우터에 닿기까지 걸리는 시간은 네 조각의 합이다.</p>
+    <ul>
+      <li><span class="term">처리 지연</span><span class="en">(processing delay)</span>: 라우터가 헤더를 읽고, 오류를 검사하고, 어느 포트로 보낼지 정하는 시간. 요즘 전용 칩(17장)에서는 수 µs 이하다.</li>
+      <li><span class="term">큐잉 지연</span><span class="en">(queuing delay)</span>: 나가는 포트 앞에서 먼저 온 패킷들이 다 나갈 때까지 줄 서서 기다리는 시간. 0일 수도, 수백 ms일 수도 있는 가장 변덕스러운 성분이다.</li>
+      <li><span class="term">전송 지연</span><span class="en">(transmission delay)</span>: 패킷의 모든 비트를 선로에 밀어 넣는 시간 = 패킷 크기 ÷ 링크 속도. 1,500바이트를 10 Mbps로 내보내면 1.2 ms, 100 Gbps면 0.12 µs.</li>
+      <li><span class="term">전파 지연</span><span class="en">(propagation delay)</span>: 신호가 선로를 따라 실제로 이동하는 시간 = 거리 ÷ 전파 속도. 광섬유 속 빛은 초당 약 20만 km(5장)이라 1,000 km에 5 ms. 돈으로도 줄일 수 없는 물리 한계다.</li>
+    </ul>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 220" style="min-width:600px" role="img" aria-label="라우터 안팎에서 생기는 네 가지 지연">
+        <defs><marker id="op-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <rect x="20" y="40" width="380" height="120" rx="14" class="f-surface"/>
+        <text x="210" y="30" text-anchor="middle" class="t" style="font-weight:700">라우터 A</text>
+        <rect x="36" y="74" width="80" height="52" rx="8" class="f-acc-soft"/><text x="76" y="98" text-anchor="middle" class="t" style="font-weight:700">처리</text><text x="76" y="116" text-anchor="middle" class="t-mono">헤더 보기</text>
+        <path d="M116 100 H140" class="s-acc" marker-end="url(#op-a)"/>
+        <g><rect x="144" y="82" width="22" height="36" rx="3" fill="var(--warn)" opacity=".75"/><rect x="170" y="82" width="22" height="36" rx="3" fill="var(--warn)" opacity=".75"/><rect x="196" y="82" width="22" height="36" rx="3" fill="var(--warn)" opacity=".75"/><rect x="222" y="82" width="22" height="36" rx="3" fill="var(--accent)"/></g>
+        <text x="194" y="140" text-anchor="middle" class="t" style="font-weight:700">큐잉 (줄 서기)</text>
+        <path d="M248 100 H268" class="s-acc" marker-end="url(#op-a)"/>
+        <rect x="272" y="74" width="110" height="52" rx="8" class="f-acc2-soft"/><text x="327" y="98" text-anchor="middle" class="t" style="font-weight:700">전송</text><text x="327" y="116" text-anchor="middle" class="t-mono">비트 밀어 넣기</text>
+        <path d="M400 100 H640" stroke="var(--accent-2)" stroke-width="5" fill="none"/>
+        <g fill="var(--accent-2)"><circle cx="440" cy="100" r="4"/><circle cx="470" cy="100" r="4"/><circle cx="500" cy="100" r="4"/><circle cx="530" cy="100" r="4"/></g>
+        <text x="520" y="80" text-anchor="middle" class="t" style="font-weight:700">전파 (선로 위 이동)</text>
+        <text x="520" y="130" text-anchor="middle" class="t-mono">거리 ÷ 빛의 속도(광섬유 약 20만 km/s)</text>
+        <rect x="644" y="60" width="140" height="80" rx="14" class="f-surface"/><text x="714" y="105" text-anchor="middle" class="t" style="font-weight:700">라우터 B</text>
+        <text x="20" y="196" class="t-dim">전송 지연은 “트럭에 짐을 싣는 시간”(차선 수에 반비례), 전파 지연은 “트럭이 도로를 달리는 시간”(도로 길이에 비례)이다.</text>
+      </svg></div>
+      <figcaption><b>그림 23-1.</b> 한 구간의 지연 = 처리 + 큐잉 + 전송 + 전파. 실제 경로는 이런 구간 10~20개가 이어진 것이고, 각 구간의 지연이 더해진다.</figcaption>
+    </figure>
+    <div class="callout analogy"><strong>톨게이트와 고속도로</strong><p>차량 행렬(패킷의 비트들)이 톨게이트를 지난다. 요금소 직원이 표를 확인하는 시간이 처리, 앞차들이 빠질 때까지 기다리는 시간이 큐잉, 행렬 전체가 요금소를 빠져나가는 시간이 전송(차선이 많으면 빠르다), 다음 톨게이트까지 달리는 시간이 전파다. 차선을 늘려도 서울에서 부산까지 달리는 시간은 그대로다.</p></div>
+    <div class="sim" id="sim-delay">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>지연 분해기: 무엇이 지배하는가</h3></div>
+      <div class="sim-view"><canvas id="cv-delay"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl" style="grid-column:1/-1"><span>상황 예시</span><div class="seg" id="dl-pre"><button data-value="dc">데이터센터 안</button><button data-value="home" class="on">가정 업로드</button><button data-value="ocean">서울→뉴욕 광케이블</button><button data-value="wifi">붐비는 Wi-Fi</button></div></div>
+        <label class="ctrl"><span>패킷 크기 <output id="dl-size-out"></output></span><input type="range" id="dl-size" min="64" max="9000" step="1" value="1500"></label>
+        <label class="ctrl"><span>링크 속도 <output id="dl-rate-out"></output></span><input type="range" id="dl-rate" min="6" max="11" step="0.1" value="7"></label>
+        <label class="ctrl"><span>거리 <output id="dl-dist-out"></output></span><input type="range" id="dl-dist" min="-2" max="4.3" step="0.05" value="1"></label>
+        <label class="ctrl"><span>앞에서 기다리는 패킷 <output id="dl-q-out"></output></span><input type="range" id="dl-q" min="0" max="500" step="1" value="20"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">처리</span><span class="v" id="dl-o1">—</span></div>
+        <div class="stat"><span class="k">큐잉</span><span class="v" id="dl-o2">—</span></div>
+        <div class="stat"><span class="k">전송</span><span class="v" id="dl-o3">—</span></div>
+        <div class="stat"><span class="k">전파</span><span class="v" id="dl-o4">—</span></div>
+        <div class="stat"><span class="k">합계 (한 구간)</span><span class="v" id="dl-tot">—</span></div>
+      </div>
+      <div class="sim-note">위 막대는 네 성분의 비율(선형), 아래는 성분별 크기(로그 눈금)다. 처리 지연은 5 µs로 고정했고, 앞의 패킷들도 같은 크기라고 가정했다. 해볼 것: “데이터센터 안”에서는 거리가 짧고 링크가 빨라 무엇이 남는가? “서울→뉴욕”에서는 링크를 아무리 빠르게 해도 합계가 거의 줄지 않는다. “붐비는 Wi-Fi”에서는 큐가 모든 것을 삼킨다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="ping">
+    <h2>ping: RTT, 지터, 손실</h2>
+    <p>가장 오래되고 가장 많이 쓰는 측정 도구가 <code>ping</code>이다. 상대에게 ICMP Echo Request(“들리나요?”)를 보내고 Echo Reply가 돌아오기까지의 <b>왕복 시간(RTT)</b>을 잰다. 세 가지를 읽는다.</p>
+    <ul>
+      <li><b>RTT의 바닥(min)</b>: 큐가 비었을 때의 값으로, 거리(전파 지연)와 경로를 반영한다. 서울 안이면 수 ms, 미국 서부까지 약 130 ms 수준.</li>
+      <li><span class="term">지터</span><span class="en">(jitter)</span>: RTT가 들쭉날쭉한 정도. 큐가 찼다 비었다 하는 신호다. 영상 통화·게임은 평균보다 지터에 더 민감해서, 수신 측은 지터만큼 버퍼를 두고 재생을 늦춘다.</li>
+      <li><span class="term">패킷 손실</span><span class="en">(packet loss)</span>: 돌아오지 않은 비율. 유선이라면 0%가 정상이고, 1%만 넘어도 TCP 처리율이 크게 떨어진다(9장). 다만 라우터가 ICMP를 일부러 덜 처리하는 경우도 있어 ping 손실이 곧 데이터 손실은 아니다.</li>
+    </ul>
+    <div class="sim" id="sim-ping">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>가상 ping: 출력 읽기</h3></div>
+      <div class="sim-view"><canvas id="cv-ping"></canvas></div>
+      <div class="tty" id="ping-out"></div>
+      <div class="sim-controls">
+        <div class="ctrl" style="grid-column:1/-1"><span>상황</span><div class="seg" id="pg-pre"><button data-value="lan" class="on">유선, 국내 서버</button><button data-value="wifi">붐비는 Wi-Fi</button><button data-value="far">미국 서버</button><button data-value="lte">약한 LTE 신호</button></div></div>
+        <label class="ctrl"><span>기본 RTT <output id="pg-base-out"></output></span><input type="range" id="pg-base" min="1" max="300" step="1" value="8"></label>
+        <label class="ctrl"><span>지터 (큐 변동) <output id="pg-jit-out"></output></span><input type="range" id="pg-jit" min="0" max="80" step="1" value="1"></label>
+        <label class="ctrl"><span>손실률 <output id="pg-loss-out"></output></span><input type="range" id="pg-loss" min="0" max="30" step="1" value="0"></label>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn primary" id="pg-go">ping -c 20 실행</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">min / avg / max</span><span class="v" id="pg-mam" style="font-size:15px">—</span></div>
+        <div class="stat"><span class="k">mdev (표준편차)</span><span class="v" id="pg-mdev">—</span></div>
+        <div class="stat"><span class="k">지터 (연속 차이 평균)</span><span class="v" id="pg-jitter">—</span></div>
+        <div class="stat"><span class="k">손실</span><span class="v" id="pg-lossv">—</span></div>
+      </div>
+      <div class="sim-note">리눅스 ping 형식을 흉내 냈다. mdev는 RTT의 표준편차(√(평균(t²) − 평균(t)²)), 지터는 연속한 두 RTT 차이의 평균이다(RTP가 쓰는 방식과 비슷). 해볼 것: “붐비는 Wi-Fi”는 평균은 괜찮아 보여도 max와 mdev가 크다. 이런 망에서 영상 통화가 끊긴다. 단순화: 큐 지연을 지수 분포로, 손실을 서로 독립으로 뽑았다(실제 손실은 몰려서 일어나는 경우가 많다).</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="traceroute">
+    <h2>traceroute로 길 읽기</h2>
+    <p>8장에서 본 <code>traceroute</code>는 IP 헤더의 <b>TTL</b>(남은 홉 수)을 이용한다. TTL=1로 보낸 패킷은 첫 라우터에서 0이 되어 버려지고, 그 라우터가 “시간 초과(ICMP Time Exceeded)”를 돌려준다. 그 답장의 출발지가 첫 홉의 주소다. TTL을 2, 3, …으로 늘려 가며 길목의 라우터를 하나씩 드러낸다. 홉마다 3번씩 보내서 RTT 세 개를 보여 준다.</p>
+    <div class="codebox"><span class="k">$</span> traceroute example.com
+traceroute to example.com (203.0.113.10), 30 hops max
+ 1  192.168.0.1 (공유기)       <span class="n">1.1</span> ms   <span class="n">0.9</span> ms   <span class="n">1.0</span> ms
+ 2  100.64.0.1 (통신사 첫 장비)  <span class="n">4.8</span> ms   <span class="n">5.2</span> ms   <span class="n">4.6</span> ms
+ 3  * * *                       <span class="c">← 응답 안 하는 라우터. 고장 아님</span>
+ 4  core1.seoul.isp.example     <span class="n">7.9</span> ms   <span class="n">8.3</span> ms   <span class="n">7.7</span> ms
+ 5  gw.busan.isp.example        <span class="n">12.0</span> ms  <span class="n">11.8</span> ms  <span class="n">12.1</span> ms
+<span class="hl"> 6  la.transpacific.example     <span class="n">138.4</span> ms <span class="n">137.9</span> ms <span class="n">138.6</span> ms   <span class="c">← 태평양 횡단: 진짜 지연</span></span>
+ 7  core2.la.example            <span class="n">212.5</span> ms <span class="n">139.0</span> ms <span class="n">198.3</span> ms   <span class="c">← 튀는 값: 착시</span>
+ 8  edge.example.net            <span class="n">140.1</span> ms <span class="n">139.6</span> ms <span class="n">140.3</span> ms
+ 9  203.0.113.10                <span class="n">140.4</span> ms <span class="n">140.2</span> ms <span class="n">140.0</span> ms</div>
+    <ul>
+      <li><b>별표(*)</b>: 시간 안에 답이 없었다는 뜻이다. 그 라우터가 보안 정책상 ICMP를 보내지 않거나 속도를 제한하는 경우가 대부분이다. 다음 홉이 정상으로 나오면 그 자리는 무시해도 된다. 반대로 어느 홉부터 끝까지 전부 *라면 거기서 패킷이 막히고 있을 가능성이 크다.</li>
+      <li><b>큰 점프</b>: 지연이 한 홉에서 크게 늘고 이후 홉에서도 계속 유지되면(6번 홉) 그 구간이 실제로 길다는 뜻이다. 대양 횡단이나 멀리 돌아가는 경로다.</li>
+      <li><b>중간 홉만 튀는 착시</b>: 7번 홉만 200 ms이고 그다음 홉들이 다시 140 ms라면 그 라우터가 느린 것이 아니다. 라우터는 패킷 <b>전달</b>은 전용 칩으로 빠르게 하지만, 자기에게 온 ICMP <b>답장 만들기</b>는 느린 제어용 CPU가 낮은 우선순위로 처리한다. 끝까지 유지되는 지연만 진짜다.</li>
+      <li><b>비대칭 경로</b>: traceroute는 가는 길만 보여 준다. 돌아오는 길은 다를 수 있어(8장의 BGP 정책) 양쪽에서 재 봐야 할 때가 있다. 지연과 손실을 홉별로 계속 집계하는 <code>mtr</code>도 많이 쓴다.</li>
+    </ul>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="bdp">
+    <h2>대역폭-지연 곱: 파이프에 담긴 데이터</h2>
+    <p>링크를 물이 흐르는 파이프로 생각하자. 대역폭은 파이프의 굵기, RTT는 길이(왕복)다. 파이프를 가득 채우는 데 필요한 데이터 양이 <span class="term">대역폭-지연 곱</span><span class="en">(BDP, bandwidth-delay product)</span>이다. TCP(9장)는 확인 응답을 받기 전에 윈도우만큼만 보낼 수 있으므로, <b>윈도우가 BDP보다 작으면 파이프에 빈틈이 생겨</b> 회선을 다 쓰지 못한다.</p>
+    <div class="formula">BDP = 대역폭 × RTT &nbsp;&nbsp;·&nbsp;&nbsp; 최대 처리율 ≈ 윈도우 크기 ÷ RTT<div class="where">예: 1 Gbps × 100 ms = 10<sup>8</sup> 비트 = 12.5 MB가 늘 “길 위에” 떠 있어야 회선이 꽉 찬다.</div></div>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 200" style="min-width:600px" role="img" aria-label="대역폭-지연 곱을 파이프에 비유한 그림">
+        <rect x="20" y="60" width="100" height="70" rx="10" class="f-acc-soft"/><text x="70" y="100" text-anchor="middle" class="t" style="font-weight:700">보내는 쪽</text>
+        <rect x="680" y="60" width="100" height="70" rx="10" class="f-acc-soft"/><text x="730" y="100" text-anchor="middle" class="t" style="font-weight:700">받는 쪽</text>
+        <rect x="130" y="66" width="540" height="58" rx="6" class="f-surface"/>
+        <g fill="var(--accent)" opacity=".85"><rect x="138" y="74" width="40" height="42" rx="4"/><rect x="184" y="74" width="40" height="42" rx="4"/><rect x="230" y="74" width="40" height="42" rx="4"/><rect x="276" y="74" width="40" height="42" rx="4"/></g>
+        <text x="490" y="100" text-anchor="middle" class="t-dim">빈 파이프 (ACK를 기다리는 중)</text>
+        <path d="M130 50 H670" class="s-axis"/><path d="M130 44 V56 M670 44 V56" class="s-axis"/>
+        <text x="400" y="38" text-anchor="middle" class="t">길이 = RTT (지연)</text>
+        <text x="20" y="160" class="t-dim">굵기 = 대역폭.</text>
+        <text x="20" y="184" class="t-dim">파란 상자 = 윈도우만큼 보낸 데이터. 윈도우가 파이프 부피(BDP)보다 작으면 나머지는 비어서 회선을 놀린다.</text>
+      </svg></div>
+      <figcaption><b>그림 23-2.</b> 대역폭-지연 곱. 굵고 긴 파이프(고속 장거리 회선)일수록 가득 채우려면 많은 데이터가 동시에 길 위에 있어야 한다.</figcaption>
+    </figure>
+    <p>원래 TCP 헤더의 윈도우 필드는 16비트라 최대 65,535바이트(약 64 KB)였다. 1980년대 회선에는 충분했지만 지금은 턱없이 작아서, 윈도우 크기 조정 옵션(window scaling)으로 최대 1 GB까지 늘린다. 지금도 오래된 장비나 잘못된 설정이 이 옵션을 지우면 “회선은 1 Gbps인데 해외 다운로드가 몇 Mbps”라는 증상이 나온다.</p>
+    <div class="sim" id="sim-bdp">
+      <div class="sim-head"><span class="sim-tag">CALCULATOR</span><h3>BDP와 윈도우 제한</h3></div>
+      <div class="sim-view"><canvas id="cv-bdp"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>대역폭 <output id="bd-bw-out"></output></span><input type="range" id="bd-bw" min="6" max="11.6" step="0.1" value="9"></label>
+        <label class="ctrl"><span>RTT <output id="bd-rtt-out"></output></span><input type="range" id="bd-rtt" min="1" max="600" step="1" value="150"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">BDP (= 필요한 윈도우)</span><span class="v" id="bd-bdp">—</span></div>
+        <div class="stat"><span class="k">64 KB 윈도우의 최대 처리율</span><span class="v" id="bd-64">—</span></div>
+        <div class="stat"><span class="k">회선 이용률 (64 KB일 때)</span><span class="v" id="bd-util">—</span></div>
+      </div>
+      <div class="sim-note">그래프는 RTT(가로, 로그)에 따른 윈도우별 최대 처리율(세로, 로그)이다. 처리율은 윈도우 ÷ RTT와 회선 대역폭 중 작은 값이다. 점은 지금 설정. 해볼 것: RTT를 1 ms(같은 건물)로 줄이면 64 KB로도 수백 Mbps가 나온다. 거리가 멀수록 큰 윈도우가 필요하다. 단순화: 손실과 혼잡 제어는 무시했다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">1 Gbps 회선으로 RTT 150 ms인 해외 서버에서 받는다. TCP 윈도우가 64 KB로 묶여 있다면 최대 속도는 대략?</p><p class="wi-hint">BDP 계산기에서 대역폭 1 Gbps, RTT 150 ms로 맞춰 보자.</p><div class="opts">
+      <button class="opt">약 1 Gbps</button><button class="opt">약 400 Mbps</button><button class="opt">약 64 Mbps</button><button class="opt" data-correct>약 3.5 Mbps</button>
+    </div><div class="quiz-exp">65,535바이트 × 8 ÷ 0.15초 ≈ 3.5 Mbps. 회선의 0.35%만 쓴다. 1 Gbps를 채우려면 BDP = 1 Gbps × 0.15 s ≈ 18.75 MB의 윈도우가 필요하다. 그래서 윈도우 크기 조정은 장거리 고속 전송의 필수 옵션이다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="queue">
+    <h2>큐와 버퍼블로트</h2>
+    <p>패킷은 제멋대로 몰려온다. 평균 도착률이 처리 능력보다 낮아도 잠깐 몰리는 순간에는 줄이 생긴다. 이 줄의 길이를 다루는 수학이 <span class="term">큐잉 이론</span><span class="en">(queueing theory)</span>이다. 가장 단순한 모델인 <b>M/M/1</b>(무작위 도착, 무작위 처리 시간, 창구 하나)에서 도착률을 λ, 처리율을 μ라 하면 이용률 ρ = λ/μ이고, 패킷이 시스템에 머무는 평균 시간은 다음과 같다.</p>
+    <div class="formula">평균 체류 시간 W = 1 ÷ (μ − λ) = (1/μ) ÷ (1 − ρ)<div class="where">ρ = 0.5면 처리 시간의 2배, 0.9면 10배, 0.99면 100배. 이용률이 1에 다가갈수록 대기 시간은 직선이 아니라 <b>폭발적으로</b> 늘어난다.</div></div>
+    <p>그래서 망 운영자는 링크를 평균 100% 가까이 쓰지 않는다. 출퇴근길 도로가 80%만 차도 막히기 시작하는 것과 같다. 백본 회선은 보통 평균 이용률이 50~70%를 넘으면 증설을 검토한다.</p>
+    <div class="sim" id="sim-queue">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>M/M/1 큐: 이용률과 대기 시간</h3></div>
+      <div class="sim-view"><canvas id="cv-queue"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>도착률 λ <output id="q-lam-out"></output></span><input type="range" id="q-lam" min="50" max="1500" step="10" value="700"></label>
+        <label class="ctrl"><span>처리율 μ <output id="q-mu-out"></output></span><input type="range" id="q-mu" min="500" max="2000" step="10" value="1000"></label>
+        <div class="ctrl"><span>버퍼 크기</span><div class="seg" id="q-buf"><button data-value="50" class="on">50 패킷</button><button data-value="1000">1,000 패킷</button></div></div>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn" id="q-reset">큐 비우기</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">이용률 ρ</span><span class="v" id="q-rho">—</span></div>
+        <div class="stat"><span class="k">이론 평균 지연</span><span class="v" id="q-th">—</span></div>
+        <div class="stat"><span class="k">측정 평균 지연 (최근)</span><span class="v" id="q-ms">—</span></div>
+        <div class="stat"><span class="k">버려진 패킷</span><span class="v" id="q-drop">—</span></div>
+      </div>
+      <div class="sim-note">위: 실시간으로 도착(왼쪽)하고 처리(오른쪽 창구)되는 패킷 줄. 아래: 이론 곡선 W = 1/(μ − λ)(로그 눈금)과 측정값(주황 점). 단위는 패킷/초, 시뮬레이션은 실제 시간으로 돈다. 해볼 것: λ를 700 → 900 → 980으로 올려 보자. 평균이 처리 능력의 98%일 뿐인데도 줄이 길게 출렁인다. λ가 μ를 넘으면 줄이 버퍼 끝까지 차고, 큰 버퍼에서는 지연이 1초 가까이 된다. 이것이 다음에 볼 버퍼블로트다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">처리율 μ = 1,000 패킷/초인 링크에서 이용률이 90%에서 95%로 오르면 평균 지연은?</p><p class="wi-hint">M/M/1 시뮬레이터에서 λ를 900과 950으로 바꿔 이론 평균 지연을 비교하자.</p><div class="opts">
+      <button class="opt">약 5% 늘어난다</button><button class="opt" data-correct>약 2배가 된다 (10 ms → 20 ms)</button><button class="opt">거의 그대로다</button><button class="opt">10배가 된다</button>
+    </div><div class="quiz-exp">W = 1/(μ − λ)이므로 1/100초 = 10 ms에서 1/50초 = 20 ms가 된다. 이용률 5%포인트 차이로 지연이 두 배가 되는 것, 이것이 높은 이용률 근처의 “무릎”이다.</div></div>
+    <h3>버퍼블로트: 너무 큰 버퍼의 역설</h3>
+    <p>패킷 손실을 줄이겠다며 공유기·모뎀에 메모리를 넉넉히 넣으면 어떻게 될까? TCP는 손실이 나야 속도를 줄이므로(9장), 큰 버퍼를 끝까지 채운다. 버퍼가 늘 가득하니 그 뒤에 선 모든 패킷이 수백 ms씩 기다린다. 큰 파일을 올리는 동안 같은 집의 게임 핑이 20 ms에서 500 ms로 치솟는 현상, 이것이 <span class="term">버퍼블로트</span><span class="en">(bufferbloat)</span>다. 2010년경 짐 게티스가 이름을 붙였다.</p>
+    <p>해결책은 버퍼를 무작정 줄이는 것이 아니라 <b>지연을 보고 관리</b>하는 것이다. 이를 <span class="term">AQM</span><span class="en">(Active Queue Management)</span>이라 한다. 대표인 <b>CoDel</b>은 패킷이 큐에서 머문 시간을 재서, 최소 체류 시간이 100 ms 동안 계속 5 ms를 넘으면 패킷을 하나씩 일부러 버린다. TCP가 이를 보고 속도를 살짝 줄여 큐가 짧게 유지된다. <b>FQ-CoDel</b>은 여기에 흐름별 큐를 더해, 대용량 업로드와 게임 패킷이 같은 줄에 서지 않게 한다. 리눅스의 기본 큐 관리 방식이고, 많은 공유기 펌웨어와 DOCSIS 3.1 케이블 모뎀(AQM 필수)에 들어갔다.</p>
+    <div class="sim" id="sim-bloat">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>업로드 하나가 게임을 망치는 이유</h3></div>
+      <div class="sim-view"><canvas id="cv-bloat"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>큐 관리</span><div class="seg" id="bl-mode"><button data-value="fifo" class="on">테일 드롭 (가득 차면 버림)</button><button data-value="codel">CoDel</button><button data-value="fq">FQ-CoDel</button></div></div>
+        <label class="ctrl"><span>버퍼 크기 <output id="bl-buf-out"></output></span><input type="range" id="bl-buf" min="20" max="1500" step="10" value="1000"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">평균 큐 지연 (업로드)</span><span class="v" id="bl-q">—</span></div>
+        <div class="stat"><span class="k">회선 이용률</span><span class="v" id="bl-u">—</span></div>
+        <div class="stat"><span class="k">게임 패킷 평균 RTT</span><span class="v" id="bl-g">—</span></div>
+      </div>
+      <div class="sim-note">20 Mbps 업링크(1,500바이트 패킷 기준 초당 약 1,667개), 기본 RTT 40 ms에서 TCP(Reno 방식) 업로드 하나가 20초 동안 도는 모습을 유체 모델로 계산했다. 회색 선은 업로드 큐 지연, 주황 선은 같은 회선을 쓰는 게임 패킷의 RTT다. 해볼 것: 테일 드롭에서 버퍼를 1,000 패킷(약 0.6초 분량)으로 두면 처음 버퍼가 넘친 뒤에도 수백 ms의 큐가 “서 있는” 채로 유지된다. 버퍼를 줄이면 지연은 줄지만 너무 작으면 이용률이 떨어진다. CoDel로 바꾸면 이용률이 조금 줄어드는 대신(흐름 하나뿐인 이 모델에서 약 86%, 흐름이 여럿이면 거의 100%) 지연이 수백 ms에서 수 ms로 내려간다. FQ-CoDel에서는 게임 패킷이 업로드 줄을 아예 건너뛴다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="qos">
+    <h2>QoS: 줄 세우기와 속도 제한</h2>
+    <p>모든 패킷이 같지는 않다. 0.1초 늦으면 끊기는 음성 패킷과, 1초 늦어도 아무도 모르는 백업 패킷을 같은 줄에 세울 이유가 없다. <span class="term">QoS</span><span class="en">(Quality of Service)</span>는 트래픽을 분류해 다르게 대우하는 기술의 묶음이다.</p>
+    <ol>
+      <li><b>분류와 표시</b>: IP 헤더의 6비트 <span class="term">DSCP</span><span class="en">(Differentiated Services Code Point)</span> 필드에 등급을 적는다. 음성은 보통 EF(46, 신속 전달), 일반 웹은 0(최선형)이다.</li>
+      <li><b>우선순위 큐</b>: 높은 등급의 큐가 비어 있지 않으면 그것부터 내보낸다. 음성처럼 작고 급한 트래픽에 좋지만, 무제한이면 낮은 큐가 굶는다.</li>
+      <li><b>가중 공정 큐잉(WFQ)</b>: 큐마다 가중치를 주고 대역폭을 비율대로 나눈다(예: 영상 50%, 업무 30%, 나머지 20%). 아무도 굶지 않는다.</li>
+      <li><b>속도 제한</b>: 정해진 속도를 넘는 트래픽을 버리거나(폴리싱) 늦춰서(셰이핑) 내보낸다. 통신사 요금제의 속도 제한, 클라우드 API의 요청 수 제한이 이 방식이다. 핵심 알고리즘이 <span class="term">토큰 버킷</span><span class="en">(token bucket)</span>이다.</li>
+    </ol>
+    <div class="callout analogy"><strong>토큰 버킷 = 놀이공원 이용권 통</strong><p>통에 이용권(토큰)이 일정한 속도 r로 하나씩 채워지고, 통은 최대 b개까지만 담는다. 패킷은 크기만큼 토큰을 내야 나갈 수 있다. 한동안 조용했다면 통이 가득 차 있으니 한꺼번에 b만큼 몰려와도 통과한다(버스트 허용). 하지만 오래 보면 평균 속도는 r을 넘을 수 없다. r은 “평균 얼마나”, b는 “한꺼번에 얼마나”를 정한다.</p></div>
+    <div class="sim" id="sim-tb">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>토큰 버킷: 버스트와 출력 트래픽</h3></div>
+      <div class="sim-view"><canvas id="cv-tb"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>채우는 속도 r <output id="tb-r-out"></output></span><input type="range" id="tb-r" min="5" max="150" step="5" value="50"></label>
+        <label class="ctrl"><span>버킷 크기 b <output id="tb-b-out"></output></span><input type="range" id="tb-b" min="10" max="3000" step="10" value="500"></label>
+        <div class="ctrl"><span>들어오는 트래픽</span><div class="seg" id="tb-in"><button data-value="burst" class="on">버스트</button><button data-value="steady">일정 80 Mbps</button><button data-value="rand">들쭉날쭉</button></div></div>
+        <div class="ctrl"><span>초과분 처리</span><div class="seg" id="tb-mode"><button data-value="police" class="on">폴리싱 (버림)</button><button data-value="shape">셰이핑 (늦춤)</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">평균 입력</span><span class="v" id="tb-oin">—</span></div>
+        <div class="stat"><span class="k">평균 출력</span><span class="v" id="tb-oout">—</span></div>
+        <div class="stat"><span class="k" id="tb-k3">버려진 데이터</span><span class="v" id="tb-o3">—</span></div>
+      </div>
+      <div class="sim-note">위: 입력(회색)과 출력(파랑) 속도, 3초 동안. 아래: 버킷 안의 토큰 양. 버스트 패턴은 0.5초마다 0.1초 동안 200 Mbps로 몰려오고 나머지는 조용하다(평균 40 Mbps). 해볼 것: b를 키우면 버스트 앞부분이 그대로 통과한다. 셰이핑으로 바꾸면 버리는 대신 뒤로 미뤄 출력이 r에 평평하게 깔리는 대신 지연이 생긴다. 단순화: 1 ms 단위 유체 계산, 셰이핑 큐는 무한.</div>
+    </div>
+    <div class="callout tip"><strong>QoS의 현실</strong><p>DSCP 표시는 내 망 안에서만 믿을 수 있다. 인터넷 구간의 통신사들은 고객이 붙인 표시를 대부분 지우거나 무시한다(누구나 자기 패킷을 ‘최우선’으로 표시할 테니까). 그래서 QoS는 회사망, 통신사 내부망, 그리고 병목인 집 공유기의 업링크에서 가장 효과가 크다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="capture">
+    <h2>패킷 캡처와 증상 읽기</h2>
+    <p>측정 도구로도 원인이 안 보이면 실제 패킷을 들여다본다. <span class="term">패킷 캡처</span><span class="en">(packet capture)</span>는 네트워크 카드를 지나는 패킷을 그대로 복사해 저장하는 것이다. 명령줄 도구 <b>tcpdump</b>는 필터 문법(<code>tcpdump -i eth0 port 53</code>)으로 원하는 패킷만 골라 pcap 파일로 저장하고, 그래픽 도구 <b>와이어샤크</b>(Wireshark)는 수천 개 프로토콜을 3장처럼 계층별로 풀어 보여 준다. TCP 재전송, 중복 ACK, 0 윈도우 같은 이상 신호를 자동으로 색칠해 주기도 한다.</p>
+    <div class="callout warn"><strong>캡처는 허락받은 곳에서만</strong><p>패킷 캡처는 남의 통신 내용을 볼 수 있는 강력한 도구다. 자기 기기나 관리 권한이 있는 망에서, 정해진 목적으로만 써야 한다. 허락 없이 남의 통신을 캡처하는 것은 대부분의 나라에서 불법이다. 또 지금은 대부분이 TLS로 암호화되어 있어(22장) 내용보다는 헤더, 타이밍, 핸드셰이크를 읽는 일이 많다.</p></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>증상</th><th>먼저 의심할 것</th><th>확인 방법</th></tr></thead>
+      <tbody>
+        <tr><td>모든 사이트가 안 됨, IP로 ping은 됨</td><td>DNS</td><td><code>nslookup</code> / <code>dig</code>가 실패하는지, 다른 DNS 서버로는 되는지</td></tr>
+        <tr><td>작은 페이지는 되는데 큰 파일·일부 사이트에서 멈춤</td><td>MTU / PMTU 블랙홀(7장)</td><td><code>ping -M do -s 1472</code>로 크기를 바꿔 가며, VPN·터널 구간 확인</td></tr>
+        <tr><td>되긴 하는데 느림, 특히 바쁜 시간</td><td>혼잡, 버퍼블로트</td><td>부하를 걸며 ping(지연 증가), 링크 이용률 그래프</td></tr>
+        <tr><td>전체적으로 느리고 들쭉날쭉, 재전송 많음</td><td>패킷 손실 (불량 케이블, 약한 Wi-Fi, 듀플렉스 불일치)</td><td>인터페이스 오류 카운터, 캡처의 재전송 비율, <code>mtr</code></td></tr>
+        <tr><td>해외만 유독 느림</td><td>BDP·윈도우 제한, 먼 경로</td><td>traceroute로 경로, 캡처로 윈도우 크기</td></tr>
+        <tr><td>특정 앱·포트만 연결 안 됨</td><td>방화벽, 서비스 다운</td><td><code>curl</code>·<code>nc</code>로 포트 연결 시도, 시간 초과 vs 즉시 거부 구분</td></tr>
+        <tr><td>몇 분마다 잠깐씩 끊김</td><td>Wi-Fi 로밍·간섭, DHCP 갱신 실패, 경로 흔들림</td><td>시스템 로그, 연속 ping 기록과 시간 대조</td></tr>
+      </tbody>
+    </table></div>
+    <p>시간 초과와 즉시 거부의 차이는 중요한 단서다. 포트에 연결했는데 곧바로 “Connection refused”(TCP RST)가 오면 상대 컴퓨터까지는 닿았지만 그 포트에서 듣는 프로그램이 없다는 뜻이다. 아무 답 없이 시간 초과가 나면 중간의 방화벽이 패킷을 조용히 버리고 있을 가능성이 크다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="troubleshoot">
+    <h2>아래 계층부터: 장애 추적</h2>
+    <p>경험 많은 엔지니어는 “인터넷이 안 돼요”를 들으면 계층(3장)을 <b>아래에서 위로</b> 하나씩 확인한다. 위 계층은 아래 계층이 멀쩡해야만 동작하므로, 아래에서 처음 실패하는 지점이 원인일 가능성이 가장 크다. 각 단계는 하나의 질문에 답한다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 260" style="min-width:600px" role="img" aria-label="아래 계층부터 위로 확인하는 문제 해결 순서">
+        <defs><marker id="op-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <g>
+          <rect x="20" y="200" width="300" height="42" rx="8" class="f-acc-soft"/><text x="36" y="226" class="t" style="font-weight:700">① 물리·링크: 연결됐나?</text>
+          <rect x="60" y="152" width="300" height="42" rx="8" class="f-acc-soft"/><text x="76" y="178" class="t" style="font-weight:700">② IP: 주소·게이트웨이 받았나?</text>
+          <rect x="100" y="104" width="300" height="42" rx="8" class="f-acc-soft"/><text x="116" y="130" class="t" style="font-weight:700">③ 라우팅: 밖으로 나가나?</text>
+          <rect x="140" y="56" width="300" height="42" rx="8" class="f-acc-soft"/><text x="156" y="82" class="t" style="font-weight:700">④ DNS: 이름이 풀리나?</text>
+          <rect x="180" y="8" width="300" height="42" rx="8" class="f-acc2-soft"/><text x="196" y="34" class="t" style="font-weight:700">⑤ 포트·앱: 서비스가 응답하나?</text>
+        </g>
+        <g class="t-mono" style="font-size:12px">
+          <text x="500" y="226">링크 LED, ip link, Wi-Fi 신호</text>
+          <text x="500" y="178">ipconfig / ip addr (169.254.x.x?)</text>
+          <text x="500" y="130">ping 게이트웨이 → ping 8.8.8.8</text>
+          <text x="500" y="82">nslookup example.com</text>
+          <text x="500" y="34">curl -I https://example.com</text>
+        </g>
+        <path d="M470 236 H490 M470 188 H490 M470 140 H490 M470 92 H490" class="s-axis"/>
+        <path d="M740 236 V54" class="s-acc" marker-end="url(#op-b)"/>
+        <text x="752" y="150" class="t-acc" style="writing-mode:vertical-rl">아래에서 위로</text>
+      </svg></div>
+      <figcaption><b>그림 23-3.</b> 문제 해결의 사다리. 첫 번째로 실패하는 단(段)이 원인의 위치를 알려 준다. 예를 들어 IP로는 ping이 되는데 이름 풀이만 안 되면 범인은 DNS다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-ts">
+      <div class="sim-head"><span class="sim-tag">GAME</span><h3>장애 추적: 숨은 원인을 찾아라</h3></div>
+      <div class="ts-msg" id="ts-msg"></div>
+      <div class="tty" id="ts-out"></div>
+      <div class="sim-controls">
+        <div class="ctrl" style="grid-column:1/-1"><span>진단 명령 (눌러서 실행)</span><div class="ts-cmds" id="ts-cmds">
+          <button class="btn" data-c="link">링크 확인</button><button class="btn" data-c="ip">ipconfig</button><button class="btn" data-c="gw">ping 게이트웨이</button><button class="btn" data-c="ext">ping 8.8.8.8</button><button class="btn" data-c="dns">nslookup</button><button class="btn" data-c="curl">curl 웹사이트</button>
+        </div></div>
+        <div class="ctrl" style="grid-column:1/-1"><span>원인은? (진단 후 하나를 고르세요)</span><div class="ts-guess" id="ts-guess">
+          <button class="btn" data-g="cable">케이블·링크 끊김</button><button class="btn" data-g="dhcp">DHCP 실패</button><button class="btn" data-g="isp">통신사 회선 장애</button><button class="btn" data-g="dns">DNS 장애</button><button class="btn" data-g="fw">방화벽 차단</button><button class="btn" data-g="cong">혼잡</button>
+        </div></div>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn primary" id="ts-new">새 문제</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">이번 문제에 쓴 명령</span><span class="v" id="ts-n">0</span></div>
+        <div class="stat"><span class="k">맞힌 문제 / 푼 문제</span><span class="v" id="ts-score">0 / 0</span></div>
+        <div class="stat"><span class="k">평균 명령 수</span><span class="v" id="ts-avg">—</span></div>
+      </div>
+      <div class="sim-note">여섯 가지 장애 중 하나가 무작위로 숨겨져 있다. 명령 결과를 아래 계층부터 읽어 가며 “처음 실패하는 곳”을 찾자. 적은 명령으로 맞힐수록 좋은 진단이다. 출력은 실제 명령의 형식을 단순화했다. 게이트웨이는 192.168.0.1, 테스트 사이트는 example.com이라고 가정했다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="monitor">
+    <h2>모니터링: 가용성, SLO, 백분위</h2>
+    <p>장애가 난 뒤에 고치는 것보다 미리 아는 것이 낫다. 운영팀은 장비와 서비스의 상태를 계속 재서 그래프로 보고, 기준을 넘으면 알림을 받는다. 핵심 지표는 세 가지다.</p>
+    <ul>
+      <li><b>가용성</b>(22장): 서비스가 정상인 시간의 비율. “나인(9)의 개수”로 말한다. 99.9%(쓰리 나인)는 1년에 약 8.76시간, 99.99%는 약 52.6분, 99.999%는 약 5.3분만 멈춰도 된다는 뜻이다.</li>
+      <li><span class="term">SLO</span><span class="en">(Service Level Objective)</span>: 팀이 스스로 정한 목표. “한 달 동안 요청의 99.9%가 300 ms 안에 성공한다” 같은 형식이다. 남은 허용치(0.1%)를 <b>오류 예산</b>이라 부르며, 예산이 남으면 새 기능을 과감히 배포하고 바닥나면 안정화에 집중한다. 고객과 계약으로 맺어 어기면 보상하는 것은 SLA다.</li>
+      <li><span class="term">백분위 지연</span><span class="en">(percentile latency)</span>: 평균 대신 p50(중앙값), p99(가장 느린 1%의 경계)를 본다. 평균 50 ms라도 p99가 2초라면 100명 중 1명은 매번 답답하다. 웹 페이지 하나가 요청 수십 개로 이루어지면, 그중 하나라도 느린 꼬리에 걸릴 확률이 높아서 p99가 체감 속도를 좌우한다.</li>
+    </ul>
+    <p>시스템이 여러 부품으로 이루어지면 가용성은 곱셈으로 계산한다. 하나라도 멈추면 전체가 멈추는 <b>직렬</b> 구성은 가용성이 곱해져 낮아지고(99.9% 두 개 → 99.8%), 하나만 살아 있어도 되는 <b>병렬</b>(이중화) 구성은 “둘 다 고장 날 확률”만 남아 크게 높아진다(99% 두 개 → 1 − 0.01² = 99.99%).</p>
+    <div class="sim" id="sim-av">
+      <div class="sim-head"><span class="sim-tag">CALCULATOR</span><h3>가용성 계산기: 직렬과 이중화</h3></div>
+      <div class="sim-view"><canvas id="cv-av"></canvas></div>
+      <div class="av-grid" id="av-grid"></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">전체 가용성</span><span class="v" id="av-tot">—</span></div>
+        <div class="stat"><span class="k">연간 예상 중단</span><span class="v" id="av-year">—</span></div>
+        <div class="stat"><span class="k">월간 예상 중단</span><span class="v" id="av-month">—</span></div>
+        <div class="stat"><span class="k">가장 약한 고리</span><span class="v" id="av-weak" style="font-size:15px">—</span></div>
+      </div>
+      <div class="sim-note">사용자 요청이 왼쪽에서 오른쪽으로 네 단계를 모두 지나야 한다(직렬). 각 단계의 대수를 늘리면 그 단계는 병렬이 되어, 한 대만 살아 있어도 된다. 전체 = Π (1 − (1 − a)<sup>n</sup>). 해볼 것: 가장 약한 단계 하나만 이중화해도 전체가 크게 좋아진다. 단순화: 고장이 서로 독립이고 전환이 즉시 된다고 가정했다. 실제로는 같은 전원·같은 설정 실수처럼 함께 고장 나는 원인이 이중화의 효과를 깎는다.</div>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>한 구간의 지연 = <b>처리 + 큐잉 + 전송(크기 ÷ 속도) + 전파(거리 ÷ 빛 속도)</b>. 장거리는 전파, 느린 링크는 전송, 혼잡한 망은 큐잉이 지배한다.</li>
+      <li><b>ping</b>의 min은 거리, max·mdev·지터는 큐의 변동, 손실은 혼잡이나 불량 링크를 보여 준다. <b>traceroute</b>에서 끝까지 유지되는 지연만 진짜이고 중간 홉의 튀는 값과 *는 대개 ICMP 처리 정책 탓이다.</li>
+      <li><b>BDP = 대역폭 × RTT</b>. TCP 윈도우가 이보다 작으면 처리율은 윈도우 ÷ RTT로 묶인다(64 KB, 150 ms → 약 3.5 Mbps).</li>
+      <li>M/M/1 큐의 평균 지연은 <b>1/(μ − λ)</b>. 이용률이 1에 다가가면 폭증한다. 큰 버퍼를 TCP가 채우면 <b>버퍼블로트</b>가 생기고, <b>CoDel·FQ-CoDel</b> 같은 AQM이 지연을 수 ms로 묶는다.</li>
+      <li><b>QoS</b>는 DSCP로 분류하고 우선순위·가중 공정 큐로 줄을 세우며, <b>토큰 버킷</b>(r = 평균 속도, b = 버스트)으로 속도를 제한한다.</li>
+      <li>문제 해결은 <b>링크 → IP·게이트웨이 → 외부 연결 → DNS → 포트·앱</b> 순서로, 처음 실패하는 곳을 찾는다.</li>
+      <li>가용성은 직렬이면 곱해져 낮아지고 병렬이면 크게 높아진다. 99.9% = 연 8.76시간. 평균보다 <b>p99</b>가 체감을 결정한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>서울-뉴욕 회선을 10 Gbps에서 100 Gbps로 올렸다. 1,500바이트 패킷의 한쪽 방향 지연은 어떻게 되나?</p><div class="opts">
+        <button class="opt">10분의 1로 준다</button>
+        <button class="opt">절반으로 준다</button>
+        <button class="opt" data-correct>거의 그대로다 (약 55 ms의 전파 지연이 지배)</button>
+        <button class="opt">오히려 는다</button>
+      </div><div class="quiz-exp">11,000 km ÷ 20만 km/s ≈ 55 ms인 전파 지연에 비해 전송 지연(1.2 µs → 0.12 µs)은 무시할 만하다. 대역폭을 올려도 거리는 줄지 않는다.</div></div>
+      <div class="quiz-q"><p>traceroute에서 7번 홉만 RTT가 250 ms이고 8~12번 홉은 모두 40 ms 안팎이다. 가장 그럴듯한 해석은?</p><div class="opts">
+        <button class="opt">7번 라우터에서 패킷이 250 ms씩 지체된다</button>
+        <button class="opt" data-correct>7번 라우터가 ICMP 답장을 낮은 우선순위로 늦게 만들 뿐, 전달 경로는 정상이다</button>
+        <button class="opt">8번 홉부터 다른 경로로 바뀌었다</button>
+        <button class="opt">7번 라우터가 패킷을 버리고 있다</button>
+      </div><div class="quiz-exp">지나가는 패킷의 지연이라면 그 뒤 홉들에도 계속 나타나야 한다. 중간 홉만 튀는 것은 라우터의 제어용 CPU가 ICMP 생성을 뒤로 미루기 때문이다.</div></div>
+      <div class="quiz-q"><p>대역폭 10 Gbps, RTT 80 ms인 경로의 대역폭-지연 곱은?</p><div class="opts">
+        <button class="opt">약 64 KB</button>
+        <button class="opt">약 1 MB</button>
+        <button class="opt">약 800 MB</button>
+        <button class="opt" data-correct>약 100 MB</button>
+      </div><div class="quiz-exp">10<sup>10</sup> bps × 0.08 s = 8×10<sup>8</sup> 비트 = 10<sup>8</sup> 바이트 = 100 MB. 이만큼이 늘 길 위에 있어야 회선이 꽉 찬다.</div></div>
+      <div class="quiz-q"><p>집에서 대용량 사진을 클라우드에 올리는 동안 게임 핑이 25 ms에서 600 ms로 치솟았다. 가장 효과적인 대책은?</p><div class="opts">
+        <button class="opt">공유기 버퍼를 더 크게 늘린다</button>
+        <button class="opt">게임 서버를 더 가까운 곳으로 옮긴다</button>
+        <button class="opt" data-correct>공유기에서 FQ-CoDel 같은 AQM(이나 업링크 셰이핑)을 켠다</button>
+        <button class="opt">DNS 서버를 바꾼다</button>
+      </div><div class="quiz-exp">업로드가 업링크 버퍼를 가득 채운 버퍼블로트다. 버퍼를 키우면 더 나빠진다. AQM이 큐를 짧게 유지하고, FQ는 게임 패킷을 별도 줄에 세운다.</div></div>
+      <div class="quiz-q"><p>노트북의 IP 주소가 169.254.12.34로 나오고 게이트웨이가 비어 있다. 원인으로 가장 그럴듯한 것은?</p><div class="opts">
+        <button class="opt" data-correct>DHCP 서버에게서 주소를 받지 못했다</button>
+        <button class="opt">DNS 서버가 다운되었다</button>
+        <button class="opt">웹 서버의 방화벽이 443을 막았다</button>
+        <button class="opt">회선이 혼잡하다</button>
+      </div><div class="quiz-exp">169.254.0.0/16은 DHCP 응답이 없을 때 기기가 스스로 붙이는 링크 로컬 주소다(7장). 링크는 살아 있지만 IP 단계에서 막혔으니 그 위의 DNS나 앱을 볼 필요가 없다.</div></div>
+      <div class="quiz-q"><p>가용성 99.9%인 서버 두 대를 직렬로 놓은 경우와 병렬(한 대만 살아도 됨)로 놓은 경우를 차례로 고르면?</p><div class="opts">
+        <button class="opt">99.9%, 99.9%</button>
+        <button class="opt">99.99%, 99.8%</button>
+        <button class="opt" data-correct>99.8%, 99.9999%</button>
+        <button class="opt">99.8%, 99.95%</button>
+      </div><div class="quiz-exp">직렬은 0.999 × 0.999 ≈ 0.998, 병렬은 1 − 0.001² = 0.999999. 연간 중단으로 치면 약 17.5시간 대 약 32초다(고장이 독립이라는 가정에서).</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const ms = (s) => NB.time(s);
+
+  /* ================= 지연 분해 ================= */
+  const fmtRate = (v) => NB.si(Math.pow(10, v), "bps");
+  const fmtDist = (v) => { const km = Math.pow(10, v); return km < 1 ? Math.round(km * 1000) + " m" : Number(km.toPrecision(3)).toLocaleString("en-US") + " km"; };
+  const dSize = NB.range("dl-size", (v) => v.toLocaleString("en-US") + " B", () => dcv.redraw());
+  const dRate = NB.range("dl-rate", fmtRate, () => dcv.redraw());
+  const dDist = NB.range("dl-dist", fmtDist, () => dcv.redraw());
+  const dQ = NB.range("dl-q", (v) => v + "개", () => dcv.redraw());
+  const PRE = { dc: [1500, 11, -1, 2], home: [1500, 7, 1, 20], ocean: [1500, 10, Math.log10(11000), 5], wifi: [1500, Math.log10(5e7), -1.7, 300] };
+  NB.seg("dl-pre", (v) => { const p = PRE[v]; dSize.set(p[0]); dRate.set(p[1]); dDist.set(p[2]); dQ.set(p[3]); });
+  const DN = ["처리", "큐잉", "전송", "전파"];
+  const dcv = NB.canvas("#cv-delay", (ctx, w, h) => {
+    const P = NB.palette(), narrow = w < 520;
+    const R = Math.pow(10, dRate()), tr = (dSize() * 8) / R;
+    const c = [5e-6, dQ() * tr, tr, (Math.pow(10, dDist()) * 1000) / 2e8];
+    const tot = c.reduce((a, b) => a + b, 0), cols = [P.dim, P.warn, P.accent2, P.accent];
+    const dom = c.indexOf(Math.max(...c));
+    ["dl-o1", "dl-o2", "dl-o3", "dl-o4"].forEach((id, i) => NB.stat(id, ms(c[i]) + ` <small>${Math.round((c[i] / tot) * 100)}%</small>`));
+    NB.stat("dl-tot", ms(tot));
+    // 누적 막대
+    const x0 = 16, x1 = w - 16, y0 = 34, bh = 34;
+    NB.text(ctx, `합계 ${ms(tot)} · 지배 성분: ${DN[dom]}`, x0, 16, { size: 13, bold: true, color: P.text });
+    let x = x0;
+    c.forEach((v, i) => { const ww = ((x1 - x0) * v) / tot; if (ww > 0.3) { ctx.fillStyle = cols[i]; ctx.globalAlpha = 0.85; ctx.fillRect(x, y0, ww, bh); ctx.globalAlpha = 1; if (ww > 46) NB.text(ctx, DN[i], x + ww / 2, y0 + bh / 2, { align: "center", size: 12, bold: true, color: P.bg }); } x += ww; });
+    ctx.strokeStyle = P.border; ctx.strokeRect(x0, y0, x1 - x0, bh);
+    // 로그 막대
+    const lx0 = narrow ? 52 : 70, lx1 = w - (narrow ? 70 : 110), top = y0 + bh + 34, rh = (h - top - 26) / 4;
+    const lmin = -9, lmax = 1; // 1 ns ~ 10 s
+    const X = (v) => lx0 + NB.clamp((Math.log10(Math.max(v, 1e-9)) - lmin) / (lmax - lmin), 0, 1) * (lx1 - lx0);
+    const lab = ["1ns", "10ns", "100ns", "1µs", "10µs", "100µs", "1ms", "10ms", "100ms", "1s", "10s"];
+    for (let e = lmin; e <= lmax; e++) { const xx = X(Math.pow(10, e)); ctx.strokeStyle = P.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(xx, top - 4); ctx.lineTo(xx, top + rh * 4); ctx.stroke(); if (!narrow || (e - lmin) % 3 === 0) NB.text(ctx, lab[e - lmin], xx, top + rh * 4 + 12, { align: "center", size: 10, mono: true, color: P.faint }); }
+    c.forEach((v, i) => {
+      const y = top + i * rh + 3, hh = rh - 8;
+      NB.text(ctx, DN[i], lx0 - 8, y + hh / 2, { align: "right", size: 12, bold: i === dom, color: P.text });
+      NB.rrect(ctx, lx0, y, Math.max(2, X(v) - lx0), hh, 4); ctx.fillStyle = cols[i]; ctx.globalAlpha = i === dom ? 0.95 : 0.6; ctx.fill(); ctx.globalAlpha = 1;
+      NB.text(ctx, ms(v), Math.min(X(v) + 6, w - 64), y + hh / 2, { size: 11, mono: true, color: P.text });
+    });
+  }, { aspect: 0.5, minHeight: 280, maxHeight: 340 });
+
+  /* ================= ping ================= */
+  const pBase = NB.range("pg-base", (v) => v + " ms", null);
+  const pJit = NB.range("pg-jit", (v) => v + " ms", null);
+  const pLoss = NB.range("pg-loss", (v) => v + "%", null);
+  const PPRE = { lan: [8, 1, 0], wifi: [12, 35, 3], far: [140, 3, 0], lte: [55, 25, 12] };
+  NB.seg("pg-pre", (v) => { const p = PPRE[v]; pBase.set(p[0]); pJit.set(p[1]); pLoss.set(p[2]); pingRun(); });
+  let pres = [], pShown = 0, pAcc = 0;
+  function pingRun() {
+    pres = [];
+    for (let i = 1; i <= 20; i++) {
+      if (Math.random() * 100 < pLoss()) { pres.push(null); continue; }
+      const q = -Math.log(1 - Math.random()) * pJit(); // 큐 지연(지수 분포)
+      pres.push(Math.max(0.2, pBase() + q + NB.randn() * 0.05 * pBase() * 0.1));
+    }
+    pShown = 0; pAcc = 0; pingText(); pcv.redraw();
+  }
+  function pingText() {
+    const L = ['<span class="p">$</span> ping -c 20 example.com', "PING example.com (203.0.113.10) 56(84) bytes of data."];
+    for (let i = 0; i < pShown; i++) {
+      const r = pres[i];
+      L.push(r == null ? `<span class="e">(icmp_seq=${i + 1} 응답 없음 — 시간 초과)</span>` : `64 bytes from 203.0.113.10: icmp_seq=${i + 1} ttl=54 time=${r < 10 ? r.toFixed(2) : r.toFixed(1)} ms`);
+    }
+    const ok = pres.slice(0, pShown).filter((r) => r != null);
+    if (pShown === pres.length && pres.length) {
+      const n = ok.length, lossP = Math.round(((pres.length - n) / pres.length) * 100);
+      L.push("", "--- example.com ping statistics ---", `${pres.length} packets transmitted, ${n} received, ${lossP}% packet loss, time 19027ms`);
+      if (n) {
+        const mn = Math.min(...ok), mx = Math.max(...ok), avg = ok.reduce((a, b) => a + b, 0) / n;
+        const mdev = Math.sqrt(Math.max(0, ok.reduce((a, b) => a + b * b, 0) / n - avg * avg));
+        let jt = 0; for (let i = 1; i < n; i++) jt += Math.abs(ok[i] - ok[i - 1]); jt = n > 1 ? jt / (n - 1) : 0;
+        L.push(`rtt min/avg/max/mdev = ${mn.toFixed(3)}/${avg.toFixed(3)}/${mx.toFixed(3)}/${mdev.toFixed(3)} ms`);
+        NB.stat("pg-mam", `${mn.toFixed(1)} / ${avg.toFixed(1)} / ${mx.toFixed(1)}`); NB.stat("pg-mdev", mdev.toFixed(1) + " ms"); NB.stat("pg-jitter", jt.toFixed(1) + " ms");
+      } else { NB.stat("pg-mam", "—"); NB.stat("pg-mdev", "—"); NB.stat("pg-jitter", "—"); }
+      NB.stat("pg-lossv", `<span style="color:${lossP ? "var(--bad)" : "var(--ok)"}">${lossP}%</span>`);
+    }
+    $("ping-out").innerHTML = L.join("\n");
+    $("ping-out").scrollTop = 1e6;
+  }
+  const pcv = NB.canvas("#cv-ping", (ctx, w, h) => {
+    const P = NB.palette();
+    const ok = pres.filter((r) => r != null);
+    const ymax = Math.max(pBase() * 1.5, ...(ok.length ? ok : [1])) * 1.1;
+    const pts = [];
+    for (let i = 0; i < pShown; i++) pts.push(pres[i] == null ? { x: i + 1, y: ymax * 0.96, color: P.bad, r: 5 } : { x: i + 1, y: pres[i], color: P.accent, r: 4 });
+    const line = []; for (let i = 0; i < pShown; i++) if (pres[i] != null) line.push([i + 1, pres[i]]);
+    NB.chart(ctx, { x: 52, y: 14, w: w - 70, h: h - 56 }, { x: [0.5, 20.5], y: [0, ymax], xLabel: "icmp_seq (빨간 점 = 손실)", yLabel: "RTT (ms)", series: [{ data: line, color: P.accent, width: 1.5 }], points: pts, hlines: [{ y: pBase(), color: P.ok, label: "기본 RTT" }], xTicks: [1, 5, 10, 15, 20] });
+  }, { aspect: 0.3, minHeight: 200, maxHeight: 240 });
+  NB.loop($("cv-ping"), (dt) => {
+    if (pShown >= pres.length) return;
+    pAcc += dt; if (pAcc < 0.12) return; pAcc = 0; pShown++; pingText(); pcv.redraw();
+  });
+  $("pg-go").onclick = pingRun;
+  pingRun();
+
+  /* ================= BDP ================= */
+  const bBw = NB.range("bd-bw", fmtRate, () => bcv.redraw());
+  const bRtt = NB.range("bd-rtt", (v) => v + " ms", () => bcv.redraw());
+  const bcv = NB.canvas("#cv-bdp", (ctx, w, h) => {
+    const P = NB.palette(), bw = Math.pow(10, bBw()), rtt = bRtt() / 1000;
+    const bdp = (bw * rtt) / 8, t64 = Math.min(bw, (65535 * 8) / rtt);
+    NB.stat("bd-bdp", NB.bytes(bdp)); NB.stat("bd-64", NB.si(t64, "bps")); NB.stat("bd-util", (t64 / bw * 100 >= 99.95 ? "100" : NB.fmt((t64 / bw) * 100, 2)) + "%");
+    const wins = [[65535, "64 KB", P.bad], [1 << 20, "1 MB", P.warn], [16 << 20, "16 MB", P.accent2], [256 << 20, "256 MB", P.ok]];
+    const xs = []; for (let e = 0; e <= 3; e += 0.05) xs.push(Math.pow(10, e));
+    const series = wins.map(([wb, , col]) => ({ data: xs.map((r) => [r, Math.min(bw, (wb * 8) / (r / 1000))]), color: col, width: 2 }));
+    const narrow = w < 520;
+    NB.chart(ctx, { x: 62, y: 14, w: w - (narrow ? 80 : 172), h: h - 58 }, {
+      x: [1, 1000], y: [1e5, 1e12], logX: true, logY: true, xLabel: "RTT (ms)", yLabel: "최대 처리율",
+      yFmt: (v) => NB.si(v, "bps", 2).replace(" ", ""), series,
+      hlines: [{ y: bw, color: P.dim, label: "회선 " + NB.si(bw, "bps") }],
+      points: [{ x: bRtt(), y: t64, color: P.bad, r: 5 }],
+    });
+    if (!narrow) wins.forEach(([, lab, col], i) => { ctx.fillStyle = col; ctx.fillRect(w - 98, 22 + i * 20, 14, 3); NB.text(ctx, "윈도우 " + lab, w - 80, 23 + i * 20, { size: 11, color: P.text }); });
+  }, { aspect: 0.48, minHeight: 260, maxHeight: 340 });
+
+  /* ================= M/M/1 ================= */
+  const qLam = NB.range("q-lam", (v) => v + "/s", () => qcv.redraw());
+  const qMu = NB.range("q-mu", (v) => v + "/s", () => qcv.redraw());
+  const qBuf = NB.seg("q-buf", () => { qReset(); });
+  let Q, qt, nextA, nextD, samples, drops, arrivals;
+  const expo = (rate) => -Math.log(1 - Math.random()) / rate;
+  function qReset() { Q = []; qt = 0; nextA = expo(qLam()); nextD = Infinity; samples = []; drops = 0; arrivals = 0; }
+  qReset();
+  $("q-reset").onclick = qReset;
+  function qStep(dt) {
+    const end = qt + dt, B = Number(qBuf());
+    let guard = 0;
+    while (guard++ < 5000) {
+      const t = Math.min(nextA, nextD);
+      if (t > end) break;
+      if (nextA <= nextD) {
+        qt = nextA; arrivals++;
+        if (Q.length >= B) drops++; else { Q.push(qt); if (Q.length === 1) nextD = qt + expo(qMu()); }
+        nextA = qt + expo(qLam());
+      } else {
+        qt = nextD; const a = Q.shift(); samples.push([qt, qt - a]);
+        nextD = Q.length ? qt + expo(qMu()) : Infinity;
+      }
+    }
+    qt = end;
+    while (samples.length && samples[0][0] < qt - 3) samples.shift();
+    if (arrivals > 20000) { arrivals = Math.round(arrivals / 2); drops = Math.round(drops / 2); }
+  }
+  const qcv = NB.canvas("#cv-queue", (ctx, w, h) => {
+    const P = NB.palette(), lam = qLam(), mu = qMu(), rho = lam / mu, narrow = w < 520;
+    const th = rho < 1 ? 1 / (mu - lam) : Infinity;
+    const avg = samples.length ? samples.reduce((a, s) => a + s[1], 0) / samples.length : 0;
+    NB.stat("q-rho", rho.toFixed(2)); NB.stat("q-th", rho < 1 ? ms(th) : '<span style="color:var(--bad)">∞ (계속 증가)</span>');
+    NB.stat("q-ms", samples.length ? ms(avg) : "—"); NB.stat("q-drop", arrivals ? ((drops / arrivals) * 100).toFixed(1) + "%" : "0%");
+    // 큐 그림
+    const qh = 70, sx = w - 60, slot = narrow ? 7 : 9, maxShow = Math.floor((sx - 70) / slot);
+    NB.text(ctx, "도착 →", 8, qh / 2, { size: 12, color: P.dim });
+    const n = Q.length;
+    for (let i = 0; i < Math.min(n, maxShow); i++) { ctx.fillStyle = i < 50 ? P.accent : P.warn; ctx.fillRect(sx - 34 - (i + 1) * slot, qh / 2 - 12, slot - 2, 24); }
+    if (n > maxShow) NB.text(ctx, `+${n - maxShow}`, 56, qh / 2 + 22, { size: 11, mono: true, bold: true, color: P.bad });
+    ctx.beginPath(); ctx.arc(sx, qh / 2, 22, 0, 7); ctx.fillStyle = n ? P.accent2 : P.surface; ctx.fill(); ctx.strokeStyle = P.border; ctx.stroke();
+    NB.text(ctx, "창구", sx, qh / 2, { align: "center", size: 11, bold: true, color: n ? P.bg : P.dim });
+    NB.text(ctx, `줄 길이 ${n}개`, sx - 34, qh / 2 - 22, { align: "right", size: 11.5, mono: true, color: P.text });
+    // 이론 곡선
+    const data = []; for (let r = 0.01; r < 0.995; r += 0.005) data.push([r, (1 / (mu - r * mu)) * 1000]);
+    const pts = [];
+    if (samples.length) pts.push({ x: Math.min(rho, 1.15), y: NB.clamp(avg * 1000, 0.3, 3000), color: P.warn, r: 6, label: "측정" });
+    NB.chart(ctx, { x: 58, y: qh + 14, w: w - 76, h: h - qh - 58 }, {
+      x: [0, 1.2], y: [0.3, 3000], logY: true, xLabel: "이용률 ρ = λ/μ", yLabel: "평균 지연 (ms)",
+      yFmt: (v) => (v >= 1 ? String(v) : v.toString()), series: [{ data, color: P.accent, width: 2 }],
+      vlines: [{ x: Math.min(rho, 1.19), color: P.dim, label: "지금" }, { x: 1, color: P.bad, label: Math.abs(rho - 1) < 0.15 ? "" : "ρ=1" }],
+      hlines: [{ y: (Number(qBuf()) / mu) * 1000, color: P.faint, label: "버퍼가 가득 찼을 때" }], points: pts,
+    });
+  }, { aspect: 0.55, minHeight: 330, maxHeight: 400 });
+  NB.loop($("cv-queue"), (dt) => { qStep(dt); qcv.redraw(); });
+
+  /* ================= 버퍼블로트 (유체 모델) ================= */
+  const blMode = NB.seg("bl-mode", () => blcv.redraw());
+  const MU = 20e6 / (1500 * 8); // 패킷/초
+  const blBuf = NB.range("bl-buf", (v) => `${v}개 ≈ ${Math.round((v / MU) * 1000)} ms`, () => blcv.redraw());
+  function blSim(mode, B) {
+    const dt = 0.001, base = 0.04, T = 20, out = [];
+    let cwnd = 10, ss = true, q = 0, t = 0, lastCut = -1, firstAbove = 0, dropNext = 0, count = 0, dropping = false, delivered = 0, sumQ = 0, sumG = 0, nS = 0;
+    for (let i = 0; i < T / dt; i++, t += dt) {
+      const rtt = base + q / MU, rate = cwnd / rtt;
+      q = Math.max(0, q + (rate - MU) * dt);
+      delivered += (q > 0 ? MU : Math.min(rate, MU)) * dt;
+      let loss = false;
+      if (q > B) { q = B; loss = true; }
+      if (mode !== "fifo") {
+        const soj = q / MU;
+        if (soj < 0.005) { firstAbove = 0; dropping = false; }
+        else if (!firstAbove) firstAbove = t + 0.1;
+        else if (!dropping && t >= firstAbove) { dropping = true; count = count > 2 ? count - 2 : 1; dropNext = t + 0.1 / Math.sqrt(count); loss = true; }
+        else if (dropping && t >= dropNext) { count++; dropNext = t + 0.1 / Math.sqrt(count); loss = true; }
+      }
+      if (loss && t - lastCut > rtt) { cwnd = Math.max(2, Math.min(cwnd, MU * base + B) / 2); ss = false; lastCut = t; }
+      else if (ss) cwnd += (cwnd * dt) / rtt; else cwnd += dt / rtt;
+      const qd = q / MU, g = mode === "fq" ? base + 1 / MU : base + qd;
+      if (i % 20 === 0) out.push([t, qd * 1000, g * 1000]);
+      if (t > 2) { sumQ += qd; sumG += g; nS++; }
+    }
+    return { out, avgQ: sumQ / nS, avgG: sumG / nS, util: delivered / (MU * T) };
+  }
+  const blcv = NB.canvas("#cv-bloat", (ctx, w, h) => {
+    const P = NB.palette(), r = blSim(blMode(), blBuf());
+    NB.stat("bl-q", ms(r.avgQ)); NB.stat("bl-u", Math.round(r.util * 100) + "%"); NB.stat("bl-g", ms(r.avgG));
+    const ymax = Math.max(100, ...r.out.map((p) => Math.max(p[1], p[2]))) * 1.1;
+    NB.chart(ctx, null, { x: [0, 20], y: [0, ymax], xLabel: "시간 (초)", yLabel: "지연 (ms)",
+      series: [{ data: r.out.map((p) => [p[0], p[1]]), color: P.dim, width: 1.5 }, { data: r.out.map((p) => [p[0], p[2]]), color: P.warn, width: 2.2 }],
+      hlines: [{ y: 40, color: P.ok, label: "기본 RTT 40 ms" }] });
+  }, { aspect: 0.42, minHeight: 240, maxHeight: 320 });
+
+  /* ================= 토큰 버킷 ================= */
+  const tR = NB.range("tb-r", (v) => v + " Mbps", () => tcv.redraw());
+  const tB = NB.range("tb-b", (v) => (v >= 1000 ? (v / 1000).toFixed(2) + " MB" : v + " KB"), () => tcv.redraw());
+  const tIn = NB.seg("tb-in", () => tcv.redraw());
+  const tMode = NB.seg("tb-mode", () => tcv.redraw());
+  let randSeed = 7;
+  function tbSim() {
+    const r = tR() * 1e6, b = tB() * 8000, T = 3000, rnd = NB.rng(randSeed);
+    let tok = b, qb = 0, sumIn = 0, sumOut = 0, dropped = 0, maxQ = 0;
+    const inp = [], outp = [], tk = [];
+    let rv = 60;
+    for (let i = 0; i < T; i++) {
+      let x; // Mbps
+      const pat = tIn();
+      if (pat === "burst") x = i % 500 < 100 ? 200 : 0;
+      else if (pat === "steady") x = 80;
+      else { if (i % 50 === 0) rv = rnd() < 0.3 ? 150 + rnd() * 100 : rnd() * 50; x = rv; }
+      const bits = x * 1000; // 1 ms 동안
+      tok = Math.min(b, tok + r * 0.001);
+      let send;
+      if (tMode() === "police") { send = Math.min(bits, tok); dropped += bits - send; }
+      else { qb += bits; send = Math.min(qb, tok); qb -= send; maxQ = Math.max(maxQ, qb); }
+      tok -= send; sumIn += bits; sumOut += send;
+      if (i % 5 === 0) { inp.push([i / 1000, x]); outp.push([i / 1000, send / 1000]); tk.push([i / 1000, (tok / b) * 100]); }
+    }
+    return { inp, outp, tk, aIn: sumIn / 3, aOut: sumOut / 3, dropped, maxQ, r };
+  }
+  const tcv = NB.canvas("#cv-tb", (ctx, w, h) => {
+    const P = NB.palette(), s = tbSim();
+    NB.stat("tb-oin", NB.si(s.aIn, "bps")); NB.stat("tb-oout", NB.si(s.aOut, "bps"));
+    if (tMode() === "police") { $("tb-k3").textContent = "버려진 데이터"; NB.stat("tb-o3", NB.bytes(s.dropped / 8) + ` <small>${Math.round((s.dropped / Math.max(1, s.aIn * 3)) * 100)}%</small>`); }
+    else { $("tb-k3").textContent = "셰이핑 큐 최대 지연"; NB.stat("tb-o3", ms(s.maxQ / s.r)); }
+    const h1 = (h - 30) * 0.66;
+    NB.chart(ctx, { x: 58, y: 12, w: w - 76, h: h1 - 30 }, { x: [0, 3], y: [0, 260], yLabel: "Mbps", xTicks: [0, 0.5, 1, 1.5, 2, 2.5, 3], xFmt: () => "",
+      series: [{ data: s.inp, color: P.faint, width: 1.5 }, { data: s.outp, color: P.accent, width: 2 }],
+      hlines: [{ y: tR(), color: P.ok, label: "r = " + tR() + " Mbps" }] });
+    NB.chart(ctx, { x: 58, y: h1 + 2, w: w - 76, h: h - h1 - 46 }, { x: [0, 3], y: [0, 100], yTicks: [0, 50, 100], yLabel: "토큰 %", xLabel: "시간 (초)", xTicks: [0, 0.5, 1, 1.5, 2, 2.5, 3],
+      series: [{ data: s.tk, color: P.warn, width: 2 }] });
+  }, { aspect: 0.55, minHeight: 320, maxHeight: 400 });
+
+  /* ================= 장애 추적 게임 ================= */
+  const SC = {
+    cable: { name: "케이블·링크 끊김", ex: "가장 아래 단계인 링크부터 죽어 있었다. 링크가 DOWN이면 그 위의 IP·DNS·웹은 볼 필요도 없다. 케이블을 다시 꽂거나 Wi-Fi 연결을 확인한다." },
+    dhcp: { name: "DHCP 실패", ex: "링크는 UP인데 IP가 169.254.x.x(링크 로컬)다. DHCP 서버(보통 공유기)에게서 주소를 못 받았다. 게이트웨이가 없으니 그 위는 모두 실패한다." },
+    isp: { name: "통신사 회선 장애", ex: "게이트웨이(공유기)까지는 되는데 그 너머 8.8.8.8이 100% 손실이다. 집 밖 회선이나 통신사 쪽 문제다. DNS 실패는 그 결과일 뿐이다." },
+    dns: { name: "DNS 장애", ex: "IP 주소로는(8.8.8.8) 잘 나가는데 이름 풀이만 실패한다. DNS 서버 설정을 바꾸거나(예: 다른 리졸버) DNS 서버를 고친다." },
+    fw: { name: "방화벽 차단", ex: "링크·IP·DNS가 모두 정상인데 443 포트 연결만 시간 초과다. 즉시 거부(refused)가 아니라 조용히 버려지는 건 중간 방화벽의 전형적 증상이다." },
+    cong: { name: "혼잡", ex: "모든 단계가 ‘되긴’ 하지만 외부 RTT가 수백 ms로 들쭉날쭉하고 손실이 있다. 게이트웨이까지는 빠르므로 병목은 업링크나 그 너머다. 버퍼블로트를 의심하자." },
+  };
+  const KEYS = Object.keys(SC);
+  let cur = null, used = 0, solved = 0, right = 0, totalCmd = 0, answered = false, lines = [];
+  const rr = (a, b) => (a + Math.random() * (b - a));
+  const pingLines = (host, base, jit, loss) => {
+    const L = [`<span class="p">$</span> ping -c 4 ${host}`]; let ok = 0; const t = [];
+    for (let i = 1; i <= 4; i++) { if (Math.random() < loss) { L.push(`<span class="e">Request timeout for icmp_seq ${i}</span>`); continue; } const v = base + Math.random() * jit; t.push(v); ok++; L.push(`64 bytes from ${host}: icmp_seq=${i} time=${v.toFixed(1)} ms`); }
+    L.push(`<span class="${ok === 4 ? "g" : "e"}">4 packets transmitted, ${ok} received, ${Math.round((1 - ok / 4) * 100)}% packet loss</span>` + (t.length ? `, avg ${(t.reduce((a, b) => a + b, 0) / t.length).toFixed(1)} ms` : ""));
+    return L;
+  };
+  function run(c) {
+    const s = cur, L = [];
+    const linkDown = s === "cable", noIp = s === "cable" || s === "dhcp", noExt = noIp || s === "isp";
+    if (c === "link") {
+      L.push('<span class="p">$</span> ip link show eth0');
+      L.push(linkDown ? '<span class="e">2: eth0: &lt;NO-CARRIER,BROADCAST,MULTICAST,UP&gt; state DOWN</span>' : '<span class="g">2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; state UP · 1000Mb/s full-duplex</span>');
+    } else if (c === "ip") {
+      L.push('<span class="p">$</span> ipconfig');
+      if (linkDown) L.push('<span class="e">미디어 상태 . . . . : 미디어 연결 끊김</span>');
+      else if (s === "dhcp") L.push('<span class="e">IPv4 주소 . . . . . : 169.254.37.112 (자동 구성)</span>', "서브넷 마스크 . . . : 255.255.0.0", '<span class="e">기본 게이트웨이 . . : (없음)</span>');
+      else L.push("IPv4 주소 . . . . . : 192.168.0.23", "서브넷 마스크 . . . : 255.255.255.0", "기본 게이트웨이 . . : 192.168.0.1", "DNS 서버 . . . . . : 192.168.0.1");
+    } else if (c === "gw") {
+      if (noIp) L.push('<span class="p">$</span> ping -c 4 192.168.0.1', '<span class="e">ping: connect: Network is unreachable</span>');
+      else L.push(...pingLines("192.168.0.1", s === "cong" ? 1.5 : 1, s === "cong" ? 3 : 1.2, 0));
+    } else if (c === "ext") {
+      if (noIp) L.push('<span class="p">$</span> ping -c 4 8.8.8.8', '<span class="e">ping: connect: Network is unreachable</span>');
+      else if (s === "isp") L.push(...pingLines("8.8.8.8", 0, 0, 1));
+      else if (s === "cong") L.push(...pingLines("8.8.8.8", 180, 650, 0.25));
+      else L.push(...pingLines("8.8.8.8", 31, 4, 0));
+    } else if (c === "dns") {
+      L.push('<span class="p">$</span> nslookup example.com');
+      if (noExt || s === "dns") L.push('<span class="e">;; communications error to 192.168.0.1#53: timed out</span>', '<span class="e">;; no servers could be reached</span>');
+      else L.push("Server:  192.168.0.1", "Name:    example.com", '<span class="g">Address: 203.0.113.10</span>' + (s === "cong" ? `  <span class="d">(응답 ${Math.round(rr(400, 1500))} ms)</span>` : ""));
+    } else if (c === "curl") {
+      L.push('<span class="p">$</span> curl -I https://example.com');
+      if (noExt || s === "dns") L.push('<span class="e">curl: (6) Could not resolve host: example.com</span>');
+      else if (s === "fw") L.push('<span class="e">curl: (28) Failed to connect to example.com port 443 after 10002 ms: Timeout was reached</span>');
+      else L.push('<span class="g">HTTP/2 200</span>', "content-type: text/html", `<span class="d">(총 ${s === "cong" ? rr(4, 9).toFixed(1) + " 초" : Math.round(rr(90, 160)) + " ms"})</span>`);
+    }
+    return L;
+  }
+  function tsNew() {
+    cur = KEYS[Math.floor(Math.random() * KEYS.length)]; used = 0; answered = false; lines = ['<span class="d"># 사용자: "인터넷이 안 돼요(또는 너무 느려요)!" — 진단 명령을 실행해 보세요.</span>'];
+    $("ts-out").innerHTML = lines.join("\n");
+    $("ts-msg").innerHTML = "새 장애가 숨겨졌다. <b>아래 계층부터</b> 명령을 실행해 처음 실패하는 곳을 찾자.";
+    document.querySelectorAll("#ts-guess .btn").forEach((b) => { b.classList.remove("right", "wrong"); b.disabled = false; });
+    NB.stat("ts-n", "0");
+  }
+  $("ts-cmds").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (!answered) used++;
+    lines.push("", ...run(b.dataset.c)); $("ts-out").innerHTML = lines.join("\n"); $("ts-out").scrollTop = 1e6;
+    NB.stat("ts-n", String(used));
+  });
+  $("ts-guess").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b || answered) return;
+    answered = true; solved++; totalCmd += used;
+    const ok = b.dataset.g === cur; if (ok) right++;
+    document.querySelectorAll("#ts-guess .btn").forEach((x) => { if (x.dataset.g === cur) x.classList.add("right"); else if (x === b) x.classList.add("wrong"); x.disabled = x.dataset.g !== cur && x !== b; });
+    $("ts-msg").innerHTML = (ok ? '<b style="color:var(--ok)">정답!</b> ' : `<b style="color:var(--bad)">아쉽다.</b> 정답은 <b>${SC[cur].name}</b>. `) + SC[cur].ex + (used === 0 ? " (명령 없이 찍었다면 운이다!)" : "");
+    NB.stat("ts-score", `${right} / ${solved}`); NB.stat("ts-avg", (totalCmd / solved).toFixed(1) + "개");
+  });
+  $("ts-new").onclick = tsNew;
+  tsNew();
+
+  /* ================= 가용성 ================= */
+  const AV = [0.99, 0.995, 0.999, 0.9995, 0.9999, 0.99999];
+  const STG = [["인터넷 회선", 2, 1], ["방화벽", 3, 1], ["웹 서버", 1, 2], ["데이터베이스", 2, 1]];
+  $("av-grid").innerHTML = STG.map(([n, a, k], i) => `<div class="av-row"><b>${i + 1}. ${n}</b>
+    <label><span>한 대의 가용성 <output id="av-a${i}-out"></output></span><input type="range" id="av-a${i}" min="0" max="5" step="1" value="${a}"></label>
+    <label><span>대수 (병렬) <output id="av-n${i}-out"></output></span><input type="range" id="av-n${i}" min="1" max="3" step="1" value="${k}"></label></div>`).join("");
+  const pct = (a) => (a * 100).toFixed(6).replace(/0+$/, "").replace(/\.$/, "") + "%";
+  const aG = STG.map((_, i) => NB.range("av-a" + i, (v) => pct(AV[v]), () => acv.redraw()));
+  const nG = STG.map((_, i) => NB.range("av-n" + i, (v) => v + "대", () => acv.redraw()));
+  const acv = NB.canvas("#cv-av", (ctx, w, h) => {
+    const P = NB.palette(), narrow = w < 520;
+    const st = STG.map((s, i) => { const a = AV[aG[i]()], n = nG[i](); return { name: s[0], a, n, eff: 1 - Math.pow(1 - a, n) }; });
+    const tot = st.reduce((p, s) => p * s.eff, 1), down = 1 - tot;
+    const weak = st.reduce((m, s) => (s.eff < m.eff ? s : m), st[0]);
+    NB.stat("av-tot", pct(Number(tot.toPrecision(7)))); NB.stat("av-year", NB.time(down * 365.25 * 86400)); NB.stat("av-month", NB.time(down * 30 * 86400)); NB.stat("av-weak", weak.name);
+    const x0 = narrow ? 40 : 70, x1 = w - (narrow ? 14 : 30), cw = (x1 - x0) / 4, mid = h / 2 - 8;
+    NB.box(ctx, 4, mid - 18, narrow ? 32 : 58, 36, { text: narrow ? "요청" : "사용자", size: 11.5 });
+    st.forEach((s, i) => {
+      const cx = x0 + cw * i + cw / 2, bw = Math.min(cw - 18, 120), bh = 30, gap = 8;
+      const tH = s.n * bh + (s.n - 1) * gap, yTop = mid - tH / 2;
+      // 연결선
+      ctx.strokeStyle = P.border; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx - cw / 2, mid); ctx.lineTo(cx - bw / 2 - 8, mid); ctx.moveTo(cx + bw / 2 + 8, mid); ctx.lineTo(cx + cw / 2, mid); ctx.stroke();
+      for (let k = 0; k < s.n; k++) {
+        const y = yTop + k * (bh + gap);
+        ctx.beginPath(); ctx.moveTo(cx - bw / 2 - 8, mid); ctx.lineTo(cx - bw / 2 - 8, y + bh / 2); ctx.lineTo(cx - bw / 2, y + bh / 2); ctx.moveTo(cx + bw / 2, y + bh / 2); ctx.lineTo(cx + bw / 2 + 8, y + bh / 2); ctx.lineTo(cx + bw / 2 + 8, mid); ctx.stroke();
+        NB.box(ctx, cx - bw / 2, y, bw, bh, { text: narrow ? String(i + 1) : s.name, size: narrow ? 12 : 11.5, fill: P.surface, stroke: s === weak ? P.bad : P.border, lw: s === weak ? 2.2 : 1 });
+      }
+      NB.text(ctx, pct(Number(s.eff.toPrecision(7))), cx, h - 30, { align: "center", size: narrow ? 9.5 : 11.5, mono: true, bold: true, color: s === weak ? P.bad : P.text });
+      NB.text(ctx, s.n > 1 ? `${s.n}대 병렬` : "단일", cx, h - 14, { align: "center", size: 10.5, color: P.dim });
+    });
+  }, { aspect: 0.32, minHeight: 210, maxHeight: 260 });
+})();
+</script>
+</body>
+</html>

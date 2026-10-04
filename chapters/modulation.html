@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>변조, OFDM, MIMO · NetworkBook</title>
+<meta name="description" content="비트를 전파에 싣는 기술. AM/FM과 ASK·FSK·PSK, I/Q 성좌도와 QAM, 적응 변조, OFDM과 OFDMA, CDMA, MIMO와 빔포밍까지 시뮬레이터로 익히고 Wi-Fi 7·5G의 최고 속도를 직접 계산한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .formula .big { font-family: var(--mono); font-size: 17px; font-weight: 600; }
+  .bitrow { display: flex; flex-wrap: wrap; gap: 6px; padding: 14px 18px 0; }
+  .bitrow .bit { min-width: 38px; }
+</style>
+</head>
+<body data-chapter="modulation">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 12</div>
+    <h1>변조, OFDM, MIMO</h1>
+    <p class="lead">11장에서 본 전파는 그냥 흔들리는 파동일 뿐이다. 거기에 어떻게 영상과 메시지를 실을까? Wi-Fi 7 공유기는 이론상 수십 Gbps, 5G 기지국은 한 셀에서 수 Gbps를 낸다. 같은 하늘길에서 해마다 더 많은 비트를 짜내는 비결은 세 가지다. 파동 한 번에 더 많은 비트를 싣고(변조), 넓은 길을 수천 개의 좁은 차선으로 나누고(OFDM), 같은 길을 여러 겹으로 쓴다(MIMO). 이 장에서 그 세 가지를 하나씩 손으로 돌려 본다.</p>
+    <ul class="objectives">
+      <li>반송파와 변조가 왜 필요한지, AM과 FM이 메시지를 어떻게 싣는지 파형으로 본다.</li>
+      <li>ASK·FSK·PSK로 비트를 진폭·주파수·위상에 싣는 방법을 비교한다.</li>
+      <li>I/Q와 성좌도로 QPSK에서 4096QAM까지를 이해하고, 잡음이 오류를 만드는 과정을 시뮬레이터로 측정한다.</li>
+      <li>적응 변조(AMC)가 신호 세기에 따라 속도를 계단식으로 바꾸는 원리를 안다.</li>
+      <li>OFDM의 직교성과 사이클릭 프리픽스, OFDMA 스케줄링, CDMA의 확산 코드를 설명한다.</li>
+      <li>MIMO 공간 다중화와 빔포밍이 안테나 여러 개로 속도와 거리를 늘리는 원리를 안다.</li>
+      <li>처리율 = 대역폭 × 스펙트럼 효율 × 스트림 수로 Wi-Fi 7과 5G의 최고 속도를 계산한다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="carrier">
+    <h2>반송파: 메시지를 태우는 트럭</h2>
+    <p>사람 목소리는 수백 Hz~수 kHz로 진동한다. 이 신호를 그대로 안테나에 넣으면 어떻게 될까? 11장에서 본 것처럼 안테나는 파장의 절반쯤 되어야 효율적으로 전파를 내보낸다. 3 kHz의 파장은 100 km이므로 50 km짜리 안테나가 필요하다. 게다가 모든 방송국이 같은 0~3 kHz 대역에 목소리를 그대로 내보내면 서로 뒤섞여 아무것도 들을 수 없다.</p>
+    <p>해결책은 메시지를 높은 주파수의 깨끗한 사인파, 즉 <span class="term">반송파</span><span class="en">(carrier)</span>에 실어 보내는 것이다. 메시지에 따라 반송파의 진폭·주파수·위상 가운데 하나를 조금씩 바꾸는 일을 <span class="term">변조</span><span class="en">(modulation)</span>, 받는 쪽에서 메시지를 다시 꺼내는 일을 <b>복조</b>라 한다. 반송파 주파수가 높으면 안테나가 작아지고, 방송국마다 다른 반송파를 쓰면 같은 하늘을 주파수별로 나눠 쓸 수 있다. 라디오 다이얼을 돌리는 것이 바로 원하는 반송파를 고르는 일이다.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 250" role="img" aria-label="반송파가 필요한 두 가지 이유: 안테나 크기와 주파수 나눠 쓰기">
+        <text x="20" y="24" class="t" style="font-weight:700">① 안테나 크기 (반파장)</text>
+        <g transform="translate(20,40)">
+          <rect x="0" y="10" width="340" height="16" rx="4" fill="var(--bad)" opacity=".75"/>
+          <text x="0" y="46" class="t-dim">목소리 3 kHz 그대로 → 안테나 약 50 km</text>
+          <rect x="0" y="70" width="4" height="16" rx="1" fill="var(--accent)"/>
+          <text x="12" y="83" class="t-dim">3.5 GHz 반송파 → 약 4 cm</text>
+          <text x="0" y="122" class="t-mono">50 km = 서울 시청에서 수원까지</text>
+          <text x="0" y="140" class="t-mono">4 cm = 손가락 한 마디 반</text>
+        </g>
+        <text x="410" y="24" class="t" style="font-weight:700">② 주파수 나눠 쓰기</text>
+        <g transform="translate(410,40)">
+          <path d="M0 140 H370" class="s-axis"/>
+          <text x="370" y="160" text-anchor="end" class="t-mono">주파수 →</text>
+          <g fill="var(--accent)" opacity=".75">
+            <path d="M30 140 Q55 40 80 140 Z"/><path d="M120 140 Q145 60 170 140 Z" fill="var(--accent-2)"/><path d="M210 140 Q235 50 260 140 Z" fill="var(--warn)"/><path d="M300 140 Q325 70 350 140 Z" fill="var(--ok)"/>
+          </g>
+          <g class="t-mono" text-anchor="middle"><text x="55" y="34">89.1</text><text x="145" y="54">91.9</text><text x="235" y="44">95.1</text><text x="325" y="64">107.7</text></g>
+          <text x="185" y="185" text-anchor="middle" class="t-dim">방송국마다 다른 반송파(MHz)에 실어서 같은 하늘에 나란히</text>
+        </g>
+        <text x="400" y="240" text-anchor="middle" class="t-dim">반송파 = 정해진 차선을 달리는 트럭, 변조 = 짐(메시지) 싣기</text>
+      </svg>
+      <figcaption><b>그림 12-1.</b> 반송파가 필요한 두 가지 이유. 높은 주파수에 실으면 안테나가 손톱만 해지고, 저마다 다른 반송파를 쓰면 하나의 하늘을 주파수로 나눠 쓸 수 있다(주파수 분할 다중화, FDM). 그림의 FM 주파수는 예시다.</figcaption>
+    </figure>
+    <p>가장 오래된 두 방식이 AM과 FM이다. <span class="term">진폭 변조</span><span class="en">(AM, Amplitude Modulation)</span>는 메시지에 따라 반송파의 세기를 바꾸고, <span class="term">주파수 변조</span><span class="en">(FM, Frequency Modulation)</span>는 메시지에 따라 반송파의 진동 빠르기를 바꾼다. 잡음은 주로 신호의 세기를 흔들기 때문에, 정보를 세기에 담는 AM은 잡음에 약하고 진동 빠르기에 담는 FM은 강하다. 대신 FM은 대역폭을 훨씬 많이 쓴다. AM 방송 한 채널은 약 10 kHz, FM 방송은 약 200 kHz를 쓴다.</p>
+    <div class="sim" id="sim-am">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>AM과 FM 파형 만들기</h3></div>
+      <div class="sim-view"><canvas id="cv-am"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>메시지 (목소리 대신)</span><div class="seg" id="am-msg"><button data-value="sine" class="on">사인파</button><button data-value="two">두 음</button><button data-value="voice">불규칙(말소리)</button></div></div>
+        <label class="ctrl"><span>반송파 주파수 <output id="am-fc-out"></output></span><input type="range" id="am-fc" min="10" max="60" step="1" value="24"></label>
+        <label class="ctrl"><span>AM 변조 깊이 <output id="am-mu-out"></output></span><input type="range" id="am-mu" min="0" max="1.5" step="0.05" value="0.7"></label>
+        <label class="ctrl"><span>FM 최대 주파수 편이 <output id="am-df-out"></output></span><input type="range" id="am-df" min="0" max="20" step="0.5" value="8"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">AM 대역폭 (2 × 메시지)</span><span class="v" id="am-bw">—</span></div>
+        <div class="stat"><span class="k">FM 대역폭 (카슨 법칙)</span><span class="v" id="am-fbw">—</span></div>
+        <div class="stat"><span class="k">AM 상태</span><span class="v" id="am-st" style="font-size:15px">—</span></div>
+      </div>
+      <div class="sim-note">화면 폭을 1 ms로 보고 메시지 최고 주파수를 2 kHz로 두었다(실제 방송보다 반송파를 아주 낮게 그렸다). AM의 점선은 포락선(envelope)으로, 수신기는 이 윤곽만 따라가면 메시지를 되찾는다. 해볼 것: 변조 깊이를 100%보다 키우면 포락선이 0 아래로 접혀 메시지가 찌그러진다(과변조). FM은 세기가 늘 같고 진동 간격만 촘촘해졌다 성겨진다. 카슨 법칙: 대역폭 ≈ 2 × (최대 편이 + 메시지 주파수).</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="digital">
+    <h2>디지털 변조: 비트를 파동에 싣기</h2>
+    <p>디지털 통신에서 실을 메시지는 0과 1이다. 일정한 시간 칸(<b>심볼</b>)마다 반송파의 성질 하나를 정해진 값 가운데 하나로 바꾼다. 무엇을 바꾸느냐에 따라 세 가지 기본형이 있다.</p>
+    <ul>
+      <li><b>ASK</b>(진폭 편이): 1이면 세게, 0이면 약하게(또는 끄기). 가장 단순하지만 잡음과 감쇠에 약하다. 광통신의 빛 켜고 끄기(5장)가 이 방식이다.</li>
+      <li><b>FSK</b>(주파수 편이): 1이면 높은 주파수, 0이면 낮은 주파수. 회로가 간단하고 튼튼해 블루투스(GFSK)와 옛 모뎀이 썼다.</li>
+      <li><span class="term">PSK</span><span class="en">(Phase Shift Keying, 위상 편이)</span>: 세기와 주파수는 그대로 두고 파동의 시작 위치(위상)를 바꾼다. 0이면 0°, 1이면 180°(뒤집기). 같은 전력에서 잡음에 가장 강하다.</li>
+    </ul>
+    <div class="sim" id="sim-dig">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>비트열 → ASK · FSK · PSK 파형</h3></div>
+      <div class="bitrow" id="dig-bits"></div>
+      <div class="sim-view"><canvas id="cv-dig"></canvas></div>
+      <div class="sim-controls">
+        <div class="btn-row"><button class="btn" id="dig-rand">무작위 비트</button><button class="btn" id="dig-alt">0101…</button></div>
+        <label class="check"><input type="checkbox" id="dig-noise"> 잡음 섞기</label>
+      </div>
+      <div class="sim-note">비트 버튼을 눌러 0과 1을 바꿔 보자. 한 비트 동안 반송파는 4번(FSK의 0은 2번, 1은 6번) 진동한다. PSK에서 비트가 바뀌는 순간 파형이 갑자기 뒤집히는 것을 찾아보자. 잡음을 섞으면 ASK의 약한 0과 강한 1이 헷갈리기 쉽지만, PSK의 마루·골 위치는 여전히 잘 보인다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="iq">
+    <h2>I/Q와 성좌도: 심볼 하나에 여러 비트</h2>
+    <p>한 심볼에 1비트만 실으면 느리다. 진폭과 위상을 <b>동시에</b> 바꾸면 심볼 하나가 여러 비트를 나를 수 있다. 이를 다루는 열쇠가 <span class="term">I/Q</span>다. 어떤 진폭·위상의 사인파든 코사인파(I, In-phase)와 사인파(Q, Quadrature) 두 개를 적당한 비율로 더해 만들 수 있다. 코사인과 사인은 90° 어긋나 있어서 서로 간섭하지 않는(직교하는) 두 개의 독립된 통로가 된다. 그래서 심볼 하나는 평면 위의 점 (I, Q)로 나타낼 수 있고, 가능한 점들을 모아 그린 그림을 <span class="term">성좌도</span><span class="en">(constellation diagram)</span>라 한다.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 270" role="img" aria-label="I/Q 두 파의 합과 성좌도 위의 점">
+        <text x="20" y="24" class="t" style="font-weight:700">① 두 파를 비율대로 더한다</text>
+        <g transform="translate(20,40)">
+          <text x="0" y="22" class="t-mono">I · cos</text>
+          <path d="M60 20 C 75 -5, 95 -5, 110 20 S 145 45, 160 20 S 195 -5, 210 20 S 245 45, 260 20 S 295 -5, 310 20" fill="none" stroke="var(--accent)" stroke-width="2"/>
+          <text x="0" y="92" class="t-mono">Q · sin</text>
+          <path d="M60 80 C 70 92, 80 100, 85 100 S 100 92, 110 80 S 125 60, 135 60 S 150 68, 160 80 S 175 100, 185 100 S 200 92, 210 80 S 225 60, 235 60 S 250 68, 260 80 S 275 100, 285 100 S 300 92, 310 80" fill="none" stroke="var(--accent-2)" stroke-width="2"/>
+          <text x="0" y="162" class="t-mono">합</text>
+          <path d="M60 165 C 72 135, 96 128, 112 140 S 140 190, 160 192 S 196 160, 210 140 S 240 128, 260 150 S 290 195, 310 175" fill="none" stroke="var(--text)" stroke-width="2.2"/>
+          <text x="60" y="215" class="t-dim">진폭 = √(I² + Q²), 위상 = atan(Q / I)</text>
+        </g>
+        <text x="420" y="24" class="t" style="font-weight:700">② 그 비율을 평면 위의 점으로</text>
+        <g transform="translate(560,145)">
+          <path d="M-110 0 H110 M0 -110 V110" class="s-axis"/>
+          <text x="112" y="-6" class="t-mono">I</text><text x="6" y="-104" class="t-mono">Q</text>
+          <circle r="70" fill="none" stroke="var(--grid)" stroke-dasharray="4 4"/>
+          <g fill="var(--accent)"><circle cx="50" cy="-50" r="7"/><circle cx="-50" cy="-50" r="7"/><circle cx="-50" cy="50" r="7"/><circle cx="50" cy="50" r="7"/></g>
+          <g class="t-mono" style="font-size:12px;font-weight:700"><text x="60" y="-58">00</text><text x="-82" y="-58">01</text><text x="-82" y="70">11</text><text x="60" y="70">10</text></g>
+          <path d="M0 0 L50 -50" stroke="var(--accent)" stroke-width="2"/>
+          <path d="M28 0 A28 28 0 0 0 20 -20" fill="none" stroke="var(--warn)" stroke-width="2"/><text x="34" y="-6" class="t-mono" style="fill:var(--warn)">45°</text>
+          <text x="-160" y="120" class="t-dim">QPSK: 점 4개 = 2비트. 이웃 점은 1비트만 다르게(그레이 코드)</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 12-2.</b> I/Q와 성좌도. 송신기는 심볼마다 I와 Q 두 숫자를 정해 코사인·사인파의 세기로 내보내고, 수신기는 받은 파형에서 다시 I와 Q를 재서 가장 가까운 점을 고른다. 점이 많을수록 한 심볼에 비트가 많이 실린다.</figcaption>
+    </figure>
+    <p>점 2개(BPSK)면 1비트, 4개(QPSK)면 2비트, 16개(16QAM)면 4비트다. 점을 격자로 촘촘히 늘어놓는 방식을 <span class="term">직교 진폭 변조</span><span class="en">(QAM, Quadrature Amplitude Modulation)</span>라 한다. 점 개수 M이 두 배가 될 때마다 비트가 1개 늘어난다(비트 수 = log₂M).</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>변조</th><th>점 개수</th><th>심볼당 비트</th><th>필요 SNR (대략)</th><th>대표 사용처</th></tr></thead>
+      <tbody>
+        <tr><td>BPSK</td><td>2</td><td>1</td><td>약 5 dB 미만</td><td>가장 먼 거리, 제어 신호, 위성</td></tr>
+        <tr><td>QPSK</td><td>4</td><td>2</td><td>약 8~11 dB</td><td>LTE·5G 셀 가장자리, 위성 방송</td></tr>
+        <tr><td>16QAM</td><td>16</td><td>4</td><td>약 14~17 dB</td><td>Wi-Fi·LTE 중간 거리</td></tr>
+        <tr><td>64QAM</td><td>64</td><td>6</td><td>약 21~25 dB</td><td>LTE 최고, 케이블 TV</td></tr>
+        <tr><td>256QAM</td><td>256</td><td>8</td><td>약 29~31 dB</td><td>Wi-Fi 5, 5G, LTE-A</td></tr>
+        <tr><td>1024QAM</td><td>1,024</td><td>10</td><td>약 34~37 dB</td><td>Wi-Fi 6, 5G(일부), DOCSIS 3.1</td></tr>
+        <tr><td>4096QAM</td><td>4,096</td><td>12</td><td>약 40 dB 이상</td><td>Wi-Fi 7, 케이블 모뎀(DOCSIS 3.1)</td></tr>
+      </tbody>
+    </table></div>
+    <p>문제는 잡음이다. 받는 점은 잡음 때문에 원래 자리에서 조금씩 흩어진다. 흩어진 점이 이웃 점의 영역(판정 경계)을 넘으면 틀린 심볼로 읽힌다. 같은 평균 전력 안에 점을 촘촘히 넣을수록 점 사이 간격이 좁아져서, 같은 잡음에도 쉽게 틀린다. 1024QAM은 점 간격이 16QAM의 약 8분의 1이다. 이웃 점이 1비트만 다르도록 비트를 배정하는 <span class="term">그레이 코드</span><span class="en">(Gray code)</span>를 쓰면, 심볼을 이웃으로 잘못 읽어도 비트 오류는 1개로 그친다.</p>
+    <div class="sim" id="sim-con">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>성좌도 + 잡음: 오류율 재기</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cv-con"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>변조 차수</span><div class="seg" id="con-m"><button data-value="2">BPSK</button><button data-value="4">QPSK</button><button data-value="16" class="on">16QAM</button><button data-value="64">64QAM</button><button data-value="256">256</button><button data-value="1024">1024</button><button data-value="4096">4096</button></div></div>
+          <label class="ctrl"><span>SNR (Es/N0) <output id="con-snr-out"></output></span><input type="range" id="con-snr" min="0" max="50" step="0.5" value="18"></label>
+          <label class="check"><input type="checkbox" id="con-gray" checked> 그레이 코드 라벨 (64점 이하)</label>
+          <label class="check"><input type="checkbox" id="con-grid" checked> 판정 경계 보기</label>
+          <div class="btn-row"><button class="btn" id="con-again">다시 보내기</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">심볼당 비트</span><span class="v" id="con-b">—</span></div>
+        <div class="stat"><span class="k">심볼 오류율 (측정)</span><span class="v" id="con-ser">—</span></div>
+        <div class="stat"><span class="k">비트 오류율 (측정)</span><span class="v" id="con-ber">—</span></div>
+        <div class="stat"><span class="k">비트 오류율 (이론)</span><span class="v" id="con-bth">—</span></div>
+      </div>
+      <div class="sim-note">심볼 4만 개를 무작위로 보내 그중 2,500개를 그렸다. 빨간 점은 판정 경계를 넘어 틀리게 읽힌 심볼이다. 잡음은 I·Q 각각에 더해지는 가우스 잡음(AWGN)이고, 오류 정정 부호는 쓰지 않았다. 해볼 것: SNR을 20 dB에 고정하고 16QAM → 64QAM → 256QAM으로 올려 보자. 4096QAM을 깨끗하게 받으려면 SNR이 몇 dB 필요할까?</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">SNR 20 dB에서 16QAM은 거의 오류가 없다. 같은 20 dB에서 256QAM으로 바꾸면?</p><p class="wi-hint">성좌도 시뮬레이터에서 SNR을 20 dB로 두고 차수만 바꿔 보자.</p><div class="opts">
+      <button class="opt">비트가 2배이므로 오류도 정확히 2배</button><button class="opt">점 개수만 늘었으니 오류율은 같다</button><button class="opt" data-correct>점 간격이 약 4분의 1로 좁아져 심볼의 상당수(수십 %)가 틀린다</button><button class="opt">오류가 줄어든다</button>
+    </div><div class="quiz-exp">평균 전력이 같을 때 256QAM의 점 간격은 16QAM의 약 1/4(전력으로 −12 dB)이다. 20 dB에서는 잡음 구름이 이웃 칸으로 대거 넘어가 심볼 오류율이 수십 %가 된다. 256QAM에는 30 dB 정도가 필요하다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="amc">
+    <h2>적응 변조: 신호에 맞춰 기어 바꾸기</h2>
+    <p>공유기 가까이에서는 SNR이 높아 1024QAM도 깨끗하게 받지만, 멀어지면 BPSK도 버겁다. 그래서 무선 장치는 수신 상태를 수 ms마다 재서 그때그때 가장 빠르면서도 오류가 거의 없는 조합을 고른다. 이것이 <span class="term">적응 변조</span><span class="en">(AMC, Adaptive Modulation and Coding)</span>다. 고르는 조합은 변조 방식과 <span class="term">부호율</span><span class="en">(code rate)</span>의 짝인데, 부호율 3/4은 비트 4개 중 3개가 데이터이고 1개는 오류를 고치기 위한 여분이라는 뜻이다. 이 짝에 번호를 붙인 것이 <span class="term">MCS</span><span class="en">(Modulation and Coding Scheme)</span> 번호다.</p>
+    <div class="callout analogy"><strong>자전거 기어</strong><p>평지에서는 무거운 기어로 한 바퀴에 멀리 가고(고차 QAM), 오르막에서는 가벼운 기어로 천천히 확실하게 간다(BPSK·QPSK). 기어를 너무 무겁게 두면 오르막에서 멈춰 서고(오류 폭증), 너무 가볍게 두면 평지에서 헛바퀴만 돈다. 적응 변조는 자동 변속기다.</p></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>MCS (Wi-Fi 6/7)</th><th>변조</th><th>부호율</th><th>필요 SNR (대략)</th><th>속도 (80 MHz, 1스트림)</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>BPSK</td><td>1/2</td><td>5 dB</td><td>36 Mbps</td></tr>
+        <tr><td>2</td><td>QPSK</td><td>3/4</td><td>11 dB</td><td>108 Mbps</td></tr>
+        <tr><td>4</td><td>16QAM</td><td>3/4</td><td>17 dB</td><td>216 Mbps</td></tr>
+        <tr><td>7</td><td>64QAM</td><td>5/6</td><td>25 dB</td><td>360 Mbps</td></tr>
+        <tr><td>9</td><td>256QAM</td><td>5/6</td><td>31 dB</td><td>480 Mbps</td></tr>
+        <tr><td>11</td><td>1024QAM</td><td>5/6</td><td>37 dB</td><td>600 Mbps</td></tr>
+        <tr><td>13 (Wi-Fi 7)</td><td>4096QAM</td><td>5/6</td><td>42 dB</td><td>721 Mbps</td></tr>
+      </tbody>
+    </table></div>
+    <div class="sim" id="sim-amc">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>거리에 따른 적응 변조</h3></div>
+      <div class="sim-view"><canvas id="cv-amc"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>공유기와의 거리 <output id="amc-d-out"></output></span><input type="range" id="amc-d" min="0" max="2.2" step="0.01" value="1.0"></label>
+        <div class="ctrl"><span>변조 선택</span><div class="seg" id="amc-mode"><button data-value="amc" class="on">적응 변조</button><button data-value="1024">1024QAM 고정</button><button data-value="16">16QAM 고정</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">SNR</span><span class="v" id="amc-snr">—</span></div>
+        <div class="stat"><span class="k">선택된 MCS</span><span class="v" id="amc-mcs" style="font-size:15px">—</span></div>
+        <div class="stat"><span class="k">처리율</span><span class="v" id="amc-rate">—</span></div>
+        <div class="stat"><span class="k">섀넌 한계 대비</span><span class="v" id="amc-sh">—</span></div>
+      </div>
+      <div class="sim-note">5 GHz, 송신 20 dBm, 실내 경로 손실 지수 3(거리 10배마다 30 dB)인 단순 모델이다. 계단은 Wi-Fi 6/7 MCS 0~13(80 MHz, 1스트림), 점선은 같은 SNR에서 섀넌 한계(2장)다. 해볼 것: ‘1024QAM 고정’을 고르면 가까이서는 빠르지만 조금만 멀어져도 절벽처럼 0이 된다. 실제 단말은 오류율을 보며 MCS를 한두 단계씩 조정한다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="ofdm">
+    <h2>OFDM: 넓은 길을 수천 개의 좁은 차선으로</h2>
+    <p>11장의 다중 경로를 떠올려 보자. 반사파는 직접파보다 수십~수백 ns 늦게 도착한다. 심볼 하나가 아주 짧으면(넓은 대역폭으로 빠르게 보내면) 늦게 온 앞 심볼의 메아리가 다음 심볼을 덮어 버린다(심볼 간 간섭). 대역폭 100 MHz를 반송파 하나로 쓰면 심볼 길이가 10 ns 수준이라 메아리를 감당할 수 없다.</p>
+    <p><span class="term">OFDM</span><span class="en">(Orthogonal Frequency Division Multiplexing, 직교 주파수 분할 다중화)</span>은 발상을 뒤집는다. 넓은 채널을 수백~수천 개의 좁은 <span class="term">부반송파</span><span class="en">(subcarrier)</span>로 나누고, 각 부반송파에 느린 심볼을 실어 <b>동시에</b> 보낸다. Wi-Fi 6의 부반송파 간격은 78.125 kHz라 심볼 길이가 12.8 µs로 길어지고, 수백 ns의 메아리는 상대적으로 작은 문제가 된다. 각 부반송파는 저마다 QAM 점 하나를 싣는다.</p>
+    <p>놀라운 점은 부반송파들의 스펙트럼이 <b>서로 겹치는데도 간섭하지 않는다</b>는 것이다. 간격을 심볼 길이의 역수로 정확히 맞추면, 한 부반송파의 꼭대기에서 다른 모든 부반송파의 값이 정확히 0이 된다. 이 성질을 <b>직교성</b>이라 한다. 겹쳐 놓으니 주파수를 낭비 없이 빽빽하게 쓸 수 있다.</p>
+    <div class="sim" id="sim-ofdm">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>부반송파 스펙트럼의 직교성</h3></div>
+      <div class="sim-view"><canvas id="cv-ofdm"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>부반송파 수 <output id="of-n-out"></output></span><input type="range" id="of-n" min="2" max="12" step="1" value="6"></label>
+        <label class="ctrl"><span>수신기 주파수 오차 (간격 대비) <output id="of-e-out"></output></span><input type="range" id="of-e" min="0" max="0.5" step="0.01" value="0"></label>
+        <label class="check"><input type="checkbox" id="of-sum"> 전체 합 스펙트럼 보기</label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">가운데 부반송파 신호</span><span class="v" id="of-sig">—</span></div>
+        <div class="stat"><span class="k">이웃에서 새어 든 간섭 (ICI)</span><span class="v" id="of-ici">—</span></div>
+        <div class="stat"><span class="k">신호 대 간섭비</span><span class="v" id="of-sir">—</span></div>
+      </div>
+      <div class="sim-note">곡선 하나가 부반송파 하나의 스펙트럼(sinc 모양)이다. 세로 점선은 수신기가 값을 읽는 위치다. 오차가 0이면 점선마다 자기 곡선만 꼭대기에 있고 나머지는 모두 정확히 0을 지난다. 해볼 것: 주파수 오차를 0.1만 줘도 간섭이 생긴다. 11장의 도플러 이동이나 발진기 오차가 OFDM에서 문제가 되는 이유다.</div>
+    </div>
+    <p>메아리 문제를 마저 해결하는 장치가 <span class="term">사이클릭 프리픽스</span><span class="en">(cyclic prefix, CP)</span>다. 각 OFDM 심볼의 끝부분을 잘라 앞에 복사해 붙여, 심볼 사이에 완충 구간을 둔다. 메아리가 CP 길이보다 짧게 늦으면 앞 심볼의 꼬리는 CP 안에서 끝나고, 수신기는 CP를 버린 나머지만 읽는다. 게다가 복사본이라 신호가 매끄럽게 이어져 있으므로, 메아리는 각 부반송파의 세기와 위상을 조금 바꾸는 효과로만 남고 수신기가 쉽게 보정한다.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 240" role="img" aria-label="사이클릭 프리픽스가 다중 경로 지연을 흡수하는 모습">
+        <defs><marker id="md-cp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-dim)"/></marker></defs>
+        <text x="20" y="22" class="t" style="font-weight:700">시간 →</text>
+        <text x="20" y="62" class="t-dim">직접파</text>
+        <g transform="translate(100,40)">
+          <rect x="0" y="0" width="50" height="40" fill="var(--warn)" opacity=".55"/><rect x="50" y="0" width="250" height="40" class="f-acc-soft"/>
+          <rect x="300" y="0" width="50" height="40" fill="var(--warn)" opacity=".55"/><rect x="350" y="0" width="250" height="40" class="f-acc2-soft"/>
+          <text x="25" y="25" text-anchor="middle" class="t-mono">CP</text><text x="175" y="25" text-anchor="middle" class="t">심볼 1</text>
+          <text x="325" y="25" text-anchor="middle" class="t-mono">CP</text><text x="475" y="25" text-anchor="middle" class="t">심볼 2</text>
+          <path d="M250 -4 Q150 -30 25 -4" fill="none" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#md-cp)"/>
+          <text x="140" y="-22" text-anchor="middle" class="t-dim" style="fill:var(--warn)">끝부분을 복사</text>
+        </g>
+        <text x="20" y="112" class="t-dim">메아리</text>
+        <g transform="translate(130,90)" opacity=".75">
+          <rect x="0" y="0" width="50" height="40" fill="var(--warn)" opacity=".4"/><rect x="50" y="0" width="250" height="40" class="f-acc-soft"/>
+          <rect x="300" y="0" width="50" height="40" fill="var(--warn)" opacity=".4"/><rect x="350" y="0" width="200" height="40" class="f-acc2-soft"/>
+          <text x="175" y="25" text-anchor="middle" class="t-dim">심볼 1 (늦게 도착)</text>
+          <rect x="270" y="0" width="30" height="40" fill="var(--bad)" opacity=".35"/>
+        </g>
+        <path d="M400 150 V200 M450 150 V200" class="s-line"/>
+        <path d="M400 30 V200" stroke="var(--text-dim)" stroke-dasharray="3 3"/>
+        <rect x="450" y="150" width="250" height="34" rx="6" class="f-elev"/><text x="575" y="172" text-anchor="middle" class="t">FFT 창: 여기만 읽는다</text>
+        <text x="404" y="196" class="t-mono">CP 버림</text>
+        <text x="20" y="226" class="t-dim">메아리의 지연(빨간 꼬리)이 CP 길이보다 짧으면 심볼 1의 꼬리가 심볼 2의 FFT 창을 침범하지 않는다.</text>
+      </svg>
+      <figcaption><b>그림 12-3.</b> 사이클릭 프리픽스. Wi-Fi 6는 0.8~3.2 µs, LTE는 약 4.7 µs의 CP를 쓴다. 빛은 1 µs에 300 m를 가므로, 경로 길이 차이가 수백 m 이하인 메아리는 모두 흡수된다. CP 시간만큼은 데이터를 못 보내는 비용이 있다.</figcaption>
+    </figure>
+    <div class="callout deep"><strong>FFT: 수천 개의 라디오를 한 번에</strong><p>부반송파 수천 개마다 발진기와 필터를 따로 두면 칩이 감당할 수 없다. OFDM이 실용화된 열쇠는 <b>고속 푸리에 변환(FFT)</b>이다. 송신기는 부반송파마다 실을 QAM 점(I, Q 숫자) 수천 개를 역FFT 한 번으로 시간 파형으로 바꾸고, 수신기는 받은 파형을 FFT 한 번으로 다시 부반송파별 점으로 분해한다. 4096점 FFT는 곱셈 약 5만 번이면 되어, 18장에서 볼 통신 칩이 1초에 수십만 번씩 해낸다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="ofdma">
+    <h2>OFDMA: 여러 사람에게 자원 블록 나눠 주기</h2>
+    <p>OFDM의 부반송파를 한 사용자가 다 쓰지 않고 여러 사용자에게 나눠 주면 <span class="term">OFDMA</span><span class="en">(Orthogonal Frequency Division Multiple Access)</span>가 된다. 시간(심볼)과 주파수(부반송파 묶음)로 이루어진 격자의 칸을 <span class="term">자원 블록</span><span class="en">(resource block)</span>이라 하고, 기지국이나 공유기의 <b>스케줄러</b>가 1 ms보다 짧은 간격으로 칸마다 주인을 정한다. LTE·5G는 처음부터, Wi-Fi는 6세대부터 OFDMA를 쓴다.</p>
+    <p>누구에게 줄 것인가가 핵심이다. 다중 경로 때문에 사용자마다 잘 받히는 주파수가 다르고(주파수 선택적 페이딩) 시시각각 바뀐다. 사용자 A에게는 나쁜 칸이 B에게는 좋은 칸일 수 있다. 스케줄러가 이를 이용하면 전체 처리율이 오른다.</p>
+    <div class="sim" id="sim-sch">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>OFDMA 스케줄러: 시간 × 주파수 격자</h3></div>
+      <div class="sim-view"><canvas id="cv-sch"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>스케줄러</span><div class="seg" id="sch-mode"><button data-value="rr" class="on">라운드 로빈</button><button data-value="max">채널 좋은 사람 우선</button><button data-value="pf">비례 공정 (PF)</button></div></div>
+        <div class="btn-row"><button class="btn primary" id="sch-run">일시정지 ■</button><button class="btn" id="sch-reset">통계 초기화</button></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">전체 처리율 (칸당 평균)</span><span class="v" id="sch-tot">—</span></div>
+        <div class="stat"><span class="k">가장 먼 사용자 D의 몫</span><span class="v" id="sch-d">—</span></div>
+        <div class="stat"><span class="k">공정성 지수 (1 = 완전 공평)</span><span class="v" id="sch-j">—</span></div>
+      </div>
+      <div class="sim-note">세로 12칸이 주파수(자원 블록), 가로가 시간이다. 칸 색은 그 칸을 받은 사용자이고, 진하기는 그 칸에서 실은 비트 수(채널이 좋을수록 고차 QAM)다. 사용자 A는 기지국 가까이(평균 SNR 25 dB), D는 셀 가장자리(5 dB)에 있고, 각자의 채널은 주파수·시간에 따라 출렁인다. ‘채널 좋은 사람 우선’은 합계는 크지만 D가 굶는다. 비례 공정은 “평소의 자기 실력보다 지금 유난히 좋은 사람”에게 줘서 합계와 공정성을 함께 챙긴다. 실제 LTE·5G 스케줄러 대부분이 PF 계열이다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="cdma">
+    <h2>확산 스펙트럼과 CDMA</h2>
+    <p>OFDMA가 주파수와 시간을 칸으로 나눈다면, 3G가 쓴 <span class="term">CDMA</span><span class="en">(Code Division Multiple Access, 코드 분할 다중 접속)</span>는 모두가 같은 주파수를 같은 시간에 쓰되 <b>코드</b>로 구분한다. 비트 하나를 ±1로 된 빠른 코드 열(칩) 여러 개로 바꿔 보내므로 신호가 넓은 대역에 얇게 퍼진다. 이것이 <span class="term">확산 스펙트럼</span><span class="en">(spread spectrum)</span>이다. 수신기는 같은 코드를 곱해 더하면 자기 신호만 다시 모이고, 다른 코드의 신호는 서로 상쇄되어 잡음처럼 흩어진다.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 230" role="img" aria-label="CDMA 코드로 두 사용자의 신호를 섞고 다시 분리하는 과정">
+        <g class="t-mono" style="font-size:12px">
+          <text x="20" y="30" class="t" style="font-weight:700">송신</text>
+          <text x="20" y="58">A: 비트 +1 × 코드 [+1 +1 +1 +1]</text><text x="330" y="58">= [+1 +1 +1 +1]</text>
+          <text x="20" y="82">B: 비트 −1 × 코드 [+1 −1 +1 −1]</text><text x="330" y="82">= [−1 +1 −1 +1]</text>
+          <text x="20" y="112" style="fill:var(--accent)">공중에서 더해짐</text><text x="330" y="112" style="fill:var(--accent)">= [ 0 +2  0 +2]</text>
+          <text x="20" y="152" class="t" style="font-weight:700">수신 (자기 코드를 곱해 더하고 4로 나눔)</text>
+          <text x="20" y="180">A의 코드로: (0 + 2 + 0 + 2) / 4</text><text x="330" y="180" style="fill:var(--ok);font-weight:700">= +1 → A의 비트</text>
+          <text x="20" y="204">B의 코드로: (0 − 2 + 0 − 2) / 4</text><text x="330" y="204" style="fill:var(--ok);font-weight:700">= −1 → B의 비트</text>
+        </g>
+        <rect x="560" y="40" width="220" height="150" rx="12" class="f-surface"/>
+        <text x="670" y="66" text-anchor="middle" class="t" style="font-weight:700">왜 될까?</text>
+        <text x="576" y="94" class="t-dim">두 코드를 칸끼리 곱해 더하면</text>
+        <text x="576" y="114" class="t-dim">(+1)(+1)+(+1)(−1)+…= 0.</text>
+        <text x="576" y="140" class="t-dim">서로 직교하는 코드라서</text>
+        <text x="576" y="160" class="t-dim">상대 신호가 정확히 사라진다.</text>
+      </svg>
+      <figcaption><b>그림 12-4.</b> 코드 분할. 시끄러운 파티에서 여러 사람이 동시에 말해도 각자 한국어, 영어, 일본어로 말하면 자기 언어만 골라 듣는 것과 같다. 실제 3G(WCDMA)는 비트 하나를 칩 수~수백 개로 퍼뜨렸다.</figcaption>
+    </figure>
+    <p>확산 스펙트럼은 잡음보다 약한 신호도 건져 낸다. GPS 위성 신호는 지상에서 잡음보다 약 20 dB 약하지만, 코드 1,023칩을 곱해 더하면 신호만 1,023배로 모여 잡음 위로 올라온다(11장). 원래는 적의 방해 전파를 견디려는 군사 기술이었다. 3G 이후 이동통신의 주력은 대역폭을 키우기 쉬운 OFDM으로 넘어갔지만, 코드로 구분하는 아이디어는 GPS와 5G의 제어 신호 곳곳에 남아 있다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="mimo">
+    <h2>MIMO와 빔포밍: 안테나 여러 개의 마법</h2>
+    <p>11장에서 다중 경로는 페이딩을 일으키는 골칫거리였다. <span class="term">MIMO</span><span class="en">(Multiple-Input Multiple-Output, 다중 입출력)</span>는 이것을 자원으로 바꾼다. 송신 안테나 N개가 같은 주파수, 같은 시간에 <b>서로 다른 데이터</b>를 보내고, 수신 안테나 N개가 받는다. 각 송수신 안테나 쌍 사이의 경로가 다중 경로 덕분에 서로 충분히 다르면, 수신기는 연립방정식을 풀듯 섞인 신호를 원래의 N개 스트림으로 분리할 수 있다. 이것이 <span class="term">공간 다중화</span><span class="en">(spatial multiplexing)</span>로, 대역폭을 늘리지 않고 속도를 최대 N배로 만든다.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 240" role="img" aria-label="2×2 MIMO 공간 다중화">
+        <defs><marker id="md-mi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-dim)"/></marker></defs>
+        <rect x="20" y="50" width="120" height="140" rx="12" class="f-surface"/><text x="80" y="40" text-anchor="middle" class="t" style="font-weight:700">송신기</text>
+        <rect x="660" y="50" width="120" height="140" rx="12" class="f-surface"/><text x="720" y="40" text-anchor="middle" class="t" style="font-weight:700">수신기</text>
+        <text x="40" y="92" class="t-mono" style="fill:var(--accent);font-weight:700">s₁ 1011…</text><text x="40" y="162" class="t-mono" style="fill:var(--accent-2);font-weight:700">s₂ 0110…</text>
+        <g stroke-width="4" stroke-linecap="round"><path d="M150 80 V100" stroke="var(--accent)"/><path d="M150 150 V170" stroke="var(--accent-2)"/><path d="M650 80 V100" stroke="var(--text-dim)"/><path d="M650 150 V170" stroke="var(--text-dim)"/></g>
+        <g class="s-line" marker-end="url(#md-mi)"><path d="M156 90 L644 90"/><path d="M156 160 L644 160"/><path d="M156 92 L644 158" stroke-dasharray="5 4"/><path d="M156 158 L644 92" stroke-dasharray="5 4"/></g>
+        <g class="t-mono" text-anchor="middle"><text x="400" y="82">h₁₁</text><text x="400" y="178">h₂₂</text><text x="300" y="112">h₂₁</text><text x="300" y="146">h₁₂</text></g>
+        <text x="670" y="92" class="t-mono">y₁</text><text x="670" y="162" class="t-mono">y₂</text>
+        <text x="400" y="214" text-anchor="middle" class="t-dim">y₁ = h₁₁s₁ + h₁₂s₂,  y₂ = h₂₁s₁ + h₂₂s₂ → 경로 h를 알면 s₁, s₂를 풀어낸다</text>
+        <text x="400" y="234" text-anchor="middle" class="t-dim">채널 h는 각 프레임 앞의 약속된 신호(파일럿)로 잰다</text>
+      </svg>
+      <figcaption><b>그림 12-5.</b> 2×2 MIMO. 두 스트림이 같은 주파수에서 섞여 도착하지만, 네 경로의 세기와 위상이 서로 다르면 두 식으로 두 미지수를 푼다. 경로가 서로 비슷하면(예: 시야가 탁 트인 먼 거리) 식을 풀 수 없어 스트림 수가 줄어든다.</figcaption>
+    </figure>
+    <p>안테나 여러 개는 다른 방식으로도 쓴다. 같은 데이터를 여러 안테나로 보내거나 받아 페이딩을 피하면 11장의 <b>다이버시티</b>이고, 각 안테나에서 내보내는 신호의 위상을 조금씩 어긋나게 해 특정 방향에서만 마루끼리 겹치게 하면 <span class="term">빔포밍</span><span class="en">(beamforming)</span>이다. 빔포밍은 손전등처럼 에너지를 사용자 쪽으로 모아, 같은 출력으로 더 멀리 보내고 다른 방향의 사용자와는 간섭을 줄인다. 위상만 전자적으로 바꾸므로 안테나를 기계적으로 돌리지 않아도 빔이 1 ms 안에 다른 방향을 향한다.</p>
+    <div class="sim" id="sim-bf">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>배열 안테나 빔포밍</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cv-bf"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>안테나 소자 수 <output id="bf-n-out"></output></span><input type="range" id="bf-n" min="1" max="32" step="1" value="8"></label>
+          <label class="ctrl"><span>소자 간격 <output id="bf-d-out"></output></span><input type="range" id="bf-d" min="0.25" max="1.5" step="0.05" value="0.5"></label>
+          <label class="ctrl"><span>사용자 방향 <output id="bf-u-out"></output></span><input type="range" id="bf-u" min="-70" max="70" step="1" value="30"></label>
+          <label class="check"><input type="checkbox" id="bf-auto" checked> 사용자 쪽으로 자동 조향</label>
+          <label class="ctrl"><span>소자 사이 위상차 (수동) <output id="bf-p-out"></output></span><input type="range" id="bf-p" min="-180" max="180" step="1" value="0"></label>
+          <div class="btn-row"><button class="btn" id="bf-walk">사용자 걷기 ▶</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">빔 방향</span><span class="v" id="bf-dir">—</span></div>
+        <div class="stat"><span class="k">사용자 쪽 이득 (안테나 1개 대비)</span><span class="v" id="bf-g">—</span></div>
+        <div class="stat"><span class="k">빔폭 (−3 dB)</span><span class="v" id="bf-bw">—</span></div>
+        <div class="stat"><span class="k">그레이팅 로브</span><span class="v" id="bf-gl" style="font-size:15px">—</span></div>
+      </div>
+      <div class="sim-note">소자를 세로 한 줄로 늘어놓은 배열을 위에서 본 그림이며 오른쪽이 정면(0°)이다. 각 소자는 모든 방향으로 고르게 내보낸다고 단순화하고 앞쪽 반원만 그렸다. 소자 n번의 위상을 n × 위상차만큼 늦추면 빔이 기운다. 조향 각 θ에 필요한 위상차 = −360° × (간격/λ) × sin θ. 해볼 것: 소자 수를 8 → 16으로 늘리면 이득이 3 dB 오르고 빔폭이 반으로 준다. 간격을 λ/2보다 넓히고 크게 기울이면 엉뚱한 방향에 같은 세기의 빔(그레이팅 로브)이 생긴다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">기지국 배열 안테나의 소자 수를 8개에서 64개로 늘리면, 같은 총 송신 전력에서 사용자 쪽 신호는 얼마나 세질까?</p><p class="wi-hint">빔포밍 시뮬레이터에서 소자 수를 8과 32로 비교하고, 두 배마다 몇 dB인지 세어 보자.</p><div class="opts">
+      <button class="opt">변하지 않는다. 총 전력이 같으니까</button><button class="opt" data-correct>약 9 dB(8배) 세진다. 소자 수가 두 배가 될 때마다 3 dB씩</button><button class="opt">64배 = 18 dB 세진다</button><button class="opt">오히려 약해진다. 전력을 64개로 나눠서</button>
+    </div><div class="quiz-exp">빔포밍 이득은 소자 수 N에 비례한다(10·log N dB). 8 → 64는 세 번 두 배가 되므로 약 9 dB다. 전력을 만든 것이 아니라 64개 소자의 파동이 사용자 방향에서만 마루끼리 겹치게 맞춘 결과다. 수신 쪽도 배열이면 그만큼 이득이 더 붙는다.</div></div>
+    <p>5G 기지국은 이 아이디어를 극단까지 밀어붙인 <span class="term">Massive MIMO</span>를 쓴다. 3.5 GHz 기지국 안테나 패널 하나에 송수신 경로 64개(64T64R), 소자로는 192개 수준을 넣고, 여러 사용자에게 각각 다른 빔을 동시에 쏘아 같은 주파수를 사용자 수만큼 겹쳐 쓴다(다중 사용자 MIMO). 28 GHz 밀리미터파 단말과 기지국은 수십~수백 개 소자의 빔포밍으로 11장에서 본 큰 경로 손실을 메운다. Wi-Fi도 4~16개 안테나로 여러 단말에 동시에 빔을 보낸다(MU-MIMO, 13장).</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="together">
+    <h2>모두 합치면: 처리율의 공식</h2>
+    <p>지금까지의 기술은 한 줄의 곱셈으로 묶인다.</p>
+    <div class="formula"><div class="big">처리율 = 대역폭 × 스펙트럼 효율 × 공간 스트림 수</div><div class="where">스펙트럼 효율(b/s/Hz) = 심볼당 비트(QAM 차수) × 부호율 × (1 − 오버헤드: CP·파일럿·보호 대역 등)</div></div>
+    <p>더 빠르게 하는 방법은 세 가지뿐이다. 더 넓은 주파수를 확보하거나(Wi-Fi 7의 320 MHz, 5G의 밀리미터파), 같은 주파수에 비트를 더 빽빽이 싣거나(4096QAM, 대신 높은 SNR 필요), 안테나를 늘려 공간을 겹쳐 쓴다(MIMO). 셋 모두 섀넌 한계(2장)와 물리의 비용을 치른다. 아래 계산기로 표준들의 “최대 속도”가 어디서 나오는지 확인해 보자.</p>
+    <div class="sim" id="sim-tp">
+      <div class="sim-head"><span class="sim-tag">CALCULATOR</span><h3>처리율 계산기</h3></div>
+      <div class="sim-view"><canvas id="cv-tp"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl" style="grid-column:1/-1"><span>표준 불러오기</span><div class="seg" id="tp-pre"><button data-value="wifi5">Wi-Fi 5</button><button data-value="wifi6">Wi-Fi 6</button><button data-value="wifi7" class="on">Wi-Fi 7 (4×4)</button><button data-value="wifi7max">Wi-Fi 7 (16스트림)</button><button data-value="lte">LTE 4×4</button><button data-value="nr">5G 3.5 GHz</button><button data-value="mmw">5G 28 GHz</button></div></div>
+        <label class="ctrl"><span>대역폭 <output id="tp-b-out"></output></span><input type="range" id="tp-b" min="20" max="400" step="20" value="320"></label>
+        <label class="ctrl"><span>변조 (심볼당 비트) <output id="tp-q-out"></output></span><input type="range" id="tp-q" min="1" max="12" step="1" value="12"></label>
+        <label class="ctrl"><span>부호율 <output id="tp-r-out"></output></span><input type="range" id="tp-r" min="0.5" max="0.95" step="0.005" value="0.835"></label>
+        <label class="ctrl"><span>공간 스트림 수 <output id="tp-s-out"></output></span><input type="range" id="tp-s" min="1" max="16" step="1" value="4"></label>
+        <label class="ctrl"><span>오버헤드 <output id="tp-o-out"></output></span><input type="range" id="tp-o" min="0" max="40" step="1" value="10"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">스펙트럼 효율 (스트림 1개)</span><span class="v" id="tp-eff">—</span></div>
+        <div class="stat"><span class="k">계산한 최대 처리율</span><span class="v" id="tp-rate">—</span></div>
+        <div class="stat"><span class="k">표준의 공식 최대치</span><span class="v" id="tp-std" style="font-size:15px">—</span></div>
+      </div>
+      <div class="sim-note">그림의 판 한 장이 스트림 하나다. 가로 = 대역폭, 세로 = 스펙트럼 효율, 겹친 장 수 = 스트림 수이고, 넓이의 합이 처리율이다. 오버헤드는 표준별 대략값(Wi-Fi 약 10~19%, LTE 약 33%, 5G 약 20~27%)으로 맞췄다. 공식 최대치는 가장 좋은 조건의 물리 계층 속도이고, 실제 체감 속도는 보통 그 절반 이하다. 5G 28 GHz는 하향 2계층, 64QAM 가정이다.</div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>표준</th><th>최대 대역폭</th><th>최고 변조</th><th>최대 스트림</th><th>공식 최대 속도</th></tr></thead>
+      <tbody>
+        <tr><td>Wi-Fi 5 (802.11ac)</td><td>160 MHz</td><td>256QAM</td><td>8</td><td>약 6.9 Gbps</td></tr>
+        <tr><td>Wi-Fi 6 (802.11ax)</td><td>160 MHz</td><td>1024QAM</td><td>8</td><td>약 9.6 Gbps</td></tr>
+        <tr><td>Wi-Fi 7 (802.11be)</td><td>320 MHz</td><td>4096QAM</td><td>16 (제품은 보통 2~4)</td><td>약 46 Gbps (4스트림 약 11.5 Gbps)</td></tr>
+        <tr><td>LTE-A (4×4, 20 MHz 1개)</td><td>20 MHz × 묶음</td><td>64·256QAM</td><td>4</td><td>약 300 Mbps (반송파 묶음으로 1 Gbps+)</td></tr>
+        <tr><td>5G NR (3.5 GHz, 100 MHz)</td><td>100 MHz</td><td>256QAM</td><td>4</td><td>약 2.3 Gbps</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>메시지를 높은 주파수의 <b>반송파</b>에 실어(변조) 보내면 안테나가 작아지고 주파수를 나눠 쓸 수 있다. AM은 세기, FM은 진동 빠르기를 바꾼다.</li>
+      <li>디지털 변조는 심볼마다 진폭(ASK)·주파수(FSK)·위상(PSK)을 바꾼다. <b>I/Q</b>로 진폭과 위상을 함께 바꾸면 성좌도 위의 점 하나가 log₂M 비트를 나른다.</li>
+      <li>QAM 차수가 높을수록 점 간격이 좁아져 더 높은 <b>SNR</b>이 필요하다. 그레이 코드는 심볼 오류를 1비트 오류로 줄인다.</li>
+      <li><b>적응 변조(AMC)</b>는 SNR에 맞춰 MCS를 계단식으로 바꿔, 가까우면 빠르고 멀면 튼튼하게 보낸다.</li>
+      <li><b>OFDM</b>은 넓은 채널을 직교하는 부반송파 수천 개로 나눠 심볼을 길게 만들고, <b>사이클릭 프리픽스</b>로 다중 경로 메아리를 흡수한다. <b>OFDMA</b>는 시간×주파수 자원 블록을 사용자에게 나눠 준다.</li>
+      <li><b>CDMA</b>는 직교 코드로 같은 주파수를 나눠 쓰고, 확산 스펙트럼은 잡음보다 약한 신호도 건진다.</li>
+      <li><b>MIMO</b>는 다중 경로를 이용해 스트림 수만큼 속도를 늘리고, <b>빔포밍</b>은 위상을 맞춰 에너지를 사용자 쪽으로 모은다. 처리율 = 대역폭 × 스펙트럼 효율 × 스트림 수.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>256QAM은 심볼 하나에 몇 비트를 싣는가?</p><div class="opts">
+        <button class="opt">4</button><button class="opt">6</button><button class="opt" data-correct>8</button><button class="opt">256</button>
+      </div><div class="quiz-exp">점 256개 = 2⁸이므로 8비트다. 1024QAM은 10비트, 4096QAM은 12비트다.</div></div>
+      <div class="quiz-q"><p>휴대폰이 기지국에서 멀어져 SNR이 떨어지면 적응 변조는 어떻게 하는가?</p><div class="opts">
+        <button class="opt" data-correct>변조 차수와 부호율을 낮춰(예: 256QAM → QPSK) 속도는 줄이고 오류를 막는다</button>
+        <button class="opt">변조 차수를 높여 잃은 속도를 보충한다</button>
+        <button class="opt">송신을 멈추고 SNR이 회복되길 기다린다</button>
+        <button class="opt">대역폭을 넓힌다</button>
+      </div><div class="quiz-exp">낮은 SNR에서는 점 간격이 넓은 낮은 차수 변조와 여분 비트가 많은 부호율을 써야 오류 없이 받을 수 있다.</div></div>
+      <div class="quiz-q"><p>OFDM에서 사이클릭 프리픽스(CP)의 역할은?</p><div class="opts">
+        <button class="opt">데이터를 암호화한다</button><button class="opt">부반송파 수를 늘린다</button><button class="opt">주파수 오차를 없앤다</button><button class="opt" data-correct>심볼 앞에 완충 구간을 두어 다중 경로 메아리가 다음 심볼을 침범하지 않게 한다</button>
+      </div><div class="quiz-exp">CP는 심볼 끝부분의 복사본이다. 메아리 지연이 CP보다 짧으면 심볼 간 간섭이 사라지고, 남은 영향은 부반송파별 보정으로 처리된다.</div></div>
+      <div class="quiz-q"><p>OFDM 부반송파들의 스펙트럼이 서로 겹치는데도 간섭하지 않는 이유는?</p><div class="opts">
+        <button class="opt">부반송파마다 다른 안테나를 써서</button><button class="opt" data-correct>간격이 정확히 맞아, 한 부반송파의 꼭대기에서 다른 부반송파들의 값이 모두 0이 되는 직교성 때문에</button><button class="opt">부반송파를 시간적으로 번갈아 보내서</button><button class="opt">겹치는 부분을 필터로 잘라 내서</button>
+      </div><div class="quiz-exp">부반송파 간격 = 1/심볼 길이로 맞추면 sinc 스펙트럼의 영점이 이웃 꼭대기에 정확히 놓인다. 주파수 오차가 생기면 이 직교성이 깨져 간섭(ICI)이 생긴다.</div></div>
+      <div class="quiz-q"><p>4×4 MIMO 공간 다중화의 효과로 가장 알맞은 것은?</p><div class="opts">
+        <button class="opt">대역폭이 4배가 된다</button><button class="opt">QAM 차수가 4배가 된다</button><button class="opt" data-correct>같은 주파수·시간에 최대 4개의 스트림을 보내 처리율이 최대 4배가 된다</button><button class="opt">송신 전력이 4배가 된다</button>
+      </div><div class="quiz-exp">다중 경로로 서로 다른 채널을 이용해 4개의 독립 스트림을 겹쳐 보낸다. 채널이 충분히 달라야 하므로 실제로는 상황에 따라 스트림 수가 줄어든다.</div></div>
+      <div class="quiz-q"><p>Wi-Fi 7(320 MHz, 4096QAM, 부호율 5/6, 4스트림)의 최대 속도가 약 11.5 Gbps인 것을 처리율 공식으로 설명할 때 빠진 요소는?</p><div class="opts">
+        <button class="opt">안테나 이득</button><button class="opt">거리</button><button class="opt">반송파 주파수</button><button class="opt" data-correct>CP·파일럿·보호 대역 같은 오버헤드 (320 × 12 × 5/6 × 4 = 12.8 Gbps에서 약 10% 차감)</button>
+      </div><div class="quiz-exp">320 MHz × 10 b/s/Hz × 4 = 12.8 Gbps. 여기서 데이터 부반송파 비율과 CP 시간만큼의 오버헤드 약 10%를 빼면 약 11.5 Gbps다.</div></div>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const lg = Math.log10, TAU = Math.PI * 2;
+
+  /* ============ 1. AM / FM ============ */
+  const amMsg = NB.seg("am-msg", () => amUpd());
+  const amFc = NB.range("am-fc", (v) => v + " kHz", () => amUpd());
+  const amMu = NB.range("am-mu", (v) => Math.round(v * 100) + "%", () => amUpd());
+  const amDf = NB.range("am-df", (v) => v + " kHz", () => amUpd());
+  const vr = NB.rng(11); const VOICE = []; for (let i = 0; i < 6; i++) VOICE.push([0.5 + vr() * 1.5, vr() * TAU, 0.3 + vr() * 0.7]);
+  function msg(t) { // t: 0..1 ms, 출력 -1..1
+    const m = amMsg();
+    if (m === "sine") return Math.sin(TAU * 2 * t);
+    if (m === "two") return 0.6 * Math.sin(TAU * 1 * t) + 0.4 * Math.sin(TAU * 2 * t + 0.5);
+    let s = 0, n = 0; VOICE.forEach(([f, p, a]) => { s += a * Math.sin(TAU * f * t + p); n += a; }); return (s / n) * 1.6;
+  }
+  function amUpd() {
+    NB.stat("am-bw", "4 kHz <small>(방송: 약 10 kHz)</small>");
+    NB.stat("am-fbw", (2 * (amDf() + 2)).toFixed(0) + " kHz <small>(방송: 약 180~200 kHz)</small>");
+    let mn = 1e9; for (let i = 0; i <= 400; i++) mn = Math.min(mn, 1 + amMu() * msg(i / 400));
+    NB.stat("am-st", mn < -1e-6 ? '<span style="color:var(--bad)">과변조! 메시지 찌그러짐</span>' : amMu() === 0 ? "변조 없음 (반송파만)" : '<span style="color:var(--ok)">정상</span>');
+    amcv.redraw();
+  }
+  const amcv = NB.canvas($("cv-am"), (ctx, w, h) => {
+    const P = NB.palette();
+    const L = 74, R = w - 10, rows = 3, rh = (h - 10) / rows, N = Math.max(600, Math.round((R - L) * 2));
+    const labels = ["메시지", "AM", "FM"];
+    const fc = amFc(), mu = amMu(), df = amDf();
+    let phase = 0;
+    for (let r = 0; r < rows; r++) {
+      const cy = 5 + rh * r + rh / 2, A = rh * 0.36;
+      ctx.strokeStyle = P.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L, cy); ctx.lineTo(R, cy); ctx.stroke();
+      NB.text(ctx, labels[r], 10, cy, { size: 13, bold: true, color: r === 0 ? P.accent2 : P.accent });
+      const sc = r === 1 ? A / Math.max(1, 1 + mu) : A;
+      if (r === 1) { // envelope
+        ctx.setLineDash([4, 4]); ctx.strokeStyle = P.warn; ctx.lineWidth = 1.3;
+        [1, -1].forEach((sg) => { ctx.beginPath(); for (let i = 0; i <= N; i++) { const t = i / N; const y = cy - sg * sc * (1 + mu * msg(t)); i ? ctx.lineTo(L + t * (R - L), y) : ctx.moveTo(L, y); } ctx.stroke(); });
+        ctx.setLineDash([]);
+      }
+      ctx.strokeStyle = r === 0 ? P.accent2 : P.accent; ctx.lineWidth = r === 0 ? 2.2 : 1.4; ctx.beginPath(); phase = 0;
+      for (let i = 0; i <= N; i++) {
+        const t = i / N; let v;
+        if (r === 0) v = msg(t);
+        else if (r === 1) v = (1 + mu * msg(t)) * Math.cos(TAU * fc * t);
+        else { phase += (TAU * (fc + df * msg(t))) / N; v = Math.cos(phase); }
+        const y = cy - sc * v; i ? ctx.lineTo(L + t * (R - L), y) : ctx.moveTo(L, y);
+      }
+      ctx.stroke();
+    }
+  }, { aspect: 0.5, minHeight: 300, maxHeight: 420 });
+  amUpd();
+
+  /* ============ 2. ASK / FSK / PSK ============ */
+  let bits = [1, 0, 1, 1, 0, 0, 1, 0];
+  function renderBits() {
+    $("dig-bits").innerHTML = bits.map((b, i) => `<button class="bit${b ? " on" : ""}" data-i="${i}">${b}<small>${i + 1}</small></button>`).join("");
+    $("dig-bits").querySelectorAll("button").forEach((el) => el.addEventListener("click", () => { const i = +el.dataset.i; bits[i] ^= 1; renderBits(); digcv.redraw(); }));
+  }
+  $("dig-rand").onclick = () => { bits = bits.map(() => (Math.random() < 0.5 ? 1 : 0)); renderBits(); digcv.redraw(); };
+  $("dig-alt").onclick = () => { bits = bits.map((_, i) => i % 2); renderBits(); digcv.redraw(); };
+  $("dig-noise").addEventListener("change", () => digcv.redraw());
+  const nz = []; const nr = NB.rng(3); for (let i = 0; i < 4000; i++) nz.push(NB.clamp((nr() + nr() + nr() - 1.5) * 0.5, -1, 1));
+  const digcv = NB.canvas($("cv-dig"), (ctx, w, h) => {
+    const P = NB.palette(), L = 56, R = w - 10, nb = bits.length, bw = (R - L) / nb;
+    const rows = ["비트", "ASK", "FSK", "PSK"], rh = (h - 8) / 4, noisy = $("dig-noise").checked;
+    for (let i = 0; i < nb; i++) { if (i % 2) { ctx.fillStyle = P.grid; ctx.globalAlpha = 0.35; ctx.fillRect(L + i * bw, 0, bw, h); ctx.globalAlpha = 1; } }
+    rows.forEach((name, r) => {
+      const cy = 4 + rh * r + rh / 2, A = rh * 0.34;
+      NB.text(ctx, name, 8, cy, { size: 12.5, bold: true, color: r ? P.accent : P.accent2 });
+      if (r === 0) {
+        ctx.strokeStyle = P.accent2; ctx.lineWidth = 2.2; ctx.beginPath();
+        bits.forEach((b, i) => { const y = cy + (b ? -A : A); i ? ctx.lineTo(L + i * bw, y) : ctx.moveTo(L, y); ctx.lineTo(L + (i + 1) * bw, y); });
+        ctx.stroke();
+        bits.forEach((b, i) => NB.text(ctx, String(b), L + i * bw + bw / 2, cy, { align: "center", size: 13, bold: true, mono: true, color: P.text }));
+        return;
+      }
+      ctx.strokeStyle = P.accent; ctx.lineWidth = 1.5; ctx.beginPath();
+      const N = Math.round((R - L) * 1.5); let ph = 0;
+      for (let k = 0; k <= N; k++) {
+        const x = (k / N) * nb, i = Math.min(nb - 1, Math.floor(x)), b = bits[i], fr = x - i;
+        let v;
+        if (r === 1) v = (b ? 1 : 0.2) * Math.sin(TAU * 4 * x);
+        else if (r === 2) { ph += (TAU * (b ? 6 : 2) * nb) / N; v = Math.sin(ph); }
+        else v = Math.sin(TAU * 4 * x + (b ? Math.PI : 0));
+        if (noisy) v += nz[k % nz.length] * 0.6;
+        const y = cy - A * v; k ? ctx.lineTo(L + (x / nb) * (R - L), y) : ctx.moveTo(L, y);
+      }
+      ctx.stroke();
+    });
+  }, { aspect: 0.48, minHeight: 300, maxHeight: 400 });
+  renderBits();
+
+  /* ============ 3. 성좌도 ============ */
+  const conM = NB.seg("con-m", () => conRun());
+  const conSnr = NB.range("con-snr", (v) => v.toFixed(1) + " dB", () => conRun());
+  $("con-gray").addEventListener("change", () => concv.redraw());
+  $("con-grid").addEventListener("change", () => concv.redraw());
+  $("con-again").onclick = () => { seed++; conRun(); };
+  let seed = 1, conPts = [];
+  const gray = (i) => i ^ (i >> 1);
+  const pop = (x) => { let c = 0; while (x) { c += x & 1; x >>= 1; } return c; };
+  function erfc(x) { const z = Math.abs(x), t = 1 / (1 + 0.5 * z); const r = t * Math.exp(-z * z - 1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277))))))))); return x >= 0 ? r : 2 - r; }
+  const Q = (x) => 0.5 * erfc(x / Math.SQRT2);
+  function conGeom(M) { // 축별 레벨 수, 정규화 계수
+    if (M === 2) return { L: 2, k: 1, s: 1, bpsk: true };
+    const L = Math.round(Math.sqrt(M)); return { L, k: Math.log2(L), s: 1 / Math.sqrt((2 * (M - 1)) / 3), bpsk: false };
+  }
+  function conRun() {
+    const M = Number(conM()), g = conGeom(M), snr = Math.pow(10, conSnr() / 10);
+    const sig = Math.sqrt(1 / (2 * snr)), rnd = NB.rng(seed * 7919 + M), N = 40000, SHOW = 2500;
+    const gauss = () => { let u = 0, v = 0; while (u === 0) u = rnd(); v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); };
+    let se = 0, be = 0; conPts = [];
+    const lev = (i) => (2 * i - (g.L - 1)) * g.s;
+    const dec = (y) => NB.clamp(Math.round((y / g.s + (g.L - 1)) / 2), 0, g.L - 1);
+    for (let n = 0; n < N; n++) {
+      const iI = Math.floor(rnd() * g.L), iQ = g.bpsk ? 0 : Math.floor(rnd() * g.L);
+      const x = g.bpsk ? (iI ? 1 : -1) : lev(iI), y = g.bpsk ? 0 : lev(iQ);
+      const rx = x + gauss() * sig, ry = y + gauss() * sig;
+      let dI, dQ;
+      if (g.bpsk) { dI = rx > 0 ? 1 : 0; dQ = 0; } else { dI = dec(rx); dQ = dec(ry); }
+      const err = dI !== iI || dQ !== iQ;
+      if (err) { se++; be += g.bpsk ? 1 : pop(gray(dI) ^ gray(iI)) + pop(gray(dQ) ^ gray(iQ)); }
+      if (n < SHOW) conPts.push([rx, ry, err]);
+    }
+    const bps = Math.log2(M);
+    NB.stat("con-b", bps + " 비트");
+    const pct = (v) => (v === 0 ? "0 <small>(4만 개 중)</small>" : v < 1e-3 ? v.toExponential(1) : (v * 100).toFixed(v < 0.01 ? 2 : 1) + "%");
+    NB.stat("con-ser", pct(se / N));
+    NB.stat("con-ber", pct(be / (N * bps)));
+    const th = g.bpsk ? Q(Math.sqrt(2 * snr)) : Math.min(0.5, (4 / bps) * (1 - 1 / g.L) * Q(Math.sqrt((3 * snr) / (M - 1))));
+    NB.stat("con-bth", th < 1e-12 ? "< 10⁻¹²" : th < 1e-3 ? th.toExponential(1) : (th * 100).toFixed(2) + "%");
+    concv.redraw();
+  }
+  const concv = NB.canvas($("cv-con"), (ctx, w, h) => {
+    const P = NB.palette(), M = Number(conM()), g = conGeom(M);
+    const S = Math.min(w, h) - 30, cx = w / 2, cy = h / 2, ext = g.bpsk ? 1.9 : Math.max(1.6, (g.L) * g.s * 1.08);
+    const X = (v) => cx + (v / ext) * (S / 2), Y = (v) => cy - (v / ext) * (S / 2);
+    ctx.strokeStyle = P.axis; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(-ext), cy); ctx.lineTo(X(ext), cy); ctx.moveTo(cx, Y(-ext)); ctx.lineTo(cx, Y(ext)); ctx.stroke();
+    NB.text(ctx, "I", X(ext) - 2, cy - 10, { align: "right", size: 12, mono: true, color: P.dim });
+    NB.text(ctx, "Q", cx + 8, Y(ext) + 8, { size: 12, mono: true, color: P.dim });
+    if ($("con-grid").checked) {
+      ctx.strokeStyle = P.warn; ctx.globalAlpha = M >= 1024 ? 0.25 : 0.55; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath();
+      if (g.bpsk) { ctx.moveTo(cx, Y(-ext)); ctx.lineTo(cx, Y(ext)); }
+      else for (let i = 1; i < g.L; i++) { const b = (2 * i - g.L) * g.s; ctx.moveTo(X(b), Y(-ext)); ctx.lineTo(X(b), Y(ext)); ctx.moveTo(X(-ext), Y(b)); ctx.lineTo(X(ext), Y(b)); }
+      ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
+    const r = M >= 1024 ? 1.1 : M >= 256 ? 1.4 : 1.8;
+    conPts.forEach(([x, y, e]) => { ctx.fillStyle = e ? P.bad : P.accent; ctx.globalAlpha = e ? 0.9 : 0.5; ctx.fillRect(X(x) - r, Y(y) - r, 2 * r, 2 * r); });
+    ctx.globalAlpha = 1;
+    // 이상적인 점
+    if (M <= 256) {
+      ctx.fillStyle = P.text;
+      const pts = g.bpsk ? [[-1, 0, 0, 0], [1, 0, 1, 0]] : [];
+      if (!g.bpsk) for (let i = 0; i < g.L; i++) for (let j = 0; j < g.L; j++) pts.push([(2 * i - (g.L - 1)) * g.s, (2 * j - (g.L - 1)) * g.s, i, j]);
+      pts.forEach(([x, y]) => { ctx.beginPath(); ctx.arc(X(x), Y(y), M >= 64 ? 1.6 : 3, 0, 7); ctx.fill(); });
+      if ($("con-gray").checked && M <= 64) {
+        const fs = M === 64 ? (w < 500 ? 0 : 9) : 12;
+        if (fs) pts.forEach(([x, y, i, j]) => {
+          const lab = g.bpsk ? String(i) : NB.bin(gray(i), g.k) + NB.bin(gray(j), g.k);
+          NB.text(ctx, lab, X(x), Y(y) - (M === 64 ? 8 : 12), { align: "center", size: fs, mono: true, bold: true, color: P.text });
+        });
+      }
+    }
+  }, { aspect: 0.85, minHeight: 320, maxHeight: 460 });
+  conRun();
+
+  /* ============ 4. 적응 변조 ============ */
+  const MCS = [[5, "BPSK 1/2", 36], [8, "QPSK 1/2", 72], [11, "QPSK 3/4", 108], [14, "16QAM 1/2", 144], [17, "16QAM 3/4", 216], [21, "64QAM 2/3", 288], [23, "64QAM 3/4", 324], [25, "64QAM 5/6", 360], [29, "256QAM 3/4", 432], [31, "256QAM 5/6", 480], [34, "1024QAM 3/4", 540], [37, "1024QAM 5/6", 600], [40, "4096QAM 3/4", 649], [42, "4096QAM 5/6", 721]];
+  const amcD = NB.range("amc-d", (v) => NB.fmt(Math.pow(10, v), 3) + " m", () => amcUpd());
+  const amcMode = NB.seg("amc-mode", () => amcUpd());
+  const snrAt = (d) => 65.6 - 30 * lg(Math.max(d, 1));
+  function rateAt(snr, mode) {
+    if (mode === "1024") return snr >= 37 ? 600 : 0;
+    if (mode === "16") return snr >= 17 ? 216 : 0;
+    let r = 0, k = -1; MCS.forEach((m, i) => { if (snr >= m[0]) { r = m[2]; k = i; } }); return r;
+  }
+  function amcUpd() {
+    const d = Math.pow(10, amcD()), snr = snrAt(d), mode = amcMode();
+    let k = -1; MCS.forEach((m, i) => { if (snr >= m[0]) k = i; });
+    const rate = rateAt(snr, mode), sh = 80 * Math.log2(1 + Math.pow(10, snr / 10));
+    NB.stat("amc-snr", snr.toFixed(1) + " dB");
+    NB.stat("amc-mcs", mode === "amc" ? (k >= 0 ? `MCS ${k} · ${MCS[k][1]}` : '<span style="color:var(--bad)">연결 불가</span>') : rate ? (mode === "16" ? "16QAM 3/4 (고정)" : "1024QAM 5/6 (고정)") : '<span style="color:var(--bad)">수신 실패</span>');
+    NB.stat("amc-rate", rate + " Mbps");
+    NB.stat("amc-sh", rate ? Math.round((rate / sh) * 100) + "% <small>(한계 " + Math.round(sh) + ")</small>" : "—");
+    amccv.redraw();
+  }
+  const amccv = NB.canvas($("cv-amc"), (ctx, w, h) => {
+    const P = NB.palette(), mode = amcMode(), d = Math.pow(10, amcD());
+    const step = [], shan = [], fix = [];
+    for (let e = 0; e <= 2.2001; e += 0.002) { const x = Math.pow(10, e), s = snrAt(x); step.push([x, rateAt(s, "amc")]); shan.push([x, 80 * Math.log2(1 + Math.pow(10, s / 10))]); if (mode !== "amc") fix.push([x, rateAt(s, mode)]); }
+    const series = [{ data: shan, color: P.faint, width: 1.5, dash: [5, 4] }, { data: step, color: mode === "amc" ? P.accent : P.faint, width: mode === "amc" ? 2.5 : 1.5 }];
+    if (mode !== "amc") series.push({ data: fix, color: P.bad, width: 2.5 });
+    const cur = rateAt(snrAt(d), mode);
+    NB.chart(ctx, null, { x: [1, 160], y: [0, 1200], logX: true, xLabel: "거리 (m, 로그)", yLabel: "처리율 (Mbps)", xTicks: [1, 3, 10, 30, 100], series, vlines: [{ x: d, color: P.accent2, dash: [] }], points: [{ x: d, y: cur, color: P.accent2, r: 6 }] });
+    NB.text(ctx, "섀넌 한계", w - 24, 30, { align: "right", size: 11.5, color: P.dim });
+  }, { aspect: 0.45, minHeight: 260, maxHeight: 340 });
+  amcUpd();
+
+  /* ============ 5. OFDM 부반송파 ============ */
+  const ofN = NB.range("of-n", (v) => v + "개", () => ofUpd());
+  const ofE = NB.range("of-e", (v) => v.toFixed(2), () => ofUpd());
+  $("of-sum").addEventListener("change", () => ofUpd());
+  const sinc = (x) => (Math.abs(x) < 1e-9 ? 1 : Math.sin(Math.PI * x) / (Math.PI * x));
+  function ofUpd() {
+    const N = ofN(), e = ofE(), k = Math.floor((N - 1) / 2);
+    const s = Math.pow(sinc(e), 2); let ici = 0; for (let j = 0; j < N; j++) if (j !== k) ici += Math.pow(sinc(k + e - j), 2);
+    NB.stat("of-sig", (10 * lg(s)).toFixed(2) + " dB");
+    NB.stat("of-ici", ici < 1e-12 ? "0 (완벽)" : (10 * lg(ici)).toFixed(1) + " dB");
+    NB.stat("of-sir", ici < 1e-12 ? "∞" : (10 * lg(s / ici)).toFixed(1) + " dB");
+    ofcv.redraw();
+  }
+  const ofcv = NB.canvas($("cv-ofdm"), (ctx, w, h) => {
+    const P = NB.palette(), N = ofN(), e = ofE(), cols = P.series;
+    const x0 = -2, x1 = N + 1;
+    const box = { x: 40, y: 14, w: w - 52, h: h - 50 };
+    const X = (v) => box.x + ((v - x0) / (x1 - x0)) * box.w, Y = (v) => box.y + box.h * (1 - (v + 0.3) / 1.45);
+    ctx.strokeStyle = P.axis; ctx.beginPath(); ctx.moveTo(box.x, Y(0)); ctx.lineTo(box.x + box.w, Y(0)); ctx.stroke();
+    NB.text(ctx, "주파수 (부반송파 간격 단위) →", box.x + box.w, box.y + box.h + 30, { align: "right", size: 11.5, color: P.dim });
+    for (let k = 0; k < N; k++) NB.text(ctx, "f" + k, X(k), box.y + box.h + 12, { align: "center", size: 10.5, mono: true, color: P.dim });
+    const M = 600;
+    for (let k = 0; k < N; k++) {
+      ctx.strokeStyle = cols[k % cols.length]; ctx.lineWidth = 1.8; ctx.globalAlpha = 0.85; ctx.beginPath();
+      for (let i = 0; i <= M; i++) { const f = x0 + ((x1 - x0) * i) / M; const y = Y(sinc(f - k)); i ? ctx.lineTo(X(f), y) : ctx.moveTo(X(f), y); }
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    if ($("of-sum").checked) {
+      ctx.strokeStyle = P.text; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath();
+      for (let i = 0; i <= M; i++) { const f = x0 + ((x1 - x0) * i) / M; let s = 0; for (let k = 0; k < N; k++) s += sinc(f - k) * (k % 2 ? 0.9 : 1); i ? ctx.lineTo(X(f), Y(s / 1.6)) : ctx.moveTo(X(f), Y(s / 1.6)); }
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+    for (let k = 0; k < N; k++) {
+      const f = k + e; ctx.strokeStyle = P.dim; ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(f), box.y); ctx.lineTo(X(f), Y(0)); ctx.stroke(); ctx.setLineDash([]);
+      for (let j = 0; j < N; j++) { const v = sinc(f - j); ctx.fillStyle = j === k ? cols[j % cols.length] : Math.abs(v) > 0.01 ? P.bad : P.faint; ctx.beginPath(); ctx.arc(X(f), Y(v), j === k ? 4.5 : 3, 0, 7); ctx.fill(); }
+    }
+  }, { aspect: 0.42, minHeight: 250, maxHeight: 320 });
+  ofUpd();
+
+  /* ============ 6. OFDMA 스케줄러 ============ */
+  const schMode = NB.seg("sch-mode", () => { tot = [0, 0, 0, 0]; cells = 0; grid = []; avg = [1, 1, 1, 1]; });
+  const USERS = [{ n: "A", snr: 25 }, { n: "B", snr: 17 }, { n: "C", snr: 11 }, { n: "D", snr: 5 }];
+  const NRB = 12, NT = 32;
+  const cr = NB.rng(5);
+  const CH = USERS.map(() => { const c = []; for (let p = 0; p < 6; p++) c.push([cr() * 0.9 + 0.2, cr() * 0.25 + 0.05, cr() * TAU, 0.5 + cr()]); return c; });
+  let slot = 0, grid = [], tot = [0, 0, 0, 0], avg = [1, 1, 1, 1], cells = 0, running = true;
+  function chanGain(u, rb, t) { // 주파수·시간 선택적 페이딩 (레일리 비슷)
+    let re = 0, im = 0; CH[u].forEach(([fq, ft, ph, a]) => { const p = TAU * (fq * rb * 0.35 + ft * t * 0.4) + ph; re += a * Math.cos(p); im += a * Math.sin(p * 1.3 + ph); });
+    return (re * re + im * im) / 6;
+  }
+  const bitsFor = (snrDb) => NB.clamp(Math.floor(Math.log2(1 + Math.pow(10, (snrDb - 3) / 10))), 0, 10);
+  function schStep() {
+    const mode = schMode(), col = [];
+    const inst = USERS.map((u, i) => { const r = []; for (let rb = 0; rb < NRB; rb++) r.push(bitsFor(u.snr + 10 * lg(Math.max(1e-3, chanGain(i, rb, slot))))); return r; });
+    for (let rb = 0; rb < NRB; rb++) {
+      let pick = 0;
+      if (mode === "rr") pick = (rb + slot * NRB) % 4;
+      else if (mode === "max") { let b = -1; for (let i = 0; i < 4; i++) if (inst[i][rb] > b) { b = inst[i][rb]; pick = i; } }
+      else { let b = -1; for (let i = 0; i < 4; i++) { const m = inst[i][rb] / avg[i]; if (m > b) { b = m; pick = i; } } }
+      const got = inst[pick][rb]; col.push([pick, got]); tot[pick] += got; cells++;
+    }
+    const served = [0, 0, 0, 0]; col.forEach(([u, b]) => (served[u] += b));
+    for (let i = 0; i < 4; i++) avg[i] = 0.9 * avg[i] + 0.1 * Math.max(0.05, served[i]);
+    grid.push(col); if (grid.length > NT) grid.shift(); slot++;
+    const sum = tot.reduce((a, b) => a + b, 0);
+    NB.stat("sch-tot", (sum / Math.max(1, cells)).toFixed(2) + " 비트/칸");
+    NB.stat("sch-d", sum ? ((tot[3] / sum) * 100).toFixed(1) + "%" : "—");
+    const sq = tot.reduce((a, b) => a + b * b, 0); NB.stat("sch-j", sq ? ((sum * sum) / (4 * sq)).toFixed(2) : "—");
+  }
+  $("sch-run").onclick = () => { running = !running; $("sch-run").textContent = running ? "일시정지 ■" : "재생 ▶"; };
+  $("sch-reset").onclick = () => { tot = [0, 0, 0, 0]; cells = 0; grid = []; };
+  const schcv = NB.canvas($("cv-sch"), (ctx, w, h) => {
+    const P = NB.palette(), cols = [P.accent, P.accent2, P.warn, P.ok];
+    const narrow = w < 520, gx = 30, gy = 10, gw = narrow ? w - 40 : w * 0.68 - 30, gh = h - 40, cw = gw / NT, chh = gh / NRB;
+    NB.text(ctx, "주파수", 6, gy + gh / 2, { size: 10.5, color: P.dim });
+    NB.text(ctx, "시간 →", gx + gw, gy + gh + 16, { align: "right", size: 11, color: P.dim });
+    ctx.fillStyle = P.surface; ctx.fillRect(gx, gy, gw, gh);
+    grid.forEach((col, t) => col.forEach(([u, b], rb) => { ctx.fillStyle = cols[u]; ctx.globalAlpha = 0.15 + 0.85 * (b / 10); ctx.fillRect(gx + t * cw + 0.5, gy + (NRB - 1 - rb) * chh + 0.5, cw - 1, chh - 1); }));
+    ctx.globalAlpha = 1;
+    // 범례 + 몫 막대
+    const lx = narrow ? gx : gx + gw + 24, ly = narrow ? h - 22 : gy + 6;
+    const sum = tot.reduce((a, b) => a + b, 0) || 1;
+    USERS.forEach((u, i) => {
+      if (narrow) { const x = lx + i * ((w - 40) / 4); ctx.fillStyle = cols[i]; ctx.fillRect(x, ly + 6, 10, 10); NB.text(ctx, `${u.n} ${Math.round((tot[i] / sum) * 100)}%`, x + 14, ly + 11, { size: 11, color: P.text }); return; }
+      const y = ly + i * 46, bwMax = w - lx - 16;
+      NB.text(ctx, `${u.n} (평균 SNR ${u.snr} dB)`, lx, y + 8, { size: 11.5, color: P.text, bold: true });
+      ctx.fillStyle = P.surface; ctx.fillRect(lx, y + 18, bwMax, 14);
+      ctx.fillStyle = cols[i]; ctx.fillRect(lx, y + 18, bwMax * (tot[i] / sum), 14);
+      NB.text(ctx, Math.round((tot[i] / sum) * 100) + "%", lx + bwMax - 2, y + 25, { align: "right", size: 10.5, mono: true, color: P.text });
+    });
+    if (!narrow) NB.text(ctx, "받은 비트의 몫", lx, ly + 4 * 46 + 6, { size: 11, color: P.dim });
+  }, { aspect: 0.42, minHeight: 280, maxHeight: 340 });
+  let schAcc = 0;
+  NB.loop($("cv-sch"), (dt) => { if (!running) return; schAcc += dt; if (schAcc > 0.18) { schAcc = 0; schStep(); schcv.redraw(); } });
+  for (let i = 0; i < 6; i++) schStep();
+  schcv.redraw();
+
+  /* ============ 7. 빔포밍 ============ */
+  const bfN = NB.range("bf-n", (v) => v + "개", () => bfUpd());
+  const bfD = NB.range("bf-d", (v) => v.toFixed(2) + " λ", () => bfUpd());
+  const bfU = NB.range("bf-u", (v) => v + "°", () => bfUpd());
+  const bfP = NB.range("bf-p", (v) => v + "°", () => bfUpd());
+  $("bf-auto").addEventListener("change", () => bfUpd());
+  const rad = (d) => (d * Math.PI) / 180;
+  function bfBeta() { return $("bf-auto").checked ? -360 * bfD() * Math.sin(rad(bfU())) : bfP(); }
+  function AF(th) { // th: 라디안, 0 = 정면. 정규화 전력 (최대 1)
+    const N = bfN(), d = bfD(), psi = TAU * d * Math.sin(th) + rad(bfBeta());
+    let re = 0, im = 0; for (let n = 0; n < N; n++) { re += Math.cos(n * psi); im += Math.sin(n * psi); }
+    return (re * re + im * im) / (N * N);
+  }
+  function bfUpd() {
+    const auto = $("bf-auto").checked; bfP.el.disabled = auto;
+    if (auto) { let b = bfBeta(); b = ((b + 180) % 360 + 360) % 360 - 180; bfP.el.value = Math.round(b); $("bf-p-out").textContent = Math.round(b) + "°"; bfP.el.style.setProperty("--fill", ((b + 180) / 360) * 100 + "%"); }
+    const N = bfN(), M = 1801; let mx = 0, im = 0; const arr = [];
+    for (let i = 0; i < M; i++) { const th = rad(-90 + (180 * i) / (M - 1)); const v = AF(th); arr.push(v); if (v > mx) { mx = v; im = i; } }
+    const dir = -90 + (180 * im) / (M - 1);
+    let l = im, r = im; while (r < M - 1 && arr[r + 1] >= mx / 2) r++; while (l > 0 && arr[l - 1] >= mx / 2) l--;
+    const bw = ((r - l) * 180) / (M - 1);
+    // 그레이팅 로브: 주빔에서 떨어진 곳의 국소 최대가 주빔의 70% 이상
+    let gl = false; for (let i = 1; i < M - 1; i++) if (Math.abs(i - im) > (r - l) * 1.5 + 5 && arr[i] > 0.7 * mx && arr[i] >= arr[i - 1] && arr[i] >= arr[i + 1]) gl = true;
+    NB.stat("bf-dir", N === 1 ? "없음 (무지향)" : dir.toFixed(0) + "°");
+    NB.stat("bf-g", (10 * lg(N * AF(rad(bfU())))).toFixed(1) + " dB");
+    NB.stat("bf-bw", N === 1 || bw > 170 ? "—" : bw.toFixed(1) + "°");
+    NB.stat("bf-gl", gl ? '<span style="color:var(--bad)">있음! 엉뚱한 방향에도 빔</span>' : '<span style="color:var(--ok)">없음</span>');
+    bfcv.redraw();
+  }
+  const bfcv = NB.canvas($("cv-bf"), (ctx, w, h) => {
+    const P = NB.palette(), N = bfN();
+    const cx = 34, cy = h / 2, R = Math.min(w - cx - 30, h / 2 - 18);
+    ctx.strokeStyle = P.grid; ctx.lineWidth = 1;
+    for (let k = 1; k <= 3; k++) { ctx.beginPath(); ctx.arc(cx, cy, (R * k) / 3, -Math.PI / 2, Math.PI / 2); ctx.stroke(); }
+    for (let a = -90; a <= 90; a += 30) { const t = rad(a); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + R * Math.cos(t), cy - R * Math.sin(t)); ctx.stroke(); NB.text(ctx, a + "°", cx + (R + 14) * Math.cos(t), cy - (R + 10) * Math.sin(t), { align: "center", size: 10, mono: true, color: P.faint }); }
+    // dB 패턴 (30 dB 범위)
+    const rr = (v) => Math.max(0, (10 * lg(Math.max(v, 1e-6)) + 30) / 30) * R;
+    ctx.beginPath();
+    for (let i = 0; i <= 720; i++) { const th = rad(-90 + i / 4); const r = rr(AF(th)); const x = cx + r * Math.cos(th), y = cy - r * Math.sin(th); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.lineTo(cx, cy); ctx.closePath(); ctx.fillStyle = P.accent; ctx.globalAlpha = 0.2; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = P.accent; ctx.lineWidth = 2; ctx.stroke();
+    // 소자
+    const sp = Math.min(9, (h - 40) / Math.max(N, 1)); ctx.fillStyle = P.accent2;
+    for (let n = 0; n < N; n++) ctx.fillRect(cx - 12, cy - ((N - 1) / 2 - n) * sp - 2.5, 6, 5);
+    // 사용자
+    const ut = rad(bfU()), ux = cx + R * 0.86 * Math.cos(ut), uy = cy - R * 0.86 * Math.sin(ut);
+    NB.box(ctx, ux - 14, uy - 11, 28, 22, { fill: P.warn, stroke: false, text: "👤", size: 13, r: 6 });
+    NB.text(ctx, "dB 눈금(30 dB 범위)", w - 8, h - 10, { align: "right", size: 10.5, color: P.faint });
+  }, { aspect: 0.8, minHeight: 300, maxHeight: 440 });
+  let bfWalk = false, bfDir = 1;
+  $("bf-walk").onclick = () => { bfWalk = !bfWalk; $("bf-walk").textContent = bfWalk ? "멈춤 ■" : "사용자 걷기 ▶"; };
+  NB.loop($("cv-bf"), (dt) => { if (!bfWalk) return; let u = bfU() + bfDir * dt * 15; if (u > 70) { u = 70; bfDir = -1; } if (u < -70) { u = -70; bfDir = 1; } bfU.set(Math.round(u * 10) / 10); });
+  bfUpd();
+
+  /* ============ 8. 처리율 계산기 ============ */
+  const PRE = {
+    wifi5: { b: 160, q: 8, r: 5 / 6, s: 8, o: 19, std: "약 6.93 Gbps (8스트림, 160 MHz)", v: 6933 },
+    wifi6: { b: 160, q: 10, r: 5 / 6, s: 8, o: 10, std: "약 9.6 Gbps (8스트림, 160 MHz)", v: 9608 },
+    wifi7: { b: 320, q: 12, r: 5 / 6, s: 4, o: 10, std: "약 11.5 Gbps (4스트림, 320 MHz)", v: 11530 },
+    wifi7max: { b: 320, q: 12, r: 5 / 6, s: 16, o: 10, std: "약 46 Gbps (16스트림, 320 MHz)", v: 46120 },
+    lte: { b: 20, q: 6, r: 0.93, s: 4, o: 33, std: "약 300 Mbps (20 MHz, 4×4, 64QAM)", v: 300 },
+    nr: { b: 100, q: 8, r: 0.925, s: 4, o: 21, std: "약 2.3 Gbps (100 MHz, 4계층, 256QAM)", v: 2340 },
+    mmw: { b: 400, q: 6, r: 0.925, s: 2, o: 27, std: "약 3.2 Gbps (400 MHz, 2계층, 64QAM)", v: 3230 },
+  };
+  const QN = { 1: "BPSK", 2: "QPSK", 4: "16QAM", 6: "64QAM", 8: "256QAM", 10: "1024QAM", 12: "4096QAM" };
+  const tpB = NB.range("tp-b", (v) => v + " MHz", () => tpUpd(true));
+  const tpQ = NB.range("tp-q", (v) => v + "비트" + (QN[v] ? " (" + QN[v] + ")" : ""), () => tpUpd(true));
+  const tpR = NB.range("tp-r", (v) => v.toFixed(3), () => tpUpd(true));
+  const tpS = NB.range("tp-s", (v) => v + "개", () => tpUpd(true));
+  const tpO = NB.range("tp-o", (v) => v + "%", () => tpUpd(true));
+  let custom = false;
+  const tpPre = NB.seg("tp-pre", (v) => { const p = PRE[v]; tpB.el.value = p.b; tpQ.el.value = p.q; tpR.el.value = p.r; tpS.el.value = p.s; tpO.el.value = p.o; [tpB, tpQ, tpR, tpS, tpO].forEach((g) => g.el.dispatchEvent(new Event("input"))); custom = false; tpUpd(false); });
+  function tpUpd(byUser) {
+    if (byUser) custom = true;
+    const eff = tpQ() * tpR() * (1 - tpO() / 100), rate = tpB() * eff * tpS();
+    NB.stat("tp-eff", eff.toFixed(2) + " b/s/Hz");
+    NB.stat("tp-rate", rate >= 1000 ? (rate / 1000).toFixed(2) + " Gbps" : rate.toFixed(0) + " Mbps");
+    const p = PRE[tpPre()];
+    NB.stat("tp-std", p.std + (custom ? ' <small style="display:block">(값을 바꿨으면 비교용)</small>' : ""));
+    tpcv.redraw();
+  }
+  const tpcv = NB.canvas($("cv-tp"), (ctx, w, h) => {
+    const P = NB.palette(), S = tpS(), B = tpB(), eff = tpQ() * tpR() * (1 - tpO() / 100);
+    const off = Math.min(8, 60 / S), baseX = 50, baseY = h - 34;
+    const maxW = w - baseX - 30 - off * 15, maxH = h - 60 - off * 15;
+    const pw = (B / 400) * maxW, ph = (eff / 12) * maxH;
+    for (let s = S - 1; s >= 0; s--) {
+      const x = baseX + s * off, y = baseY - ph - s * off;
+      ctx.fillStyle = P.series[s % 4]; ctx.globalAlpha = 0.85; ctx.fillRect(x, y, pw, ph); ctx.globalAlpha = 1;
+      ctx.strokeStyle = P.bg; ctx.lineWidth = 1; ctx.strokeRect(x, y, pw, ph);
+    }
+    ctx.strokeStyle = P.axis; ctx.beginPath(); ctx.moveTo(baseX, baseY - maxH - 4); ctx.lineTo(baseX, baseY); ctx.lineTo(baseX + maxW + 4, baseY); ctx.stroke();
+    NB.text(ctx, "대역폭 " + B + " MHz →", baseX, baseY + 16, { size: 11.5, color: P.dim });
+    ctx.save(); ctx.translate(16, baseY - maxH / 2); ctx.rotate(-Math.PI / 2); NB.text(ctx, "효율 " + eff.toFixed(1) + " b/s/Hz", 0, 0, { align: "center", size: 11.5, color: P.dim }); ctx.restore();
+    NB.text(ctx, "× 스트림 " + S + "장", baseX + pw + S * off + 8, baseY - ph - S * off + 8, { size: 12, bold: true, color: P.text });
+  }, { aspect: 0.4, minHeight: 230, maxHeight: 300 });
+  tpUpd(false);
+})();
+</script>
+</body>
+</html>
