@@ -238,12 +238,12 @@
       <div style="overflow-x:auto">
       <svg viewBox="0 0 760 330" style="min-width:600px" role="img" aria-label="AS 계층, 트랜짓, 피어링, IXP">
         <defs><marker id="rt-a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
-        <g stroke="var(--ok)" stroke-width="2.5" stroke-dasharray="7 5"><line x1="230" y1="52" x2="300" y2="52"/><line x1="460" y1="52" x2="530" y2="52"/><path d="M150 30 Q380 -8 610 30" fill="none"/></g>
+        <g stroke="var(--ok)" stroke-width="2.5" stroke-dasharray="7 5"><line x1="230" y1="52" x2="300" y2="52"/><line x1="460" y1="52" x2="530" y2="52"/></g>
         <g stroke="var(--accent)" stroke-width="2" fill="none">
-          <path d="M115 140 L140 76" marker-end="url(#rt-a4)"/><path d="M645 140 L620 76" marker-end="url(#rt-a4)"/><path d="M380 250 L380 76" marker-end="url(#rt-a4)"/>
+          <path d="M115 140 L140 76" marker-end="url(#rt-a4)"/><path d="M645 140 L620 76" marker-end="url(#rt-a4)"/>
           <path d="M115 250 V186" marker-end="url(#rt-a4)"/><path d="M645 250 V186" marker-end="url(#rt-a4)"/>
         </g>
-        <g stroke="var(--ok)" stroke-width="2.5" stroke-dasharray="7 5"><line x1="190" y1="163" x2="270" y2="170"/><line x1="490" y1="170" x2="570" y2="163"/><line x1="350" y1="200" x2="350" y2="250"/></g>
+        <g stroke="var(--ok)" stroke-width="2.5" stroke-dasharray="7 5"><line x1="190" y1="163" x2="270" y2="170"/><line x1="490" y1="170" x2="570" y2="163"/><line x1="380" y1="200" x2="380" y2="250"/></g>
         <g stroke="var(--border)">
           <rect x="70" y="30" width="160" height="44" rx="10" class="f-acc2-soft"/><rect x="300" y="30" width="160" height="44" rx="10" class="f-acc2-soft"/><rect x="530" y="30" width="160" height="44" rx="10" class="f-acc2-soft"/>
           <rect x="40" y="140" width="150" height="46" rx="10" class="f-elev"/><rect x="570" y="140" width="150" height="46" rx="10" class="f-elev"/>
@@ -257,10 +257,9 @@
           <text x="115" y="278">가정 · 기업 고객</text><text x="380" y="278">콘텐츠 · CDN · 클라우드</text><text x="645" y="278">가정 · 기업 고객</text>
         </g>
         <g class="t-dim" style="font-size:11.5px">
-          <text x="380" y="16" text-anchor="middle">피어링: Tier-1끼리는 서로 돈을 내지 않는다</text>
-          <text x="60" y="110">트랜짓 ($): 상위에게 돈을 내고</text><text x="60" y="125">인터넷 전체로 가는 길을 산다</text>
-          <text x="392" y="110">CDN도 트랜짓을 산다</text>
-          <text x="200" y="230">IXP에서 피어링: 서로의 고객 트래픽만 무료로 직접 교환</text>
+          <text x="380" y="18" text-anchor="middle">Tier-1끼리는 피어링: 서로 돈을 내지 않고 맞교환</text>
+          <text x="150" y="108">트랜짓 ($): 상위에게 돈을 내고</text><text x="150" y="123">인터넷 전체로 가는 길을 산다</text>
+          <text x="392" y="224">IXP에서 피어링:</text><text x="392" y="239">고객 트래픽만 무료로 직접 교환</text>
         </g>
         <g style="font-size:11.5px" class="t">
           <line x1="40" y1="318" x2="70" y2="318" stroke="var(--accent)" stroke-width="2" marker-end="url(#rt-a4)"/><text x="76" y="322">트랜짓 (화살표 쪽에 돈을 낸다)</text>
@@ -346,8 +345,7 @@
           <text x="130" y="197">파리 사용자</text><text x="380" y="197">부산 사용자</text><text x="630" y="197">오사카 사용자</text>
         </g>
         <g stroke="var(--accent)" stroke-width="2.5"><path d="M130 170 V106" marker-end="url(#rt-a5)"/><path d="M380 170 V106" marker-end="url(#rt-a5)"/><path d="M630 170 V106" marker-end="url(#rt-a5)"/></g>
-        <g stroke="var(--border)" stroke-width="1.5" stroke-dasharray="4 5"><path d="M200 186 L300 100"/><path d="M450 186 L550 100"/></g>
-        <text x="380" y="136" text-anchor="middle" class="t-dim" style="font-size:12px">모두 “203.0.113.53으로 DNS 질의”를 보낸다 → 각자 가장 가까운 곳에 도착</text>
+                <text x="380" y="136" text-anchor="middle" class="t-dim" style="font-size:12px">모두 “203.0.113.53으로 DNS 질의”를 보낸다 → 각자 가장 가까운 곳에 도착</text>
         <text x="380" y="232" text-anchor="middle" class="t-dim" style="font-size:12px">서울 서버가 고장 나 광고를 거두면, 부산 사용자의 경로는 BGP 수렴 후 도쿄로 넘어간다</text>
       </svg>
       </div>

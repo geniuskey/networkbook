@@ -37,7 +37,7 @@
     <p>사람 목소리는 수백 Hz~수 kHz로 진동한다. 이 신호를 그대로 안테나에 넣으면 어떻게 될까? 11장에서 본 것처럼 안테나는 파장의 절반쯤 되어야 효율적으로 전파를 내보낸다. 3 kHz의 파장은 100 km이므로 50 km짜리 안테나가 필요하다. 게다가 모든 방송국이 같은 0~3 kHz 대역에 목소리를 그대로 내보내면 서로 뒤섞여 아무것도 들을 수 없다.</p>
     <p>해결책은 메시지를 높은 주파수의 깨끗한 사인파, 즉 <span class="term">반송파</span><span class="en">(carrier)</span>에 실어 보내는 것이다. 메시지에 따라 반송파의 진폭·주파수·위상 가운데 하나를 조금씩 바꾸는 일을 <span class="term">변조</span><span class="en">(modulation)</span>, 받는 쪽에서 메시지를 다시 꺼내는 일을 <b>복조</b>라 한다. 반송파 주파수가 높으면 안테나가 작아지고, 방송국마다 다른 반송파를 쓰면 같은 하늘을 주파수별로 나눠 쓸 수 있다. 라디오 다이얼을 돌리는 것이 바로 원하는 반송파를 고르는 일이다.</p>
     <figure class="diagram">
-      <svg viewBox="0 0 800 250" role="img" aria-label="반송파가 필요한 두 가지 이유: 안테나 크기와 주파수 나눠 쓰기">
+      <svg viewBox="0 0 800 260" role="img" aria-label="반송파가 필요한 두 가지 이유: 안테나 크기와 주파수 나눠 쓰기">
         <text x="20" y="24" class="t" style="font-weight:700">① 안테나 크기 (반파장)</text>
         <g transform="translate(20,40)">
           <rect x="0" y="10" width="340" height="16" rx="4" fill="var(--bad)" opacity=".75"/>
@@ -50,14 +50,14 @@
         <text x="410" y="24" class="t" style="font-weight:700">② 주파수 나눠 쓰기</text>
         <g transform="translate(410,40)">
           <path d="M0 140 H370" class="s-axis"/>
-          <text x="370" y="160" text-anchor="end" class="t-mono">주파수 →</text>
+          <text x="370" y="156" text-anchor="end" class="t-mono">주파수 →</text>
           <g fill="var(--accent)" opacity=".75">
             <path d="M30 140 Q55 40 80 140 Z"/><path d="M120 140 Q145 60 170 140 Z" fill="var(--accent-2)"/><path d="M210 140 Q235 50 260 140 Z" fill="var(--warn)"/><path d="M300 140 Q325 70 350 140 Z" fill="var(--ok)"/>
           </g>
           <g class="t-mono" text-anchor="middle"><text x="55" y="34">89.1</text><text x="145" y="54">91.9</text><text x="235" y="44">95.1</text><text x="325" y="64">107.7</text></g>
-          <text x="185" y="185" text-anchor="middle" class="t-dim">방송국마다 다른 반송파(MHz)에 실어서 같은 하늘에 나란히</text>
+          <text x="185" y="178" text-anchor="middle" class="t-dim">방송국마다 다른 반송파(MHz)에 실어서 같은 하늘에 나란히</text>
         </g>
-        <text x="400" y="240" text-anchor="middle" class="t-dim">반송파 = 정해진 차선을 달리는 트럭, 변조 = 짐(메시지) 싣기</text>
+        <text x="400" y="248" text-anchor="middle" class="t-acc">반송파 = 정해진 차선을 달리는 트럭, 변조 = 짐(메시지) 싣기</text>
       </svg>
       <figcaption><b>그림 12-1.</b> 반송파가 필요한 두 가지 이유. 높은 주파수에 실으면 안테나가 손톱만 해지고, 저마다 다른 반송파를 쓰면 하나의 하늘을 주파수로 나눠 쓸 수 있다(주파수 분할 다중화, FDM). 그림의 FM 주파수는 예시다.</figcaption>
     </figure>
