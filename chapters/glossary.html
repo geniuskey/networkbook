@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>용어집 & 종합 퀴즈 · NetworkBook</title>
+<meta name="description" content="신호와 프로토콜, 유선·광·무선 통신, IP와 라우팅, TCP, Wi-Fi와 5G, 위성, 통신 반도체, 데이터센터와 클라우드, 보안까지 이 책의 핵심 용어를 검색하고, 장별 종합 퀴즈로 실력을 점검한다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<script src="../js/terms.js"></script>
+<style>
+  [hidden] { display: none !important; }
+  .gl-tools { display: grid; gap: 10px; margin-bottom: 18px; }
+  .gl-tools .row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .gl-tools .seg button { font-size: 12.5px; padding: 4px 9px; }
+  .gl-search { margin-bottom: 0 !important; }
+  .gl-count { font-size: 13px; color: var(--text-faint); margin-left: auto; }
+  #gl-list { max-height: min(78vh, 980px); overflow-y: auto; overscroll-behavior: contain; padding: 2px 6px 2px 2px; }
+  .gl-group { position: sticky; top: 0; z-index: 1; background: var(--bg); font-family: var(--mono); font-weight: 700; font-size: 13px; color: var(--accent); letter-spacing: .04em; margin: 14px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+  .gl-group:first-child { margin-top: 0; }
+  .gl-item { margin-bottom: 8px; }
+  .gl-item mark { background: color-mix(in srgb, var(--warn) 35%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+  .gl-empty { padding: 24px; text-align: center; color: var(--text-dim); border: 1px dashed var(--border); border-radius: 12px; }
+  .fq { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .fq-top { display: flex; justify-content: space-between; gap: 10px; padding: 12px 18px 8px; font-size: 13px; color: var(--text-dim); font-family: var(--mono); }
+  .fq-bar { height: 6px; background: var(--surface-2); margin: 0 18px; border-radius: 3px; overflow: hidden; }
+  .fq-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .3s ease; }
+  .fq-card, .fq-result { padding: 18px 20px 20px; }
+  .fq-ch { font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+  .fq-q { font-weight: 700; font-size: 17px; margin: 0 0 14px !important; }
+  .fq-opts { display: grid; gap: 8px; }
+  .fq-opt { text-align: left; font: inherit; font-size: 15px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; line-height: 1.5; }
+  .fq-opt:hover:not(:disabled) { border-color: var(--accent); }
+  .fq-opt:disabled { cursor: default; }
+  .fq-opt.right { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, transparent); font-weight: 600; }
+  .fq-opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+  .fq-exp { margin-top: 12px; font-size: 15px; color: var(--text-dim); padding: 12px 14px; border-radius: 8px; background: var(--surface); }
+  .fq-nav { display: flex; justify-content: flex-end; margin-top: 14px; }
+  .fq-result { text-align: center; }
+  .fq-title { font-size: clamp(24px, 5vw, 32px); font-weight: 800; margin: 4px 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .fq-big { font-family: var(--mono); font-size: 40px; font-weight: 700; }
+  .fq-big small { font-size: 18px; color: var(--text-dim); }
+  .fq-rows { text-align: left; display: grid; gap: 6px; margin: 16px 0; }
+  .fq-rows div { display: grid; grid-template-columns: 170px 1fr 52px; gap: 10px; align-items: center; font-size: 13.5px; }
+  @media (max-width: 520px) { .fq-rows div { grid-template-columns: 110px 1fr 44px; font-size: 12.5px; } }
+  .fq-rows i { display: block; height: 10px; border-radius: 5px; background: var(--surface-2); overflow: hidden; }
+  .fq-rows i b { display: block; height: 100%; background: var(--accent); }
+  .fq-rows a { color: var(--text); }
+</style>
+</head>
+<body data-chapter="glossary">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 26</div>
+    <h1>용어집 &amp; 종합 퀴즈</h1>
+    <p class="lead">이 책에 나온 핵심 용어를 한곳에 모았다. 모르는 말이 나오면 검색해 보고, 설명 아래의 링크로 해당 장으로 돌아가 시뮬레이터를 다시 만져 보자. 마지막에는 모든 장을 아우르는 종합 퀴즈로 실력을 점검할 수 있다.</p>
+  </header>
+
+  <section id="glossary" data-nonum>
+    <h2>용어집</h2>
+    <div class="gl-tools">
+      <input class="gl-search" id="gl-q" type="search" placeholder="용어, 영어 이름, 설명으로 검색 (예: 라우터, TCP, OFDM, SerDes)" aria-label="용어 검색">
+      <div class="row"><div class="seg" id="gl-part"><button data-value="all" class="on">전체</button></div><span class="gl-count" id="gl-count"></span></div>
+    </div>
+    <div id="gl-list"></div>
+  </section>
+
+  <section id="final" data-nonum>
+    <h2>종합 퀴즈</h2>
+    <p>각 장에서 골고루 뽑은 문제다. 보기를 고르면 바로 해설이 나온다. 끝까지 풀면 장별 결과를 보여 준다.</p>
+    <div class="fq" id="fq"></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const T = window.NB_TERMS || [];
+  const chOf = (slug) => NB.CHAPTERS.find((c) => c.slug === slug);
+  // part filter buttons
+  const parts = [...new Set(NB.CHAPTERS.filter((c) => c.slug !== "glossary" && c.slug !== "journey").map((c) => c.part))];
+  $("gl-part").insertAdjacentHTML("beforeend", parts.map((p) => `<button data-value="${p}">${p}</button>`).join(""));
+  const part = NB.seg("gl-part", render);
+  const q = $("gl-q"); q.addEventListener("input", render);
+  try { const qq = new URLSearchParams(location.search).get("q"); if (qq) q.value = qq; } catch (e) {}
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function hl(s, term) { if (!term) return esc(s); const i = s.toLowerCase().indexOf(term.toLowerCase()); if (i < 0) return esc(s); return esc(s.slice(0, i)) + "<mark>" + esc(s.slice(i, i + term.length)) + "</mark>" + esc(s.slice(i + term.length)); }
+  function render() {
+    const term = q.value.trim(), p = part();
+    const list = T.filter(([ko, en, def, ch]) => (p === "all" || chOf(ch).part === p) && (!term || (ko + " " + en + " " + def).toLowerCase().includes(term.toLowerCase())));
+    let html = "", last = "";
+    list.forEach(([ko, en, def, ch]) => {
+      const c = chOf(ch);
+      if (c.slug !== last) { html += `<div class="gl-group">${c.num} ${c.title}</div>`; last = c.slug; }
+      html += `<div class="gl-item"><h4>${hl(ko, term)}<span class="en">${hl(en, term)}</span></h4><p>${hl(def, term)}</p><a class="ch" href="${c.slug}.html">→ ${c.num}장에서 보기</a></div>`;
+    });
+    $("gl-list").innerHTML = html || `<div class="gl-empty">“${esc(term)}”에 맞는 용어가 없습니다.</div>`;
+    $("gl-count").textContent = `${list.length} / ${T.length}개`;
+  }
+  render();
+
+  /* ---------------- final quiz ---------------- */
+  const QZ = [
+/*QZ-BEGIN*/
+/*QZ-END*/
+  ];
+  let qi = 0, results = [];
+  // shuffle options deterministically per load
+  function renderQ() {
+    const [ch, q, opts, ans, exp] = QZ[qi]; const c = chOf(ch);
+    $("fq").innerHTML = `<div class="fq-top"><span>${qi + 1} / ${QZ.length}</span><span>맞힌 문제 ${results.filter(Boolean).length}</span></div><div class="fq-bar"><i style="width:${(qi / QZ.length) * 100}%"></i></div>
+      <div class="fq-card"><div class="fq-ch">${c.num} · ${c.title}</div><p class="fq-q">${q}</p><div class="fq-opts">${opts.map((o, k) => `<button class="fq-opt" data-k="${k}">${o}</button>`).join("")}</div><div id="fq-after"></div></div>`;
+    $("fq").querySelectorAll(".fq-opt").forEach((b) => b.onclick = () => {
+      const k = Number(b.dataset.k), ok = k === ans; results[qi] = ok;
+      $("fq").querySelectorAll(".fq-opt").forEach((x) => { x.disabled = true; if (Number(x.dataset.k) === ans) x.classList.add("right"); });
+      if (!ok) b.classList.add("wrong");
+      $("fq-after").innerHTML = `<div class="fq-exp"><b style="color:${ok ? "var(--ok)" : "var(--bad)"}">${ok ? "정답!" : "아쉽다."}</b> ${exp}</div><div class="fq-nav"><button class="btn primary" id="fq-next">${qi < QZ.length - 1 ? "다음 문제 →" : "결과 보기"}</button></div>`;
+      $("fq-next").onclick = () => { qi++; qi < QZ.length ? renderQ() : renderResult(); };
+    });
+  }
+  function renderResult() {
+    const score = results.filter(Boolean).length, pct = score / QZ.length;
+    const title = pct >= 0.9 ? "네트워크 박사" : pct >= 0.7 ? "든든한 이해자" : pct >= 0.5 ? "성장 중인 탐험가" : "이제 막 출발한 여행자";
+    const by = {}; QZ.forEach(([ch], k) => { by[ch] = by[ch] || [0, 0]; by[ch][1]++; if (results[k]) by[ch][0]++; });
+    $("fq").innerHTML = `<div class="fq-result"><div class="scale-note">결과</div><div class="fq-title">${title}</div><div class="fq-big">${score}<small> / ${QZ.length}</small></div>
+      <div class="fq-rows">${Object.keys(by).map((ch) => { const c = chOf(ch), [a, n] = by[ch]; return `<div><a href="${c.slug}.html">${c.num} ${c.title}</a><i><b style="width:${(a / n) * 100}%;background:${a === n ? "var(--ok)" : a === 0 ? "var(--bad)" : "var(--accent)"}"></b></i><span class="mono">${a}/${n}</span></div>`; }).join("")}</div>
+      <p class="scale-note">틀린 문제가 있는 장의 시뮬레이터를 다시 만져 보면 금방 감이 온다.</p><button class="btn primary" id="fq-again">다시 풀기</button></div>`;
+    $("fq-again").onclick = () => { qi = 0; results = []; renderQ(); };
+  }
+  renderQ();
+})();
+</script>
+</body>
+</html>

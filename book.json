@@ -1,0 +1,10 @@
+{
+  "id": "networkbook",
+  "title": "NetworkBook",
+  "description": "패킷이 지구 반대편까지 가는 길. 구리선과 광섬유, 전파와 위성, 인터넷 프로토콜, 데이터센터와 클라우드, 그리고 이를 움직이는 통신 반도체까지. 신호를 직접 보내고 망가뜨리며 네트워크의 모든 층을 이해하도록 썼습니다.",
+  "url": "https://networkbook.euiyun.com/",
+  "repo": "https://github.com/geniuskey/networkbook",
+  "field": "computing",
+  "status": "published",
+  "domain": "networkbook.euiyun.com"
+}

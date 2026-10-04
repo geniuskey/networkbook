@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<title>NetworkBook · 누구나 읽는 네트워크 교과서</title>
+<meta name="description" content="패킷이 지구 반대편까지 가는 길 — 신호와 프로토콜, 구리선·광섬유·전파·위성, 인터넷과 이동통신, 데이터센터와 클라우드, 그리고 이를 움직이는 통신 반도체까지 시뮬레이터로 직접 만지며 이해하는 인터랙티브 네트워크 교과서.">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/common.js"></script>
+<style>
+  .hero-3d { cursor: pointer; height: auto; touch-action: auto; }
+  .hero-3d canvas { display: block; width: 100%; }
+  .paths { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .path { padding: 18px 20px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg-elev); }
+  .path h3 { margin: 0 0 6px; font-size: 17px; }
+  .path p { margin: 0 0 10px; color: var(--text-dim); font-size: 14.5px; }
+  .path .steps { display: flex; flex-wrap: wrap; gap: 6px; }
+  .path .steps a { font-family: var(--mono); font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+  .path .steps a:hover { text-decoration: none; filter: brightness(1.1); }
+  .numbers { display: grid; gap: 1px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .numbers div { background: var(--bg-elev); padding: 18px 20px; }
+  .numbers b { display: block; font-family: var(--mono); font-size: 24px; letter-spacing: -0.02em; color: var(--text); }
+  .numbers span { color: var(--text-dim); font-size: 14px; }
+  .hero-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+  .hero-badges span { font-size: 13px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim); background: var(--bg-elev); }
+  .hero-resume { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; justify-content: space-between; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-elev); box-shadow: var(--shadow); }
+  .hero-resume[hidden] { display: none; }
+  .hero-resume small { display: block; font-size: 12px; color: var(--text-faint); letter-spacing: .05em; }
+  .hero-resume a { font-size: 16px; }
+  .hero-resume .hr-meta { font-size: 13.5px; color: var(--text-dim); }
+  .hero-resume button { font: inherit; border: 0; background: none; color: var(--text-faint); text-decoration: underline; cursor: pointer; padding: 0; }
+  .part-title { font-size: 13px; letter-spacing: .1em; font-weight: 700; color: var(--text-faint); margin: 28px 0 10px; text-transform: uppercase; }
+  .part-title:first-of-type { margin-top: 0; }
+  .stack-fig svg { display: block; width: 100%; height: auto; }
+  .stack-fig a:hover rect { stroke: var(--accent); stroke-width: 2; }
+  .howto { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .howto div { padding: 16px 18px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-elev); font-size: 14.5px; color: var(--text-dim); }
+  .howto b { display: block; color: var(--text); font-size: 16px; margin-bottom: 4px; }
+  .howto .sim-tag { display: inline-block; margin-bottom: 8px; }
+</style>
+</head>
+<body data-root="">
+
+<section class="home-hero">
+  <div class="inner">
+    <div>
+      <div class="eyebrow">Interactive Network Textbook</div>
+      <h1>패킷이 지구 반대편까지<br><span class="grad">가는 길</span></h1>
+      <p>메시지를 보내면 1초도 안 되어 지구 반대편 친구의 휴대폰이 울린다. 그사이 비트는 전파가 되었다가, 구리선의 전압이 되었다가, 바닷속 유리실을 지나는 빛이 된다. 수십 개의 라우터가 길을 고르고, 데이터센터의 스위치 칩이 초당 수백억 개의 패킷을 나눈다. 신호와 프로토콜에서 유선·무선 통신, 인터넷과 5G, 데이터센터와 클라우드, 그리고 이 모두를 움직이는 통신 반도체까지. 직접 신호를 보내고, 망가뜨리고, 고치며 배우는 네트워크 교과서입니다.</p>
+      <div class="cta">
+        <a class="primary" href="chapters/intro.html">1장부터 시작하기 →</a>
+        <a class="ghost" href="chapters/journey.html">영상 통화 한 번의 여행</a>
+      </div>
+      <div class="hero-badges" id="badges">
+        <span>26개 챕터</span><span>인터랙티브 시뮬레이터</span><span>개념 그림</span><span>3D 모형</span><span>사전 지식 불필요</span><span>설치 없이 브라우저에서</span>
+      </div>
+      <div class="hero-resume" id="nb-resume" hidden></div>
+    </div>
+    <div class="hero-3d" id="hero"><canvas id="cv-hero"></canvas><span class="hint">장소를 누르면 해당 장으로 이동합니다 · 움직이는 점은 패킷</span></div>
+  </div>
+</section>
+
+<section class="home-section">
+  <h2>네트워크는 층층이 쌓은 탑이다</h2>
+  <p class="sub">각 층은 바로 아래층이 제공하는 기능만 믿고 그 위에 더 편한 기능을 쌓습니다. 맨 아래에는 비트를 전기·빛·전파로 바꾸는 물리와 반도체가 있고, 맨 위에는 우리가 쓰는 앱과 클라우드가 있습니다. 층을 누르면 해당 장으로 갑니다.</p>
+  <figure class="diagram stack-fig">
+    <div style="overflow-x:auto"><svg style="min-width:620px" viewBox="0 0 900 432" role="img" aria-label="네트워크의 계층 구조와 각 장">
+      <g font-family="var(--font)">
+        <a href="chapters/cloud.html"><rect x="250" y="10" width="400" height="44" rx="10" class="f-acc2-soft"/><text x="450" y="38" text-anchor="middle" class="t" style="font-weight:700">클라우드와 데이터센터 (VPC, 로드 밸런서, Clos)</text><text x="670" y="38" class="t-mono">20–21장</text></a>
+        <a href="chapters/apps.html"><rect x="215" y="62" width="470" height="44" rx="10" class="f-acc-soft"/><text x="450" y="90" text-anchor="middle" class="t">응용 (DNS, HTTP, 스트리밍, 영상 통화)</text><text x="705" y="90" class="t-mono">10·24장</text></a>
+        <a href="chapters/tcp.html"><rect x="180" y="114" width="540" height="44" rx="10" class="f-acc-soft"/><text x="450" y="142" text-anchor="middle" class="t">전송 (TCP, UDP, QUIC, 혼잡 제어)</text><text x="740" y="142" class="t-mono">9장</text></a>
+        <a href="chapters/ip.html"><rect x="145" y="166" width="610" height="44" rx="10" class="f-acc-soft"/><text x="450" y="194" text-anchor="middle" class="t">네트워크 (IP 주소, 서브넷, NAT, 라우팅, BGP)</text><text x="775" y="194" class="t-mono">7–8장</text></a>
+        <a href="chapters/ethernet.html"><rect x="110" y="218" width="335" height="44" rx="10" class="f-elev"/><text x="277" y="246" text-anchor="middle" class="t">이더넷·스위치</text></a>
+        <a href="chapters/wifi.html"><rect x="455" y="218" width="160" height="44" rx="10" class="f-elev"/><text x="535" y="246" text-anchor="middle" class="t">Wi-Fi</text></a>
+        <a href="chapters/cellular.html"><rect x="625" y="218" width="165" height="44" rx="10" class="f-elev"/><text x="707" y="246" text-anchor="middle" class="t">LTE·5G·위성</text></a>
+        <text x="800" y="246" class="t-mono">6·13–15장</text>
+        <a href="chapters/copper.html"><rect x="75" y="270" width="250" height="44" rx="10" class="f-surface"/><text x="200" y="298" text-anchor="middle" class="t">구리선</text></a>
+        <a href="chapters/optical.html"><rect x="335" y="270" width="230" height="44" rx="10" class="f-surface"/><text x="450" y="298" text-anchor="middle" class="t">광섬유</text></a>
+        <a href="chapters/radio.html"><rect x="575" y="270" width="250" height="44" rx="10" class="f-surface"/><text x="700" y="298" text-anchor="middle" class="t">전파 (변조·OFDM·MIMO)</text></a>
+        <text x="835" y="298" class="t-mono">4·5·11·12</text>
+        <a href="chapters/signal.html"><rect x="40" y="322" width="820" height="44" rx="10" class="f-surface"/><text x="450" y="350" text-anchor="middle" class="t">신호와 정보 (주파수, 잡음, 섀넌의 한계, 오류 정정)</text><text x="800" y="350" class="t-mono">2장</text></a>
+        <a href="chapters/serdes.html"><rect x="0" y="374" width="900" height="50" rx="10" fill="var(--accent)"/><text x="450" y="397" text-anchor="middle" class="t" style="fill:#fff;font-weight:700">통신 반도체 (SerDes, 스위치 ASIC, RF 칩, 레이저·실리콘 포토닉스)</text><text x="450" y="415" text-anchor="middle" class="t-mono" style="fill:#fff">16–19장</text></a>
+      </g>
+    </svg></div>
+    <figcaption><b>그림 0-1.</b> 네트워크의 계층과 이 책의 장. 위층으로 갈수록 사람과 앱에 가깝고, 아래층으로 갈수록 물리와 반도체에 가깝다. 보안(22장)과 측정·문제 해결(23장)은 모든 층에 걸쳐 있다.</figcaption>
+  </figure>
+</section>
+
+<section class="home-section" style="padding-top:0">
+  <h2>숫자로 보는 요즘 네트워크</h2>
+  <p class="sub">이 책을 끝내면 아래 숫자가 무엇을 뜻하는지, 서로 어떻게 얽혀 있는지 설명할 수 있게 됩니다.</p>
+  <div class="numbers">
+    <div><b>200,000 km/s</b><span>광섬유 속 빛의 속도. 서울↔뉴욕 왕복은 아무리 빨라도 약 110 ms</span></div>
+    <div><b>수십 Tbps</b><span>머리카락 굵기 광섬유 한 가닥에 파장 수십 개를 겹쳐 싣는 용량</span></div>
+    <div><b>51.2 Tbps</b><span>스위치 칩 하나가 처리하는 대역폭. 초당 패킷 수백억 개</span></div>
+    <div><b>1,500 B</b><span>이더넷 프레임 하나에 담는 최대 데이터. 50년째 그대로</span></div>
+    <div><b>4096-QAM</b><span>Wi-Fi 7이 전파의 한 순간에 12비트를 싣는 방식</span></div>
+    <div><b>550 km</b><span>저궤도 인터넷 위성의 고도. 정지 위성보다 약 65배 가깝다</span></div>
+  </div>
+</section>
+
+<section class="home-section" style="padding-top:0">
+  <h2>이 책을 읽는 방법</h2>
+  <p class="sub">수식이나 전문 지식 없이도 따라올 수 있도록 만들었습니다. 각 장은 같은 흐름으로 진행됩니다.</p>
+  <div class="howto">
+    <div><span class="pill" style="background:color-mix(in srgb, var(--warn) 14%, transparent);color:var(--warn);border:0">비유</span><b>택배로 이해하기</b>패킷은 택배 상자, IP 주소는 집 주소, 라우터는 물류 허브, 대역폭은 차선 수, 지연은 이동 시간. 익숙한 물류의 장면으로 먼저 감을 잡습니다.</div>
+    <div><span class="sim-tag">SIMULATOR</span><b>직접 만지기</b>슬라이더를 움직이고 버튼을 눌러 신호를 보내고, 링크를 끊고, 잡음을 섞어 보세요. “해볼 것”에 적힌 실험을 따라 하면 핵심이 보입니다.</div>
+    <div><span class="pill acc">정리</span><b>핵심 정리와 퀴즈</b>장 끝의 요약과 퀴즈로 확인하고, 마지막 장의 용어집과 종합 퀴즈로 전체를 복습합니다.</div>
+  </div>
+</section>
+
+<section class="home-section" style="padding-top:0">
+  <h2>추천 학습 경로</h2>
+  <p class="sub">처음부터 순서대로 읽는 것이 가장 좋지만, 관심사에 따라 골라 읽어도 됩니다.</p>
+  <div class="paths" id="paths"></div>
+</section>
+
+<section class="home-section" style="padding-top:0" id="chapters">
+  <h2>전체 목차</h2>
+  <p class="sub">모든 장에 직접 조작하는 시뮬레이터가 들어 있습니다.</p>
+  <div id="ch-parts"></div>
+</section>
+
+<script>
+(function () {
+  "use strict";
+  const byNum = (n) => NB.CHAPTERS.find((c) => c.num === n);
+  // 학습 경로
+  const PATHS = [
+    ["🧭 전체 일주 (추천)", "네트워크를 처음 배운다면 1장부터 차례로. 각 장이 앞 장 위에 쌓입니다.", NB.CHAPTERS.filter((c) => c.slug !== "glossary").map((c) => [c.num, ""])],
+    ["🌐 인터넷은 어떻게", "웹 서핑, 메신저, 동영상이 어떻게 오가는지 궁금하다면.", [["01", "큰 그림"], ["03", "계층"], ["07", "IP"], ["08", "라우팅"], ["09", "TCP"], ["10", "DNS·웹"], ["22", "보안"], ["24", "여행"]]],
+    ["📡 무선과 모바일", "Wi-Fi가 느린 이유, 5G와 위성 인터넷의 원리가 궁금하다면.", [["02", "신호"], ["11", "전파"], ["12", "변조"], ["13", "Wi-Fi"], ["14", "5G"], ["15", "위성"], ["18", "RF 칩"]]],
+    ["🔬 통신 반도체", "네트워크를 움직이는 칩과 빛의 물리가 궁금하다면.", [["02", "신호"], ["04", "구리선"], ["05", "광통신"], ["16", "SerDes"], ["17", "스위치 칩"], ["18", "RF 칩"], ["19", "포토닉스"]]],
+    ["☁️ 클라우드 엔지니어", "서버와 서비스를 운영하며 네트워크를 제대로 알고 싶다면.", [["07", "서브넷"], ["08", "라우팅"], ["09", "TCP"], ["10", "CDN"], ["20", "데이터센터"], ["21", "클라우드"], ["22", "보안"], ["23", "문제 해결"]]],
+  ];
+  document.getElementById("paths").innerHTML = PATHS.map(([t, d, steps]) => `<div class="path"><h3>${t}</h3><p>${d}</p><div class="steps">${steps.map(([n, l]) => { const c = byNum(n); return `<a href="chapters/${c.slug}.html" title="${c.title}">${n}${l ? " " + l : ""}</a>`; }).join("")}</div></div>`).join("");
+
+  // chapter grid grouped by part
+  let html = "", last = "";
+  NB.CHAPTERS.forEach((c) => {
+    if (c.part !== last) { if (last) html += "</div>"; html += `<div class="part-title">${c.part}</div><div class="ch-grid">`; last = c.part; }
+    html += `<a class="ch-card" href="chapters/${c.slug}.html"><span class="num">CHAPTER ${c.num}</span><h3>${c.title}</h3><p>${c.desc}</p><div class="tags">${c.tags.map((t) => `<span class="${t === "sim" ? "is-sim" : t === "3D" ? "d3" : ""}">${t === "sim" ? "시뮬레이터" : t}</span>`).join("")}</div></a>`;
+  });
+  document.getElementById("ch-parts").innerHTML = html + "</div>";
+
+  // 학습 진도 표시 (이 브라우저에만 저장됨)
+  const PG = NB.progress.load().ch || {};
+  document.querySelectorAll("#ch-parts .ch-card").forEach((a, i) => {
+    const c = NB.CHAPTERS[i], p = PG[c.slug]; if (!p || p.pct < 2) return;
+    a.classList.toggle("is-done", !!p.done);
+    a.insertAdjacentHTML("beforeend", `<div class="ch-prog" title="${Math.round(p.pct)}% 읽음"><i style="width:${p.done ? 100 : Math.round(p.pct)}%"></i></div>`);
+    if (p.done) a.querySelector(".num").insertAdjacentHTML("beforeend", '<span class="done-badge">✓ 다 읽음</span>');
+  });
+  const lastRead = NB.progress.last(), rs = document.getElementById("nb-resume");
+  if (lastRead && NB.CHAPTERS.some((c) => c.slug === lastRead.slug)) {
+    const c = NB.CHAPTERS.find((x) => x.slug === lastRead.slug), done = NB.progress.doneCount();
+    rs.hidden = false;
+    rs.innerHTML = `<div><small>이어 읽기</small><a href="chapters/${c.slug}.html${lastRead.sec ? "#" + lastRead.sec : ""}"><b>${c.num} ${c.title}</b> →</a></div><div class="hr-meta">${NB.CHAPTERS.length}장 중 <b>${done}</b>장 다 읽음 · <button type="button" id="nb-reset">기록 지우기</button></div>`;
+    document.getElementById("nb-reset").onclick = () => { if (confirm("이 브라우저에 저장된 읽기 기록과 퀴즈 답을 모두 지울까요?")) { NB.progress.reset(); location.reload(); } };
+  }
+
+  // hero: 살아 있는 네트워크 — 집에서 출발한 패킷이 공유기, 기지국, 해저 케이블, 위성, 데이터센터를 오간다
+  const PLACES = [
+    { k: "home", x: 0.13, y: 0.30, label: "집", sub: "Wi-Fi · 13장", slug: "wifi", icon: "home" },
+    { k: "phone", x: 0.13, y: 0.74, label: "휴대폰", sub: "RF 칩 · 18장", slug: "rfchips", icon: "phone" },
+    { k: "tower", x: 0.36, y: 0.80, label: "기지국", sub: "5G · 14장", slug: "cellular", icon: "tower" },
+    { k: "isp", x: 0.38, y: 0.38, label: "통신사", sub: "라우팅 · 8장", slug: "routing", icon: "router", main: true },
+    { k: "sea", x: 0.64, y: 0.60, label: "해저 케이블", sub: "광통신 · 5장", slug: "optical", icon: "fiber" },
+    { k: "sat", x: 0.62, y: 0.12, label: "위성", sub: "15장", slug: "satellite", icon: "sat" },
+    { k: "dc", x: 0.87, y: 0.36, label: "데이터센터", sub: "20·21장", slug: "datacenter", icon: "dc" },
+    { k: "friend", x: 0.87, y: 0.80, label: "지구 반대편", sub: "여행 · 24장", slug: "journey", icon: "phone" },
+  ];
+  const LINKS = [["home", "isp", "fiber"], ["phone", "tower", "radio"], ["tower", "isp", "fiber"], ["isp", "sea", "fiber"], ["sea", "dc", "fiber"], ["sea", "friend", "fiber"], ["isp", "sat", "radio"], ["sat", "dc", "radio"], ["dc", "friend", "fiber"]];
+  const P_ = Object.fromEntries(PLACES.map((p) => [p.k, p]));
+  const dots = Array.from({ length: 30 }, (_, i) => ({ l: i % LINKS.length, t: Math.random(), s: 0.22 + Math.random() * 0.45, dir: Math.random() < 0.5 ? 1 : -1 }));
+  let hover = null, tt = 0;
+  const cvEl = document.getElementById("cv-hero");
+  function icon(ctx, kind, x, y, s, col) {
+    ctx.save(); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.8; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath();
+    if (kind === "home") { ctx.moveTo(x - s, y); ctx.lineTo(x, y - s * 0.9); ctx.lineTo(x + s, y); ctx.moveTo(x - s * 0.7, y - 0.1 * s); ctx.lineTo(x - s * 0.7, y + s * 0.8); ctx.lineTo(x + s * 0.7, y + s * 0.8); ctx.lineTo(x + s * 0.7, y - 0.1 * s); ctx.stroke(); }
+    else if (kind === "phone") { NB.rrect(ctx, x - s * 0.5, y - s * 0.85, s, s * 1.7, 3); ctx.stroke(); ctx.beginPath(); ctx.arc(x, y + s * 0.6, 1.4, 0, 7); ctx.fill(); }
+    else if (kind === "tower") { ctx.moveTo(x - s * 0.6, y + s); ctx.lineTo(x, y - s * 0.6); ctx.lineTo(x + s * 0.6, y + s); ctx.moveTo(x - s * 0.3, y + s * 0.2); ctx.lineTo(x + s * 0.3, y + s * 0.2); ctx.stroke(); ctx.beginPath(); ctx.arc(x, y - s * 0.6, s * 0.45, -2.4, -0.7); ctx.stroke(); ctx.beginPath(); ctx.arc(x, y - s * 0.6, s * 0.8, -2.4, -0.7); ctx.stroke(); }
+    else if (kind === "router") { NB.rrect(ctx, x - s, y - s * 0.4, s * 2, s * 0.9, 4); ctx.stroke(); ctx.beginPath(); for (let i = -1; i <= 1; i++) { ctx.moveTo(x + i * s * 0.5, y - s * 0.4); ctx.lineTo(x + i * s * 0.5, y - s); } ctx.stroke(); }
+    else if (kind === "fiber") { for (let i = 0; i < 3; i++) { ctx.moveTo(x - s, y - s * 0.4 + i * s * 0.4); ctx.bezierCurveTo(x - s * 0.3, y - s * 0.9 + i * s * 0.4, x + s * 0.3, y + i * s * 0.4, x + s, y - s * 0.4 + i * s * 0.4); } ctx.stroke(); }
+    else if (kind === "sat") { ctx.rect(x - s * 0.3, y - s * 0.3, s * 0.6, s * 0.6); ctx.rect(x - s * 1.1, y - s * 0.22, s * 0.6, s * 0.44); ctx.rect(x + s * 0.5, y - s * 0.22, s * 0.6, s * 0.44); ctx.stroke(); }
+    else if (kind === "dc") { for (let i = 0; i < 3; i++) { NB.rrect(ctx, x - s * 0.9 + i * s * 0.62, y - s * 0.8, s * 0.5, s * 1.6, 2); ctx.stroke(); } }
+    ctx.restore();
+  }
+  const hero = NB.canvas(cvEl, (ctx, w, h) => {
+    const P = NB.palette();
+    const pos = (p) => [p.x * w, p.y * h];
+    LINKS.forEach(([a, b, kind]) => {
+      const [x1, y1] = pos(P_[a]), [x2, y2] = pos(P_[b]);
+      ctx.strokeStyle = kind === "radio" ? P.accent2 : P.border; ctx.lineWidth = kind === "radio" ? 1.6 : 2.5; ctx.setLineDash(kind === "radio" ? [5, 6] : []);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([]);
+    });
+    dots.forEach((d) => {
+      const [a, b, kind] = LINKS[d.l]; const t = d.dir > 0 ? d.t : 1 - d.t;
+      const [x1, y1] = pos(P_[a]), [x2, y2] = pos(P_[b]);
+      const x = NB.lerp(x1, x2, t), y = NB.lerp(y1, y2, t);
+      ctx.fillStyle = kind === "radio" ? P.accent2 : P.accent; ctx.globalAlpha = 0.9; ctx.beginPath(); ctx.arc(x, y, 3.5, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+    });
+    const small = w < 520, R = small ? 22 : 30;
+    PLACES.forEach((p) => {
+      const [x, y] = pos(p); const on = hover === p.k;
+      if (p.main) { const pulse = 0.5 + 0.5 * Math.sin(tt * 3); ctx.fillStyle = P.accent; ctx.globalAlpha = 0.12 + 0.12 * pulse; ctx.beginPath(); ctx.arc(x, y, R + 10 + pulse * 4, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
+      ctx.beginPath(); ctx.arc(x, y, R, 0, 7);
+      ctx.fillStyle = p.main ? P.accent : on ? P.accent2 : P.bg; ctx.fill();
+      ctx.strokeStyle = on || p.main ? P.accent : P.border; ctx.lineWidth = on ? 2.5 : 1.5; ctx.stroke();
+      icon(ctx, p.icon, x, y, R * 0.42, p.main || on ? "#fff" : P.text);
+      drawLabel(ctx, p, x, y + R + 12, on, P, small);
+    });
+  }, { aspect: 0.82, minHeight: 300, maxHeight: 440 });
+  function drawLabel(ctx, p, x, y, on, P, small) {
+    NB.text(ctx, p.label, x, y, { align: "center", size: small ? 11.5 : 13, bold: true, color: on ? P.accent : P.text });
+    if (!small) NB.text(ctx, p.sub, x, y + 15, { align: "center", size: 11, color: P.dim });
+  }
+  NB.loop(cvEl, (dt) => { tt += dt; dots.forEach((d) => { d.t += dt * d.s; if (d.t > 1) { d.t = 0; d.l = Math.floor(Math.random() * LINKS.length); d.dir = Math.random() < 0.5 ? 1 : -1; } }); hero.redraw(); });
+  const hit = (e) => { const r = cvEl.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top; const R = (r.width < 520 ? 22 : 30) + 8; return PLACES.find((p) => Math.hypot(x - p.x * r.width, y - p.y * r.height) < R); };
+  cvEl.addEventListener("pointermove", (e) => { const p = hit(e); hover = p ? p.k : null; cvEl.style.cursor = p ? "pointer" : "default"; });
+  cvEl.addEventListener("pointerleave", () => (hover = null));
+  cvEl.addEventListener("click", (e) => { const p = hit(e); if (p) location.href = "chapters/" + p.slug + ".html"; });
+})();
+</script>
+</body>
+</html>
