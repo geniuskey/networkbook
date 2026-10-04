@@ -288,7 +288,7 @@
           <text x="96" y="66">전화</text><text x="96" y="126">전화</text><text x="96" y="186">전화</text>
           <text x="293" y="66">올림</text><text x="422" y="66">내림 (~2.2 MHz)</text>
           <text x="293" y="126">올림</text><text x="437" y="126">내림</text>
-          <text x="613" y="160" class="t-dim" style="font-size:10.5px">17.7 MHz까지 올림·내림 교대</text>
+          <text x="590" y="100" class="t-dim" style="font-size:10.5px">17.7 MHz까지 올림·내림 교대</text>
           <text x="613" y="186">시간 분할 (TDD) ~106 MHz</text>
         </g>
         <text x="420" y="24" text-anchor="middle" class="t-dim" style="font-size:12px">높은 주파수를 쓸수록 빠르지만, 높은 주파수일수록 거리에 따라 빨리 죽는다</text>
@@ -693,16 +693,15 @@
   }
   const dsCv = NB.canvas($("cv-dsl"), (ctx, w, h) => {
     dsCompute();
-    const P = NB.palette(), L = dsLen(), cols = [P.warn, P.accent, P.accent2, P.ok];
-    NB.chart(ctx, { x: 56, y: 14, w: w - 56 - 16, h: h - 14 - 44 }, {
+    const P = NB.palette(), L = dsLen(), cols = [P.warn, P.accent, P.accent2, P.ok], narrow = w < 480, lgH = narrow ? 34 : 0;
+    NB.chart(ctx, { x: 56, y: 14, w: w - 56 - 16, h: h - 14 - 44 - lgH }, {
       x: [0, 5], y: [0.1, 1000], logY: true, xLabel: "선로 길이 (km)", yLabel: "내려받기 (Mbps, 로그)", yFmt: (v) => String(v),
       series: TECH.map((t, i) => ({ data: dsCurves[i], color: cols[i], width: 2.2 })),
       vlines: [{ x: L, color: P.bad, dash: [3, 3] }],
       points: TECH.map((t, i) => ({ x: L, y: Math.max(0.1, dslRate(t, L, $("ds-xt").checked && !$("ds-vec").checked)), color: cols[i], r: 4 })),
     });
-    const narrow = w < 480;
-    TECH.forEach((t, i) => { const x = narrow ? 64 + (i % 2) * 110 : w - 130, y = narrow ? h - 78 + Math.floor(i / 2) * 15 : 24 + i * 16; ctx.fillStyle = cols[i]; ctx.fillRect(x, y - 1, 14, 3); NB.text(ctx, t.n, x + 18, y, { size: 11, color: P.dim }); });
-  }, { aspect: 0.5, minHeight: 290, maxHeight: 400 });
+    TECH.forEach((t, i) => { const x = narrow ? 56 + (i % 2) * 120 : w - 130, y = narrow ? h - 26 + Math.floor(i / 2) * 15 : 24 + i * 16; ctx.fillStyle = cols[i]; ctx.fillRect(x, y - 1, 14, 3); NB.text(ctx, t.n, x + 18, y, { size: 11, color: P.dim }); });
+  }, { aspect: 0.5, minHeight: 320, maxHeight: 400 });
   function dsUpd() {
     const L = dsLen(), xt = $("ds-xt").checked && !$("ds-vec").checked;
     const ids = ["o-ds-a", "o-ds-v", "o-ds-v35", "o-ds-g"];

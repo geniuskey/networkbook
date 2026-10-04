@@ -542,8 +542,9 @@
     NB.text(ctx, "E-k 그림: " + m.name, 10, 12, { size: 12, bold: true, color: P.dim });
     const cx = w / 2, sx = (w - 40) / 2.6, top = 30, bot = h - 24;
     const Emax = 4, Emin = -1.6, Y = (E) => bot - ((E - Emin) / (Emax - Emin)) * (bot - top);
-    const egv = Math.min(m.eg, 3.4) * 0.65 + 0.3; // 보기 좋게 압축한 그림용 간격
+    const egv = Math.min(m.eg, 3.4) * 0.7 + 0.55; // 보기 좋게 압축한 그림용 간격
     const k0 = m.direct ? 0 : m.kmin;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, top - 6, w, bot - top + 30); ctx.clip();
     ctx.strokeStyle = P.grid; ctx.beginPath(); ctx.moveTo(cx, top); ctx.lineTo(cx, bot); ctx.stroke();
     NB.text(ctx, "k (운동량)", w - 12, bot + 10, { size: 10.5, color: P.faint, align: "right" });
     // valence
@@ -568,9 +569,10 @@
       NB.text(ctx, "빛 hν = Eg", cx + 12, Y(egv / 2) - 14, { size: 11.5, color: P.ok, bold: true });
     } else {
       NB.arrow(ctx, cx + k0 * sx - 4, Y(egv) - 2, cx + 6, Y(0) + 10, { color: P.bad, lw: 1.8, dash: [4, 3] });
-      NB.text(ctx, "운동량이 달라", cx + k0 * sx * 0.5 + 6, Y(egv / 2) + 2, { size: 11, color: P.bad });
-      NB.text(ctx, "포논 필요 → 드묾", cx + k0 * sx * 0.5 + 6, Y(egv / 2) + 17, { size: 11, color: P.bad });
+      NB.text(ctx, "최저점의 운동량이 달라", w - 10, top + 8, { size: 11, color: P.bad, align: "right" });
+      NB.text(ctx, "포논 필요 → 빛 내기 드묾", w - 10, top + 24, { size: 11, color: P.bad, align: "right" });
     }
+    ctx.restore();
     NB.text(ctx, "Eg = " + m.eg.toFixed(2) + " eV", 12, Y(egv / 2), { size: 12, bold: true, color: P.text });
   }, { aspect: 0.8, minHeight: 250, maxHeight: 310 });
   const wlCv = NB.canvas($("cv-wl"), (ctx, w, h) => {
