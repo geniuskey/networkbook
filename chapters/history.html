@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>통신의 역사와 미래 · NetworkBook</title>
+<meta name="description" content="봉화와 광학 전신, 모스 전신과 대서양 케이블, 전화와 무선, 섀넌의 정보 이론과 패킷 교환, 아파넷과 웹, 스마트폰과 5G를 거쳐 6G, 양자 통신, 행성 간 인터넷까지. 대역폭 성장 곡선을 시뮬레이터로 따라간다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .mo-code { font-family: var(--mono); font-size: 15px; line-height: 1.7; padding: 10px 18px; border-top: 1px solid var(--border); word-break: break-word; color: var(--text); }
+  .mo-code .cur { background: var(--accent-soft); color: var(--accent); border-radius: 4px; }
+  .tl-desc { padding: 12px 18px; border-top: 1px solid var(--border); font-size: 15px; line-height: 1.65; min-height: 76px; }
+  .tl-desc b.yr { color: var(--accent); font-family: var(--mono); margin-right: 6px; }
+</style>
+</head>
+<body data-chapter="history">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 25</div>
+    <h1>통신의 역사와 미래</h1>
+    <p class="lead">조선 시대 남해안에 왜선이 나타나면, 산꼭대기 봉수대에 연기와 불이 차례로 올라 약 12시간 뒤 한양 남산에 소식이 닿았다. 지금 우리는 같은 거리를 1,000분의 몇 초 만에 넘고, 그 사이에 고화질 영상 수십 편을 보낸다. 이 장에서는 불빛과 깃발에서 전선, 전파, 유리실, 패킷, 그리고 우주로 이어진 통신의 역사를 한 줄로 꿰어 본다. 그리고 그 곡선이 어디로 향하는지, 6G와 양자 통신, 행성 간 인터넷까지 내다본다.</p>
+    <ul class="objectives">
+      <li>봉수·광학 전신에서 전신·전화·무선·광섬유까지 통신 매체의 흐름을 설명한다.</li>
+      <li>모스 부호로 메시지를 보내 보고, 그 속도를 오늘의 기술과 비교한다.</li>
+      <li>섀넌의 정보 이론과 패킷 교환이 인터넷의 설계에 준 의미를 이해한다.</li>
+      <li>아파넷, TCP/IP, 이더넷, 웹, 스마트폰으로 이어지는 인터넷의 탄생 과정과 한국 인터넷의 역사를 안다.</li>
+      <li>대역폭이 170년 동안 몇 자릿수 성장했는지 로그 그래프로 확인하고 닐슨의 법칙을 이해한다.</li>
+      <li>IETF와 ICANN이 인터넷을 어떻게 “운영”하는지 안다.</li>
+      <li>6G, 양자 키 분배, 가시광 통신, 지연 내성 네트워크 같은 미래 기술을 내다본다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="ancient">
+    <h2>불빛과 깃발: 눈에 보이는 거리만큼</h2>
+    <p>전기가 없던 시대의 원거리 통신은 <b>눈에 보이는 것</b>을 이어 붙이는 일이었다. 조선은 전국에 600곳이 넘는 <span class="term">봉수</span><span class="en">(烽燧, beacon relay)</span>대를 두고 밤에는 횃불(봉), 낮에는 연기(수)로 신호를 전했다. 신호는 횃불 개수 다섯 가지뿐이었다. 평상시 1개, 적이 나타나면 2개, 국경에 다가오면 3개, 국경을 넘으면 4개, 싸움이 붙으면 5개. 다섯 갈래의 봉수로가 모두 서울 남산(목멱산)으로 모였다. 정해진 몇 가지 상태만 보낼 수 있으니 자세한 내용은 말을 탄 전령, <b>파발</b>이 날랐다.</p>
+    <p>더 많은 내용을 보내려는 시도가 1790년대 프랑스에서 나왔다. 클로드 샤프의 <span class="term">광학 전신</span><span class="en">(semaphore telegraph)</span>은 언덕마다 탑을 세우고 꼭대기의 막대 팔 세 개를 여러 각도로 움직여 기호를 만들었다. 다음 탑의 관측자가 망원경으로 보고 똑같이 따라 하는 방식이다. 1794년 파리–릴 약 230 km 구간이 개통되었고, 나폴레옹 시대에는 프랑스 전역에 500곳이 넘는 탑이 생겼다. 기호 하나에 담긴 경우의 수가 수십~백여 가지였으므로, 봉수보다 훨씬 많은 정보를 보낼 수 있었다. 다만 밤과 안개에는 쓸 수 없었고 기호 하나를 넘기는 데 수십 초가 걸렸다.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 300" role="img" aria-label="조선 봉수의 다섯 단계 신호와 샤프의 광학 전신 탑">
+        <text x="200" y="26" text-anchor="middle" class="t" style="font-weight:700">조선의 봉수: 횃불 개수로 다섯 가지 상태</text>
+        <g transform="translate(20,40)">
+          <rect x="0" y="150" width="360" height="16" rx="3" class="f-surface"/>
+          <g class="f-elev">
+            <rect x="18" y="96" width="48" height="54" rx="4"/><rect x="88" y="96" width="48" height="54" rx="4"/><rect x="158" y="96" width="48" height="54" rx="4"/><rect x="228" y="96" width="48" height="54" rx="4"/><rect x="298" y="96" width="48" height="54" rx="4"/>
+          </g>
+          <g fill="var(--warn)"><path d="M42.0 92 q-4 -7 0 -16 q4 9 0 16z"/><path d="M107.8 92 q-4 -7 0 -16 q4 9 0 16z"/><path d="M116.2 92 q-4 -7 0 -16 q4 9 0 16z"/><path d="M173.5 92 q-4 -7 0 -16 q4 9 0 16z"/><path d="M182.0 92 q-4 -7 0 -16 q4 9 0 16z"/><path d="M190.5 92 q-4 -7 0 -16 q4 9 0 16z"/><path d="M239.2 92 q-4 -7 0 -16 q4 9 0 16z"/><path d="M247.8 92 q-4 -7 0 -16 q4 9 0 16z"/><path d="M256.2 92 q-4 -7 0 -16 q4 9 0 16z"/><path d="M264.8 92 q-4 -7 0 -16 q4 9 0 16z"/><path d="M305.0 92 q-4 -7 0 -16 q4 9 0 16z"/><path d="M313.5 92 q-4 -7 0 -16 q4 9 0 16z"/><path d="M322.0 92 q-4 -7 0 -16 q4 9 0 16z"/><path d="M330.5 92 q-4 -7 0 -16 q4 9 0 16z"/><path d="M339.0 92 q-4 -7 0 -16 q4 9 0 16z"/></g>
+          <g class="t-mono" text-anchor="middle">
+            <text x="42" y="190">1개</text><text x="112" y="190">2개</text><text x="182" y="190">3개</text><text x="252" y="190">4개</text><text x="322" y="190">5개</text>
+          </g>
+          <g class="t-dim" text-anchor="middle" style="font-size:11px">
+            <text x="42" y="208">평상시</text><text x="112" y="208">적 출현</text><text x="182" y="208">국경 접근</text><text x="252" y="208">국경 침범</text><text x="322" y="208">접전</text>
+          </g>
+          <text x="180" y="240" text-anchor="middle" class="t-dim">한 번에 약 2.3비트(log₂5). 남해안 → 서울 약 12시간.</text>
+        </g>
+        <line x1="410" y1="40" x2="410" y2="280" stroke="var(--border)"/>
+        <text x="600" y="26" text-anchor="middle" class="t" style="font-weight:700">샤프의 광학 전신(1794)</text>
+        <g transform="translate(450,40)">
+          <path d="M60 230 L75 120 L105 120 L120 230 Z" class="f-elev"/>
+          <rect x="86" y="40" width="8" height="82" fill="var(--text-dim)"/>
+          <g transform="rotate(-25 90 60)"><rect x="40" y="56" width="100" height="9" rx="2" fill="var(--accent)"/>
+            <rect x="34" y="40" width="7" height="34" rx="2" fill="var(--accent-2)" transform="rotate(50 37 60)"/>
+            <rect x="139" y="46" width="7" height="34" rx="2" fill="var(--accent-2)" transform="rotate(-70 142 60)"/></g>
+          <text x="150" y="68" class="t-mono">조절대(긴 막대)</text>
+          <text x="150" y="88" class="t-mono">지시 팔 2개</text>
+          <path d="M200 140 h60" class="s-line" stroke-dasharray="4 4"/>
+          <text x="230" y="132" text-anchor="middle" class="t-mono">망원경</text>
+          <path d="M270 230 L278 170 L292 170 L300 230 Z" class="f-elev"/>
+          <text x="285" y="160" text-anchor="middle" class="t-mono">다음 탑</text>
+          <text x="10" y="258" class="t-dim">탑 간격 약 10~15 km · 팔의 각도 조합으로 기호를 만든다</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 25-1.</b> 전기 이전의 원거리 통신. 봉수는 다섯 가지 상태만 보낼 수 있었지만 빨랐고, 샤프의 광학 전신은 막대 팔의 각도 조합으로 훨씬 많은 기호를 보냈다. 둘 다 “보이는 거리마다 중계소”라는 점에서 오늘날의 중계기, 라우터와 닮았다.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="wire">
+    <h2>전기의 시대: 전신과 전화</h2>
+    <p>1844년 5월 24일, 새뮤얼 모스는 워싱턴에서 볼티모어까지 약 60 km 전선으로 “What hath God wrought(하느님께서 무엇을 이루셨는가)”라는 메시지를 보냈다. 전류를 짧게 끊으면 점(·), 길게 흘리면 선(−). 자주 쓰는 글자일수록 짧은 부호를 주었다. 영어에서 가장 흔한 E는 점 하나, T는 선 하나다. 2장에서 본 “자주 나오는 것은 짧게”라는 부호화 원리를 170년 앞서 실천한 셈이다. 이것이 <span class="term">모스 부호</span><span class="en">(Morse code)</span>다.</p>
+    <p>전신은 빠르게 대륙을 덮었다. 다음 목표는 바다였다. 1858년 첫 <b>대서양 횡단 전신 케이블</b>이 놓였지만, 빅토리아 여왕의 98단어짜리 축하 메시지를 보내는 데 16시간이 넘게 걸렸고, 높은 전압을 무리하게 걸었다가 3주 만에 망가졌다. 긴 케이블은 거대한 축전기처럼 신호를 뭉개 버린다는 것(4장의 감쇠와 분산)을 사람들은 이때 비싼 값을 치르고 배웠다. 켈빈 경의 이론과 더 좋은 케이블 덕분에 1866년 거대한 증기선 그레이트 이스턴호가 놓은 케이블이 마침내 성공했다. 유럽과 미국 사이의 소식이 배로 열흘 걸리던 것이 몇 분으로 줄었다. 한국에서는 1885년 서울과 인천 사이에 첫 전신선이 놓였다.</p>
+    <p>1876년 알렉산더 그레이엄 벨은 소리의 떨림을 전류의 세기 변화로 바꾸는 <b>전화</b>로 특허를 받았다. 전신이 0과 1의 디지털이었다면 전화는 아날로그였다. 전화망은 교환원이 손으로 선을 꽂아 주던 교환대에서 자동 교환기로 발전했고, 통화하는 동안 두 사람 사이에 회선 하나를 통째로 잡아 두는 <b>회선 교환</b>(1장)의 세계를 100년 가까이 지배했다.</p>
+    <div class="sim" id="sim-morse">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>모스 전신기: 메시지를 점과 선으로</h3></div>
+      <div class="sim-controls" style="border-top:0">
+        <label class="ctrl"><span>보낼 메시지(영문·숫자)</span><input type="text" id="mo-text" value="SOS HELLO WORLD" maxlength="40"></label>
+        <label class="ctrl"><span>전신 속도 <output id="mo-wpm-out"></output></span><input type="range" id="mo-wpm" min="5" max="40" value="20"></label>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn primary" id="mo-play">▶ 재생(소리)</button><button class="btn" id="mo-light">불빛만</button><button class="btn" id="mo-stop">■ 정지</button></div></div>
+      </div>
+      <div class="mo-code" id="mo-code">—</div>
+      <div class="sim-view"><canvas id="cv-morse"></canvas></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">신호 단위 수</span><span class="v" id="mo-u">—</span></div>
+        <div class="stat"><span class="k">전송 시간</span><span class="v" id="mo-t">—</span></div>
+        <div class="stat"><span class="k">점·선 신호 속도</span><span class="v" id="mo-baud">—</span></div>
+        <div class="stat"><span class="k">정보 전송 속도(환산)</span><span class="v" id="mo-bps">—</span></div>
+      </div>
+      <div class="sim-note">국제 모스 부호 규칙: 점 = 1단위, 선 = 3단위, 점·선 사이 1단위, 글자 사이 3단위, 단어 사이 7단위. 속도는 “PARIS”(50단위)를 1분에 몇 번 보내는지(WPM)로 잰다. 숙련된 전신 기사는 분당 20~30단어 정도를 보냈다. 정보 속도는 글자 하나를 약 5.2비트(영문 26자 + 숫자 10개 + 공백 중 하나)로 보고 환산했다. <b>해볼 것</b>: E와 T만으로 된 메시지와 숫자로 된 메시지의 길이를 비교하자. 소리는 재생 버튼을 누를 때만 난다. 한글은 자모 단위로 된 한글 모스 부호가 따로 있다(여기서는 영문만 지원).</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="wireless">
+    <h2>전선 없이: 무선, 방송, 위성, 그리고 유리실</h2>
+    <p>1887년 하인리히 헤르츠가 맥스웰이 예언한 전자기파를 실험으로 확인했고(11장), 1901년 12월 굴리엘모 마르코니는 영국 콘월에서 보낸 모스 부호 “S”(점 세 개)를 대서양 건너 캐나다 뉴펀들랜드에서 받는 데 성공했다. 전선 없이 3,500 km를 건넌 것이다. 이후 무선 전신은 배의 필수품이 되었다. 1912년 타이태닉호가 조난 신호를 보낸 것도 무선 전신이었다.</p>
+    <p>전파에 소리를 실으면서 1920년대 <b>라디오 방송</b>이, 1930년대에는 <b>텔레비전</b>이 시작되었다. 한 송신탑이 수백만 명에게 같은 내용을 뿌리는 방송은 20세기의 대중문화를 만들었다. 1962년에는 통신 위성 <b>텔스타 1호</b>가 대서양 너머로 처음 TV 생중계를 이어 주었고, 1965년에는 첫 상업 정지 궤도 통신 위성 인텔샛 1호(얼리 버드)가 올라갔다(15장).</p>
+    <p>오늘날 인터넷을 떠받치는 매체는 광섬유다(5장). 1966년 찰스 가오는 유리의 불순물만 없애면 빛을 수십 km 보낼 수 있다고 내다봤고(이 공로로 2009년 노벨 물리학상), 1970년 미국 코닝사가 km당 20 dB 이하의 저손실 광섬유를 만들어 그 가능성을 증명했다. 손실은 곧 km당 0.2 dB 수준까지 내려갔다. 1988년에는 첫 대서양 횡단 광 해저 케이블 <b>TAT-8</b>이 개통되었다. 전화 약 4만 회선을 동시에 실을 수 있었는데, 지금의 해저 케이블은 그보다 수십만 배 많은 데이터를 나른다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="shannon">
+    <h2>섀넌과 패킷: 인터넷을 가능하게 한 두 생각</h2>
+    <p>1948년 벨 연구소의 클로드 섀넌은 논문 「통신의 수학적 이론」에서 정보를 <b>비트</b>라는 단위로 잴 수 있다고 보였다. 그리고 놀라운 정리를 증명했다. 어떤 통신 채널이든 대역폭과 신호 대 잡음비로 정해지는 <b>최대 속도(채널 용량)</b>가 있고, 그보다 느리게만 보내면 적절한 부호화로 오류를 얼마든지 작게 만들 수 있다는 것이다(2장의 섀넌 한계). 이 정리는 “어떻게”는 알려 주지 않았다. 그 뒤 70년간 통신 공학은 섀넌의 한계에 다가가는 부호를 찾는 여정이었다. 1990년대의 터보 부호, 다시 발견된 LDPC 부호(Wi-Fi, 5G 데이터 채널), 2009년의 폴라 부호(5G 제어 채널)가 오늘날 그 한계에 거의 닿아 있다. 섀넌은 또 소리든 영상이든 문자든 모든 정보가 결국 같은 비트라는 관점을 주었다. 이것이 모든 미디어가 하나의 디지털 망으로 합쳐지는 출발점이다.</p>
+    <p>두 번째 생각은 <span class="term">패킷 교환</span><span class="en">(packet switching)</span>이다. 1960년대 초 미국 RAND 연구소의 폴 배런은 핵 공격에도 살아남는 통신망을 연구하다, 메시지를 작은 블록으로 쪼개 그물처럼 얽힌 망에서 각자 알아서 길을 찾게 하자고 제안했다. 비슷한 시기 영국 국립물리연구소(NPL)의 도널드 데이비스는 컴퓨터 사이의 짧고 띄엄띄엄한 통신에는 회선을 잡아 두는 것이 낭비라는 이유로 같은 생각에 이르렀고, 조각에 <b>“패킷”</b>이라는 이름을 붙였다. MIT의 레너드 클라인록은 대기열 이론으로 이런 저장 후 전달 망의 성능을 수학적으로 분석했다. 핵심은 <span class="term">통계적 다중화</span><span class="en">(statistical multiplexing)</span>다. 사람들이 늘 동시에 데이터를 보내지는 않으므로, 회선을 나눠 예약하는 대신 길을 함께 쓰면 훨씬 많은 사람을 태울 수 있다.</p>
+    <div class="callout analogy"><strong>전세 버스와 시내버스</strong><p>회선 교환은 한 사람이 버스 한 대를 통째로 전세 내는 것이다. 자리에 앉아 있지 않아도 그 버스는 다른 사람이 못 쓴다. 패킷 교환은 시내버스다. 누구나 필요할 때 타고 내리며, 모두가 한꺼번에 몰리지 않는 한 버스 몇 대로 훨씬 많은 사람이 이동한다. 출근 시간에 가끔 만원이 되는 것(혼잡, 대기)이 그 대가다.</p></div>
+    <div class="sim" id="sim-mux">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>회선 교환 대 패킷 교환: 몇 명이 같은 선을 쓸 수 있나</h3></div>
+      <div class="sim-view"><canvas id="cv-mux"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>사용자 수 <output id="mx-n-out"></output></span><input type="range" id="mx-n" min="10" max="100" value="35"></label>
+        <label class="ctrl"><span>한 사람이 실제로 보내는 시간 비율 <output id="mx-p-out"></output></span><input type="range" id="mx-p" min="1" max="60" value="10"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">회선 교환으로 받을 수 있는 인원</span><span class="v" id="mx-c">—</span></div>
+        <div class="stat"><span class="k">평균 동시 사용자</span><span class="v" id="mx-avg">—</span></div>
+        <div class="stat"><span class="k">패킷 교환에서 넘칠 확률</span><span class="v" id="mx-ov">—</span></div>
+        <div class="stat"><span class="k">링크 평균 이용률</span><span class="v" id="mx-u">—</span></div>
+      </div>
+      <div class="sim-note">링크 속도 1 Mbps, 한 사람은 보낼 때 100 kbps를 쓴다. 회선 교환은 100 kbps씩 예약하므로 최대 10명이다. 패킷 교환은 예약하지 않고, 각자 독립적으로 정해진 비율만큼 보낸다고 볼 때 동시에 보내는 사람 수는 이항 분포를 따른다. 막대는 동시 사용자 수의 확률, 빨간 막대는 10명을 넘어 대기열이 생기는 경우다. <b>해볼 것</b>: 기본값(35명, 10%)에서 넘칠 확률은 0.04% 정도로, 같은 선에 3.5배의 사람을 태운다. 비율을 50%로 올리면(모두가 계속 영상을 본다면) 이득이 사라진다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="internet">
+    <h2>인터넷의 탄생: 아파넷에서 스마트폰까지</h2>
+    <p>1969년 미국 국방부 고등연구계획국(ARPA)이 연구 기관의 컴퓨터를 잇는 <span class="term">아파넷</span><span class="en">(ARPANET)</span>을 만들었다. 각 기관에는 IMP라는 냉장고만 한 패킷 교환기(오늘날 라우터의 조상)를 두고 50 kbps 전용선으로 이었다. 1969년 10월 29일 UCLA에서 스탠퍼드 연구소(SRI)로 첫 메시지 “LOGIN”을 보내려 했는데, “LO” 두 글자를 보내고 시스템이 멈췄다. 인터넷 최초의 메시지는 그래서 “LO”다. 그해 말 4개 노드였던 아파넷은 몇 년 만에 수십 곳으로 늘었다.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 260" role="img" aria-label="1969년 12월 아파넷의 네 개 노드">
+        <rect x="20" y="20" width="760" height="220" rx="14" class="f-surface"/>
+        <path d="M120 70 Q90 140 120 200 L330 205 Q500 160 650 170" fill="none" stroke="var(--border)" stroke-width="2"/>
+        <g stroke="var(--accent)" stroke-width="3" fill="none">
+          <path d="M150 90 L160 175"/><path d="M150 90 L560 90"/><path d="M160 175 L250 200"/><path d="M160 175 L560 90"/>
+        </g>
+        <g>
+          <circle cx="150" cy="90" r="14" class="f-acc"/><text x="150" y="65" text-anchor="middle" class="t" style="font-weight:700">SRI</text><text x="150" y="122" text-anchor="middle" class="t-mono">스탠퍼드 연구소</text>
+          <circle cx="160" cy="175" r="14" class="f-acc"/><text x="112" y="180" text-anchor="end" class="t" style="font-weight:700">UCLA</text>
+          <circle cx="250" cy="200" r="14" class="f-acc"/><text x="275" y="222" class="t" style="font-weight:700">UCSB</text>
+          <circle cx="560" cy="90" r="14" class="f-acc"/><text x="560" y="65" text-anchor="middle" class="t" style="font-weight:700">유타 대학</text>
+        </g>
+        <text x="390" y="82" text-anchor="middle" class="t-mono">50 kbps 전용선</text>
+        <g transform="translate(600,120)">
+          <text x="0" y="10" class="t-dim">1969.10.29 첫 메시지 “LO”</text>
+          <text x="0" y="32" class="t-dim">1969.12 노드 4개</text>
+          <text x="0" y="54" class="t-dim">1971 노드 15개</text>
+          <text x="0" y="76" class="t-dim">1983 TCP/IP로 전환</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 25-2.</b> 1969년 12월의 아파넷(미국 서부, 위치는 대략). 지금 인터넷에 이어진 기기는 수백억 대에 이르지만, 그 시작은 IMP 네 대와 50 kbps 회선이었다.</figcaption>
+    </figure>
+    <p>아파넷 말고도 위성 패킷망, 무선 패킷망, 대학의 지역 망 등 여러 망이 생겼다. 서로 다른 망을 잇는 방법, 즉 “망들의 망(internet)”을 만드는 방법이 필요했다. 1974년 빈트 서프와 밥 칸은 논문 「패킷 네트워크 상호 통신을 위한 프로토콜」에서 그 답을 내놓았다. 망마다 사정이 달라도 모든 컴퓨터가 공통의 주소와 패킷 형식(IP)을 쓰고, 신뢰성은 양 끝의 컴퓨터가 책임진다(TCP)는 설계다(3장, 9장). 이것이 나중에 TCP와 IP로 나뉘었고, 1983년 1월 1일 아파넷 전체가 TCP/IP로 갈아탔다. 이날을 흔히 인터넷의 생일로 꼽는다. 같은 시기인 1973년, 제록스 PARC의 밥 멧커프는 건물 안 컴퓨터를 동축 케이블 하나로 잇는 <b>이더넷</b>을 고안했다(6장).</p>
+    <p>인터넷이 연구자의 도구에서 모두의 것이 된 계기는 <b>월드 와이드 웹</b>이다. 1989년 CERN의 팀 버너스리가 하이퍼텍스트로 문서를 잇자는 제안을 했고, 1991년 첫 웹사이트를 공개했다. URL, HTTP, HTML이라는 세 가지 단순한 약속(10장)과 1993년 그래픽 브라우저 모자이크가 폭발적인 성장을 불렀다. 버너스리와 CERN이 웹 기술을 특허 없이 공개한 것이 결정적이었다.</p>
+    <p>그다음은 주머니 속으로 들어온 인터넷이다. 1980년대 아날로그 1G, 1990년대 디지털 음성 2G, 2000년대 데이터를 위한 3G를 거쳐(14장), 2007년 아이폰이 등장하며 스마트폰 시대가 열렸다. 모든 것이 IP 패킷인 4G LTE(2010년 전후), 그리고 2019년 4월 한국이 세계 최초로 상용화한 5G로 이어졌다.</p>
+    <div class="callout deep"><strong>한국 인터넷의 역사</strong><p>1982년 5월 서울대와 구미의 한국전자기술연구소가 TCP/IP로 연결된 <b>SDN</b>(System Development Network)이 개통되었다. 전길남 박사가 주도한 이 망은 미국 다음으로 이른 시기의 IP 네트워크 가운데 하나로 꼽힌다. 1994년 KT의 코넷이 일반인 대상 상용 인터넷을 시작했고, 1996년에는 세계 최초로 CDMA 이동통신을 상용화했다. 1998년 두루넷의 케이블 모뎀, 1999년 하나로통신의 <b>ADSL</b>이 전화선으로 수 Mbps를 내며 초고속 인터넷 붐을 일으켰고, 2002년 가입자가 1,000만을 넘었다. PC방과 온라인 게임 문화가 이 위에서 자랐다. 이후 아파트 광랜(100 Mbps), 2014년 기가 인터넷, 10기가 인터넷으로 이어지며 한국은 유선 속도와 보급률에서 늘 선두권을 지켜 왔다.</p></div>
+    <div class="sim" id="sim-tl">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>타임머신: 사진 한 장(5 MB)을 보내는 데 걸리는 시간</h3></div>
+      <div class="sim-controls" style="border-top:0">
+        <label class="ctrl"><span>시대 <output id="tl-i-out"></output></span><input type="range" id="tl-i" min="0" max="12" value="2"></label>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn" id="tl-prev">← 이전 시대</button><button class="btn primary" id="tl-next">다음 시대 →</button></div></div>
+      </div>
+      <div class="tl-desc" id="tl-desc"></div>
+      <div class="sim-view"><canvas id="cv-tl"></canvas></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">대표 속도</span><span class="v" id="tl-rate">—</span></div>
+        <div class="stat"><span class="k">사진 5 MB 전송 시간</span><span class="v" id="tl-photo">—</span></div>
+        <div class="stat"><span class="k">소식이 닿는 지연</span><span class="v" id="tl-lat" style="font-size:14px">—</span></div>
+        <div class="stat"><span class="k">이전 시대 대비</span><span class="v" id="tl-x">—</span></div>
+      </div>
+      <div class="sim-note">막대 길이는 5 MB(4천만 비트) 사진을 보내는 시간을 <b>로그 눈금</b>으로 나타냈다. 눈금 한 칸이 1,000배다. 속도는 그 시대 대표 기술의 대략적인 실효 속도이고, 사람이 손으로 보내던 시대는 정보량으로 환산한 값이다. 실제로 봉수나 전신으로 사진을 보낸 적은 없으니, “그 통로의 정보 전달 능력”을 비교하는 사고 실험으로 보자.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="growth">
+    <h2>대역폭 성장 곡선: 170년, 열세 자릿수</h2>
+    <p>모스 전신의 초당 10비트 남짓에서 해저 케이블 광섬유 한 쌍의 초당 20조 비트까지, 통신 속도는 열두~열세 자릿수 커졌다. 이렇게 큰 변화는 보통 눈금으로는 그릴 수 없어서 <b>로그 눈금</b>(한 칸 올라갈 때마다 10배)으로 그린다. 로그 그래프에서 일정한 비율의 성장은 직선이 된다.</p>
+    <p>웹 사용성 연구자 제이콥 닐슨은 1980년대부터 자기 집 인터넷 속도를 기록하고, 고급 사용자의 가정용 회선 속도가 <b>매년 약 50%씩</b> 빨라진다고 정리했다. 이를 <span class="term">닐슨의 법칙</span><span class="en">(Nielsen's law)</span>이라 한다. 연 50%면 10년에 약 58배, 40년이면 1,000만 배가 넘는다. 반도체의 무어의 법칙(2년에 2배, 연 약 41%)과 비슷한 속도다. 실제로 통신 속도의 성장은 반도체가 이끈다. 더 빠른 칩이 더 정교한 변조와 오류 정정 부호, 더 빠른 SerDes(16장)와 광 트랜시버(19장)를 가능하게 하기 때문이다.</p>
+    <div class="sim" id="sim-bw">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>대역폭 성장 그래프 (로그 눈금)</h3></div>
+      <div class="sim-view"><canvas id="cv-bw"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>연도 <output id="bw-y-out"></output></span><input type="range" id="bw-y" min="1840" max="2026" value="2000"></label>
+        <div class="ctrl"><span>보여 줄 곡선</span>
+          <label class="check"><input type="checkbox" id="bw-s0" checked> 가정용 유선 인터넷</label>
+          <label class="check"><input type="checkbox" id="bw-s1" checked> 이동통신(최고 속도)</label>
+          <label class="check"><input type="checkbox" id="bw-s2" checked> 이더넷 표준</label>
+          <label class="check"><input type="checkbox" id="bw-s3" checked> 해저 광케이블 광섬유 한 쌍</label>
+        </div>
+        <div class="ctrl"><span>추세선</span><label class="check"><input type="checkbox" id="bw-nl"> 닐슨의 법칙(연 50%, 1984년 300 bps 기준)</label></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">가정용 유선</span><span class="v" id="bw-r0">—</span></div>
+        <div class="stat"><span class="k">이동통신</span><span class="v" id="bw-r1">—</span></div>
+        <div class="stat"><span class="k">이더넷</span><span class="v" id="bw-r2">—</span></div>
+        <div class="stat"><span class="k">광섬유 한 쌍</span><span class="v" id="bw-r3">—</span></div>
+      </div>
+      <div class="sim-note">점은 그 해에 나온 대표 기술의 속도(가정용: 300 bps 모뎀 → 56k → ADSL → 광랜 → 기가 → 10기가, 이동통신: 2G → 3G → LTE → 5G의 이론 최고 속도, 이더넷: IEEE 표준, 광섬유: TAT-8 → TAT-12/13 → TAT-14 → MAREA 등 해저 케이블의 광섬유 한 쌍 용량)다. 맨 왼쪽 두 점은 모스 전신(1844)과 대서양 전신 케이블(1866)이다. <b>해볼 것</b>: 닐슨 추세선을 켜고 가정용 유선 곡선과 비교하자. 연도 슬라이더로 그 해의 최신 속도를 읽어 보자. 값은 대표 수준이며 출처마다 조금씩 다르다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">닐슨의 법칙(연 50% 성장)이 계속된다면, 지금 1 Gbps인 가정용 회선은 20년 뒤 대략 얼마가 될까?</p><p class="wi-hint">대역폭 성장 그래프에서 닐슨 추세선의 기울기를 보자. 1.5를 20번 곱하면?</p><div class="opts">
+      <button class="opt">약 30 Gbps (30배)</button>
+      <button class="opt">약 100 Gbps (100배)</button>
+      <button class="opt" data-correct>약 3 Tbps (3,000배)</button>
+      <button class="opt">약 1 Pbps (100만 배)</button>
+    </div><div class="quiz-exp">1.5<sup>20</sup> ≈ 3,325. 매년 50%라는 “작아 보이는” 성장이 20년 쌓이면 세 자릿수가 넘는다. 실제로 1984년 300 bps에서 2024년 수 Gbps까지 40년 동안 약 1,000만 배 성장해 추세와 잘 맞았다. 다만 집에서 그 속도가 정말 필요해질지는 별개의 문제다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="governance">
+    <h2>누가 인터넷을 운영하나: 거친 합의와 돌아가는 코드</h2>
+    <p>인터넷에는 사장도 본사도 없다. 수만 개의 통신사·기업·대학이 각자 자기 망(자율 시스템, 8장)을 운영하고, 공통의 약속만 지킨다. 그 약속은 <span class="term">IETF</span><span class="en">(Internet Engineering Task Force)</span>에서 만든다. 1986년 생긴 IETF는 회원 가입도 투표도 없이 누구나 메일링 리스트와 회의에 참여해 표준을 논의하는 열린 모임이다. 결과물은 <b>RFC</b>(Request for Comments)라는 문서로 공개된다. 1969년 RFC 1번 이래 지금까지 9,000편이 넘게 나왔다. IP(RFC 791), TCP(RFC 9293), HTTP/3(RFC 9114)도 모두 RFC다.</p>
+    <p>IETF의 정신은 1992년 데이비드 클라크의 말로 요약된다. <b>“우리는 왕도, 대통령도, 투표도 거부한다. 우리는 거친 합의(rough consensus)와 돌아가는 코드(running code)를 믿는다.”</b> 모두가 만장일치로 동의할 필요는 없지만 반대 의견이 충분히 다뤄져야 하고, 종이 위의 설계보다 실제로 여러 곳에서 구현해 서로 통하는 것이 중요하다는 뜻이다. 실제로 동작하는 단순한 설계가 위원회가 만든 완벽한 설계를 이긴 것이 인터넷 역사의 반복되는 장면이다. 국제 표준 기구가 공들여 만든 OSI 프로토콜 묶음이 TCP/IP에 밀린 것도 그 예다(3장).</p>
+    <p>주소와 이름처럼 하나뿐이어야 하는 자원은 따로 관리한다. 1998년 세워진 비영리 기구 <span class="term">ICANN</span><span class="en">(Internet Corporation for Assigned Names and Numbers)</span>이 도메인 이름 체계의 최상위(.com, .kr 같은 최상위 도메인)와 IP 주소 할당의 꼭대기(IANA 기능)를 조정한다. IP 주소는 대륙별 기관(아시아·태평양은 APNIC)을 거쳐 나라별 기관(한국은 한국인터넷진흥원 KISA)과 통신사로 나뉘어 내려온다. 이 밖에 웹 표준은 W3C, 이동통신은 3GPP, 이더넷과 Wi-Fi는 IEEE, 주파수와 위성 궤도는 ITU가 맡는다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="future">
+    <h2>미래: 6G, 양자, 빛, 그리고 우주</h2>
+    <h3>6G와 하늘·땅의 통합</h3>
+    <p>이동통신은 대략 10년마다 세대가 바뀌었다. 국제전기통신연합(ITU)은 6G를 IMT-2030이라 부르고, 2030년 전후 상용화를 목표로 3GPP가 표준을 만들고 있다. 후보 주파수는 7~24 GHz 대역(FR3)과 100 GHz가 넘는 <span class="term">서브테라헤르츠</span><span class="en">(sub-THz)</span> 대역이다. 서브THz는 수십 GHz의 넓은 대역폭으로 초당 수백 Gbps를 노리지만, 수 m~수십 m만 가도 신호가 급격히 약해지고 벽 하나도 넘기 어렵다(11장). 6G의 또 다른 축은 통신과 레이더 같은 감지(sensing)의 결합, AI가 설계에 녹아든 무선 접속, 그리고 <b>위성과 지상망의 통합</b>이다. 15장에서 본 휴대폰-위성 직접 연결이 표준 안으로 들어와, 지구 어디에서나 끊김 없는 연결을 목표로 한다.</p>
+
+    <h3>양자 통신: 도청하면 티가 나는 열쇠</h3>
+    <p>지금의 암호(22장)는 “풀기 어려운 수학 문제”에 기댄다. 충분히 큰 양자 컴퓨터가 나오면 RSA나 타원 곡선 암호를 깰 수 있다. 대응은 두 갈래다. 하나는 양자 컴퓨터로도 풀기 어려운 새로운 수학 문제를 쓰는 <span class="term">양자 내성 암호</span><span class="en">(PQC)</span>로, 미국 NIST가 2024년 첫 표준을 정했고 브라우저와 서버가 이미 도입하고 있다. 다른 하나는 물리 법칙 자체로 비밀을 지키는 <span class="term">양자 키 분배</span><span class="en">(QKD, quantum key distribution)</span>다.</p>
+    <p>1984년 베넷과 브라사르가 제안한 BB84 방식에서는 광자 하나하나의 편광에 비트를 싣는다. 양자 상태는 관측하는 순간 바뀌고 똑같이 복제할 수도 없으므로(복제 불가 정리), 도청자가 중간에서 광자를 엿보면 반드시 흔적(오류율 증가)이 남는다. 두 사람은 오류율을 확인해 도청이 없을 때만 그 비트를 암호 키로 쓴다. 다만 광자 하나는 광섬유에서 증폭할 수 없어 거리가 보통 100 km 안팎으로 제한된다. 그래서 신뢰할 수 있는 중계소를 잇거나, 2017년 중국의 묵자(Micius) 위성처럼 우주를 거쳐 대륙 간 키를 나누는 실험이 이루어졌다. 더 나아가 멀리 떨어진 양자 컴퓨터와 센서를 양자 얽힘으로 잇는 <b>양자 인터넷</b>은 양자 메모리와 양자 중계기가 필요한, 아직 연구 단계의 기술이다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 230" style="min-width:560px" role="img" aria-label="BB84 양자 키 분배에서 도청이 흔적을 남기는 원리">
+        <defs><marker id="h-qa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <rect x="20" y="70" width="110" height="60" rx="10" class="f-acc-soft"/><text x="75" y="96" text-anchor="middle" class="t" style="font-weight:700">앨리스</text><text x="75" y="116" text-anchor="middle" class="t-mono">광자 송신</text>
+        <rect x="670" y="70" width="110" height="60" rx="10" class="f-acc-soft"/><text x="725" y="96" text-anchor="middle" class="t" style="font-weight:700">밥</text><text x="725" y="116" text-anchor="middle" class="t-mono">편광 측정</text>
+        <path d="M130 100 H666" class="s-acc" marker-end="url(#h-qa)"/>
+        <g font-family="var(--mono)" font-size="18" fill="var(--accent)" text-anchor="middle">
+          <text x="190" y="90">↕</text><text x="240" y="90">⤢</text><text x="290" y="90">↔</text><text x="340" y="90">⤡</text>
+        </g>
+        <rect x="380" y="128" width="130" height="56" rx="10" fill="color-mix(in srgb, var(--bad) 14%, transparent)" stroke="var(--bad)"/>
+        <text x="445" y="152" text-anchor="middle" class="t" style="font-weight:700;fill:var(--bad)">이브(도청자)</text>
+        <text x="445" y="172" text-anchor="middle" class="t-mono">엿보면 상태가 바뀐다</text>
+        <path d="M445 128 V104" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <g font-family="var(--mono)" font-size="18" text-anchor="middle"><text x="560" y="90" fill="var(--bad)">⤢?</text><text x="610" y="90" fill="var(--accent)">↔</text></g>
+        <text x="400" y="36" text-anchor="middle" class="t" style="font-weight:700">비트를 광자 하나의 편광(수직·수평 또는 대각선)에 싣는다</text>
+        <text x="400" y="212" text-anchor="middle" class="t-dim">나중에 일부 비트를 공개해 비교 → 오류율이 높으면 도청이 있었던 것 → 그 키는 버린다</text>
+      </svg></div>
+      <figcaption><b>그림 25-3.</b> BB84 양자 키 분배의 아이디어. 도청자는 광자의 편광 기준(수직·수평인지 대각선인지)을 모르고 측정해야 하므로 상태를 망가뜨린다. 비밀은 수학의 어려움이 아니라 물리 법칙이 지킨다.</figcaption>
+    </figure>
+
+    <h3>빛으로 하는 무선: Li-Fi</h3>
+    <p><span class="term">가시광 통신</span><span class="en">(VLC, visible light communication)</span>은 LED 조명을 사람 눈이 느끼지 못할 만큼 빠르게 깜빡여 데이터를 보낸다. 흔히 Li-Fi라고 부르며, 2023년 IEEE 802.11bb로 Wi-Fi 표준 가족에 들어왔다. 빛은 벽을 넘지 못하니 방 밖에서 도청하기 어렵고, 전파를 쓰기 곤란한 병원·항공기·공장, 그리고 주파수가 붐비는 곳에서 쓸모가 있다. 봉화와 광학 전신에서 시작된 “빛으로 하는 통신”이 LED와 함께 돌아온 셈이다.</p>
+
+    <h3>행성 간 인터넷: 빛도 느린 곳</h3>
+    <p>지구 위에서는 빛의 속도가 거의 무한해 보이지만, 우주에서는 다르다. 달까지는 편도 약 1.3초, 화성까지는 두 행성의 위치에 따라 <b>편도 3분에서 22분</b>이 걸린다. 왕복 수십 분 동안 TCP의 3방향 악수(9장)는 시간 초과로 끊어지고, 태양이 지구와 화성 사이를 가리는 “합” 기간에는 2주 가까이 연락이 끊긴다. 그래서 NASA와 빈트 서프 등은 <span class="term">지연 내성 네트워크</span><span class="en">(DTN, delay/disruption tolerant networking)</span>를 만들었다. 끝과 끝이 동시에 연결되어 있다고 가정하지 않고, 중간 노드가 데이터 묶음(번들)을 <b>저장했다가</b> 다음 길이 열리면 <b>전달</b>한다(번들 프로토콜, RFC 9171). 택배로 치면 직통 배송 대신 중간 물류 창고에 쌓아 두었다가 다음 배가 뜰 때 싣는 방식이다. 국제우주정거장과 화성 탐사선들이 이미 이런 방식으로 궤도선을 중계 삼아 데이터를 보내고 있다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 220" style="min-width:560px" role="img" aria-label="지연 내성 네트워크의 저장 후 전달">
+        <defs><marker id="h-da" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <circle cx="80" cy="120" r="46" class="f-acc-soft"/><text x="80" y="124" text-anchor="middle" class="t" style="font-weight:700">지구</text>
+        <rect x="140" y="58" width="96" height="40" rx="8" class="f-elev"/><text x="188" y="83" text-anchor="middle" class="t-mono">지상 안테나</text>
+        <path d="M240 78 H420" class="s-acc" marker-end="url(#h-da)"/>
+        <text x="330" y="66" text-anchor="middle" class="t-mono">편도 3~22분</text>
+        <rect x="424" y="54" width="130" height="50" rx="8" class="f-acc2-soft"/><text x="489" y="76" text-anchor="middle" class="t" style="font-weight:700">화성 궤도선</text><text x="489" y="94" text-anchor="middle" class="t-mono">번들 저장 ▣▣▣</text>
+        <path d="M554 92 Q610 130 640 150" class="s-acc" marker-end="url(#h-da)" stroke-dasharray="6 4"/>
+        <text x="620" y="110" class="t-mono">머리 위를 지날 때만</text>
+        <circle cx="700" cy="170" r="36" fill="color-mix(in srgb, var(--warn) 22%, transparent)" stroke="var(--warn)"/><text x="700" y="174" text-anchor="middle" class="t" style="font-weight:700">화성</text>
+        <rect x="642" y="122" width="40" height="18" rx="4" fill="var(--text-dim)"/><text x="662" y="117" text-anchor="middle" class="t-mono">로버</text>
+        <text x="400" y="160" text-anchor="middle" class="t-dim">끝과 끝이 동시에 이어져 있지 않아도 된다.</text>
+        <text x="400" y="182" text-anchor="middle" class="t-dim">길이 열릴 때까지 각 노드가 보관했다가 넘긴다(저장 후 전달).</text>
+      </svg></div>
+      <figcaption><b>그림 25-4.</b> 지연 내성 네트워크. 화성 로버는 궤도선이 머리 위를 지나는 몇 분 동안만 데이터를 올리고, 궤도선은 지구와 통하는 시간에 이를 내려보낸다. 1960년대 패킷 교환의 “저장 후 전달”이 행성 규모로 되살아났다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-space">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>행성 간 지연: 빛으로도 몇 분, 몇 시간</h3></div>
+      <div class="sim-view"><canvas id="cv-space"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>목적지</span><div class="seg" id="sp-dst"><button data-value="moon">달</button><button data-value="venus">금성</button><button data-value="mars" class="on">화성</button><button data-value="jupiter">목성</button><button data-value="saturn">토성</button><button data-value="voyager">보이저 1호</button></div></div>
+        <label class="ctrl"><span>행성 위치(지구–태양–행성 각도) <output id="sp-a-out"></output></span><input type="range" id="sp-a" min="0" max="180" value="90"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">거리</span><span class="v" id="sp-d">—</span></div>
+        <div class="stat"><span class="k">편도 지연</span><span class="v" id="sp-1">—</span></div>
+        <div class="stat"><span class="k">왕복 지연</span><span class="v" id="sp-2">—</span></div>
+        <div class="stat"><span class="k">TCP 연결 맺기(1.5 왕복)</span><span class="v" id="sp-tcp">—</span></div>
+      </div>
+      <div class="sim-note">행성 궤도를 원으로 보고, 지구–태양–행성 사이 각도로 거리를 계산했다(0°: 가장 가까울 때, 180°: 태양 반대편). 그림의 거리 눈금은 제곱근으로 줄여 그렸고, 빛 펄스의 속도도 실제가 아니라 보기 좋게 맞췄다. <b>해볼 것</b>: 화성의 각도를 0°와 180°로 바꿔 3분과 22분 사이를 오가는 것을 확인하자. 보이저 1호는 태양계 밖으로 날아가는 중이라 2026년 말이면 빛으로 꼬박 하루 거리에 이른다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">지구의 관제사가 화성 로버에게 “앞으로 1 m 가라”고 명령하고 결과 사진을 받아 보려 한다. 화성이 가장 멀 때 최소 얼마나 기다려야 할까?</p><p class="wi-hint">행성 간 지연 시뮬레이터에서 화성, 180°를 골라 왕복 지연을 보자.</p><div class="opts">
+      <button class="opt">몇 초</button>
+      <button class="opt">약 6분</button>
+      <button class="opt" data-correct>40분 이상</button>
+      <button class="opt">약 하루</button>
+    </div><div class="quiz-exp">가장 멀 때 편도 약 22분, 왕복 약 44분이다. 그래서 화성 로버는 실시간 조종이 불가능하고, 하루치 명령을 한꺼번에 보내면 스스로 판단해 장애물을 피하며 움직인다. 통신 지연이 기계의 자율성을 요구하는 셈이다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>전기 이전의 봉수와 샤프의 광학 전신은 “보이는 거리마다 중계”하는 방식이었고, 보낼 수 있는 정보량이 매우 작았다.</li>
+      <li>1844년 모스 전신과 1866년 대서양 케이블로 소식이 빛에 가까운 속도로 대륙과 바다를 건너기 시작했다. 1876년 전화, 1901년 마르코니의 대서양 무선, 1962년 텔스타 위성, 1970년 저손실 광섬유와 1988년 TAT-8이 뒤를 이었다.</li>
+      <li>섀넌(1948)은 정보를 비트로 재고 채널마다 넘을 수 없는 최대 속도가 있음을 보였다. 배런·데이비스·클라인록의 패킷 교환은 통계적 다중화로 같은 선에 훨씬 많은 사용자를 태웠다.</li>
+      <li>1969년 아파넷, 1973년 이더넷, 1974년 TCP/IP 논문과 1983년 전환, 1991년 웹, 2007년 스마트폰, 2019년 5G가 오늘의 인터넷을 만들었다. 한국은 1982년 SDN, 1999년 ADSL 붐으로 초고속 인터넷 강국이 되었다.</li>
+      <li>통신 속도는 170년간 열두 자릿수 이상 커졌고, 가정용 회선은 대략 연 50%씩 빨라졌다(닐슨의 법칙).</li>
+      <li>인터넷 표준은 IETF가 “거친 합의와 돌아가는 코드”로 만들고, 이름과 주소의 꼭대기는 ICANN이 조정한다.</li>
+      <li>미래에는 서브THz와 위성 통합의 6G, 물리 법칙으로 도청을 감지하는 양자 키 분배, LED 빛의 Li-Fi, 그리고 수 분~수 시간의 지연을 견디는 행성 간 인터넷(DTN)이 기다린다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>모스 부호에서 영어의 E는 점 하나, T는 선 하나로 가장 짧다. 그 이유는?</p><div class="opts">
+        <button class="opt">알파벳 순서상 앞에 있어서</button>
+        <button class="opt" data-correct>가장 자주 쓰이는 글자에 짧은 부호를 주어 전체 전송 시간을 줄이려고</button>
+        <button class="opt">모스의 이름 철자에 들어 있어서</button>
+        <button class="opt">전선의 저항 때문에 짧은 신호만 보낼 수 있어서</button>
+      </div><div class="quiz-exp">자주 나오는 기호를 짧게 부호화하면 평균 길이가 줄어든다. 오늘날 압축 기법(허프만 부호 등)과 같은 원리다.</div></div>
+      <div class="quiz-q"><p>1858년의 첫 대서양 전신 케이블이 겪은 문제로 옳은 것은?</p><div class="opts">
+        <button class="opt">상어가 케이블을 끊어 첫날 고장 났다</button>
+        <button class="opt">전파가 바다에 흡수되어 신호가 가지 않았다</button>
+        <button class="opt">유럽과 미국의 모스 부호가 서로 달랐다</button>
+        <button class="opt" data-correct>긴 케이블이 신호를 뭉개 전송이 매우 느렸고, 높은 전압을 걸었다가 몇 주 만에 망가졌다</button>
+      </div><div class="quiz-exp">긴 해저 케이블은 큰 축전기처럼 작용해 펄스를 퍼뜨린다. 여왕의 짧은 메시지에도 16시간이 넘게 걸렸다. 1866년에야 개선된 케이블로 실용적인 대서양 전신이 시작되었다.</div></div>
+      <div class="quiz-q"><p>패킷 교환이 회선 교환보다 같은 선에 더 많은 사용자를 받을 수 있는 이유는?</p><div class="opts">
+        <button class="opt">패킷은 압축되어 있어서</button>
+        <button class="opt">패킷 교환은 전송 속도가 더 빨라서</button>
+        <button class="opt" data-correct>사용자들이 늘 동시에 보내지는 않으므로, 회선을 예약하지 않고 함께 쓰면(통계적 다중화) 빈 시간을 다른 사람이 쓸 수 있어서</button>
+        <button class="opt">패킷 교환은 오류가 생기지 않아서</button>
+      </div><div class="quiz-exp">띄엄띄엄 보내는 사용자가 많을수록 예약 방식은 대부분의 시간 동안 선을 비워 둔다. 대신 패킷 교환은 가끔 몰릴 때 대기와 손실을 감수한다.</div></div>
+      <div class="quiz-q"><p>다음 중 시간 순서가 바르게 놓인 것은?</p><div class="opts">
+        <button class="opt" data-correct>아파넷 첫 메시지 → TCP/IP 논문 → 아파넷의 TCP/IP 전환 → 월드 와이드 웹 공개</button>
+        <button class="opt">TCP/IP 논문 → 아파넷 첫 메시지 → 월드 와이드 웹 공개 → 아파넷의 TCP/IP 전환</button>
+        <button class="opt">월드 와이드 웹 공개 → 아파넷 첫 메시지 → TCP/IP 논문 → TCP/IP 전환</button>
+        <button class="opt">아파넷 첫 메시지 → 월드 와이드 웹 공개 → TCP/IP 논문 → TCP/IP 전환</button>
+      </div><div class="quiz-exp">1969년 아파넷 → 1974년 서프·칸의 논문 → 1983년 1월 1일 TCP/IP 전환 → 1991년 웹 공개 순서다.</div></div>
+      <div class="quiz-q"><p>IETF가 표준을 정하는 방식을 가장 잘 나타낸 말은?</p><div class="opts">
+        <button class="opt">회원국 정부의 다수결 투표</button>
+        <button class="opt">가장 큰 통신사의 결정</button>
+        <button class="opt">한 명의 의장이 최종 결정</button>
+        <button class="opt" data-correct>거친 합의(rough consensus)와 실제로 돌아가는 코드(running code)</button>
+      </div><div class="quiz-exp">IETF는 투표 대신 반대 의견을 충분히 다룬 대체적인 합의와 실제 구현의 상호 운용성을 중시한다. 결과는 RFC로 공개된다.</div></div>
+      <div class="quiz-q"><p>지구와 화성 사이 통신에 지연 내성 네트워크(DTN)가 필요한 이유로 가장 알맞은 것은?</p><div class="opts">
+        <button class="opt">화성에는 IP 주소가 부족해서</button>
+        <button class="opt" data-correct>편도 수 분~수십 분의 지연과 잦은 단절 때문에 끝과 끝이 동시에 연결되어 있다고 가정하는 TCP가 제대로 동작하지 않아서</button>
+        <button class="opt">우주에서는 빛의 속도가 느려져서</button>
+        <button class="opt">화성의 대기가 전파를 모두 흡수해서</button>
+      </div><div class="quiz-exp">DTN은 중간 노드가 번들을 저장했다가 길이 열리면 전달하는 방식으로, 긴 지연과 단절을 견딘다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const fmtBps = (v) => NB.si(v, "bps", 3);
+
+  /* ================= 1. 모스 부호 ================= */
+  const MORSE = { A: ".-", B: "-...", C: "-.-.", D: "-..", E: ".", F: "..-.", G: "--.", H: "....", I: "..", J: ".---", K: "-.-", L: ".-..", M: "--", N: "-.", O: "---", P: ".--.", Q: "--.-", R: ".-.", S: "...", T: "-", U: "..-", V: "...-", W: ".--", X: "-..-", Y: "-.--", Z: "--..",
+    0: "-----", 1: ".----", 2: "..---", 3: "...--", 4: "....-", 5: ".....", 6: "-....", 7: "--...", 8: "---..", 9: "----.", ".": ".-.-.-", ",": "--..--", "?": "..--..", "!": "-.-.--", "/": "-..-.", "=": "-...-", "@": ".--.-." };
+  const moWpm = NB.range("mo-wpm", (v) => v + " WPM", () => moBuild());
+  let moEls = [], moTotal = 0, moChars = [], moPlay = null, audio = null, moSkipped = 0;
+  const moOpts = { height: 140 };
+  function moBuild() {
+    stopPlay();
+    const raw = $("mo-text").value.toUpperCase();
+    moEls = []; moChars = []; moSkipped = 0;
+    let u = 0;
+    const words = raw.split(/\s+/).filter(Boolean);
+    words.forEach((wd, wi) => {
+      if (wi > 0 && moEls.length) { moEls.push({ on: false, s: u, n: 7 }); u += 7; }
+      let firstChar = true;
+      [...wd].forEach((ch) => {
+        const code = MORSE[ch];
+        if (!code) { moSkipped++; return; }
+        if (!firstChar) { moEls.push({ on: false, s: u, n: 3 }); u += 3; }
+        firstChar = false;
+        const start = u;
+        [...code].forEach((sym, k) => {
+          if (k) { moEls.push({ on: false, s: u, n: 1 }); u += 1; }
+          const n = sym === "." ? 1 : 3;
+          moEls.push({ on: true, s: u, n }); u += n;
+        });
+        moChars.push({ ch, code, s: start, e: u });
+      });
+    });
+    moTotal = u;
+    const unit = 1.2 / moWpm();
+    const secs = moTotal * unit;
+    NB.stat("mo-u", moTotal + "<small>단위</small>");
+    NB.stat("mo-t", (secs >= 60 ? NB.time(secs) : secs.toFixed(1) + "<small>초</small>"));
+    NB.stat("mo-baud", (1 / unit).toFixed(1) + "<small>단위/초</small>");
+    const chars = moChars.length + Math.max(0, words.length - 1);
+    NB.stat("mo-bps", secs ? ((chars * 5.2) / secs).toFixed(1) + "<small>bps</small>" : "—");
+    renderCode(-1);
+    const rowsU = rowUnits();
+    const rows = Math.max(1, Math.ceil(moTotal / rowsU));
+    moOpts.height = 96 + rows * 26;
+    if (moCv) moCv.resize();
+  }
+  function renderCode(curIdx) {
+    if (!moChars.length) { $("mo-code").textContent = "—"; return; }
+    let html = "", ci = 0;
+    const raw = $("mo-text").value.toUpperCase().split(/\s+/).filter(Boolean);
+    raw.forEach((wd, wi) => {
+      if (wi) html += " &nbsp;/&nbsp; ";
+      [...wd].forEach((ch) => {
+        if (!MORSE[ch]) return;
+        const c = moChars[ci];
+        const body = `<b>${ch === "<" ? "&lt;" : ch}</b> ${c.code.replace(/\./g, "·").replace(/-/g, "−")}`;
+        html += (ci === curIdx ? `<span class="cur">${body}</span>` : body) + "&nbsp;&nbsp; ";
+        ci++;
+      });
+    });
+    if (moSkipped) html += ` <span style="color:var(--warn)">(지원하지 않는 글자 ${moSkipped}개 제외)</span>`;
+    $("mo-code").innerHTML = html;
+  }
+  const rowUnits = () => { const w = $("cv-morse").parentElement.clientWidth || 600; return w < 500 ? 60 : 120; };
+  function stopPlay() {
+    moPlay = null;
+    if (audio) { try { audio.close(); } catch (e) {} audio = null; }
+  }
+  function startPlay(sound) {
+    stopPlay();
+    if (!moTotal) return;
+    const unit = 1.2 / moWpm();
+    let t0 = performance.now() / 1000;
+    if (sound) {
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        audio = new AC();
+        const base = audio.currentTime + 0.08;
+        const gain = audio.createGain(); gain.gain.value = 0; gain.connect(audio.destination);
+        const osc = audio.createOscillator(); osc.frequency.value = 650; osc.type = "sine"; osc.connect(gain); osc.start(base);
+        moEls.forEach((e) => { if (!e.on) return; const a = base + e.s * unit, b = a + e.n * unit; gain.gain.setValueAtTime(0, a); gain.gain.linearRampToValueAtTime(0.25, a + 0.005); gain.gain.setValueAtTime(0.25, b - 0.005); gain.gain.linearRampToValueAtTime(0, b); });
+        osc.stop(base + moTotal * unit + 0.1);
+        t0 += 0.08;
+      } catch (e) { audio = null; }
+    }
+    moPlay = { t0, unit };
+  }
+  $("mo-play").onclick = () => startPlay(true);
+  $("mo-light").onclick = () => startPlay(false);
+  $("mo-stop").onclick = () => { stopPlay(); renderCode(-1); moCv.redraw(); };
+  $("mo-text").addEventListener("input", () => moBuild());
+  let moCur = -1, lastCi = -2;
+  const moCv = NB.canvas($("cv-morse"), (ctx, w, h) => {
+    const P = NB.palette();
+    const rowsU = rowUnits(), px = (w - 28) / rowsU;
+    const lampOn = moCur >= 0 && moEls.some((e) => e.on && moCur >= e.s && moCur < e.s + e.n);
+    // lamp
+    const lx = 40, ly = 40;
+    if (lampOn) { ctx.fillStyle = P.warn; ctx.globalAlpha = 0.25; ctx.beginPath(); ctx.arc(lx, ly, 30, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
+    ctx.fillStyle = lampOn ? P.warn : P.surface; ctx.strokeStyle = P.border; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(lx, ly, 18, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    const ci = moChars.findIndex((c) => moCur >= c.s && moCur < c.e);
+    NB.text(ctx, moPlay ? (ci >= 0 ? "보내는 중: " + moChars[ci].ch : "…") : "재생 버튼을 누르면 불빛과 소리로 보낸다", 72, 32, { size: w < 500 ? 12 : 14, bold: !!moPlay, color: P.text });
+    NB.text(ctx, "막대 = 신호 켜짐(점 1단위, 선 3단위)", 72, 52, { size: 11, color: P.dim });
+    // bars
+    for (let r = 0; r * rowsU < Math.max(1, moTotal); r++) {
+      const y = 82 + r * 26;
+      ctx.strokeStyle = P.grid; ctx.beginPath(); ctx.moveTo(14, y + 9); ctx.lineTo(w - 14, y + 9); ctx.stroke();
+    }
+    moEls.forEach((e) => {
+      if (!e.on) return;
+      let k = 0;
+      while (k < e.n) {
+        const uu = e.s + k, r = Math.floor(uu / rowsU), c = uu % rowsU;
+        const run = Math.min(e.n - k, rowsU - c);
+        ctx.fillStyle = moCur >= 0 && uu <= moCur ? P.warn : P.accent;
+        ctx.fillRect(14 + c * px, 82 + r * 26, run * px - (run === e.n - k ? 0 : 0), 18);
+        k += run;
+      }
+    });
+    if (moCur >= 0 && moCur < moTotal) {
+      const r = Math.floor(moCur / rowsU), c = moCur % rowsU;
+      ctx.strokeStyle = P.text; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(14 + c * px, 78 + r * 26); ctx.lineTo(14 + c * px, 104 + r * 26); ctx.stroke();
+    }
+  }, moOpts);
+  NB.loop($("cv-morse"), () => {
+    if (!moPlay) { if (moCur !== -1) { moCur = -1; moCv.redraw(); } return; }
+    const el = performance.now() / 1000 - moPlay.t0;
+    const u = Math.floor(el / moPlay.unit);
+    if (u >= moTotal) { stopPlay(); moCur = -1; renderCode(-1); lastCi = -2; moCv.redraw(); return; }
+    if (u !== moCur) {
+      moCur = u;
+      const ci = moChars.findIndex((c) => u >= c.s && u < c.e);
+      if (ci !== lastCi && ci >= 0) { renderCode(ci); lastCi = ci; }
+      moCv.redraw();
+    }
+  });
+  moBuild();
+
+  /* ================= 2. 패킷 교환 다중화 ================= */
+  const mxN = NB.range("mx-n", (v) => v + "명", () => mxUpd());
+  const mxP = NB.range("mx-p", (v) => v + "%", () => mxUpd());
+  const CAP = 10;
+  function binom(n, p) {
+    const out = new Array(n + 1).fill(0);
+    let lp = n * Math.log(1 - p);
+    for (let k = 0; k <= n; k++) {
+      out[k] = Math.exp(lp);
+      lp += Math.log((n - k) / (k + 1)) + Math.log(p / (1 - p));
+    }
+    return out;
+  }
+  let mxPmf = [];
+  function mxUpd() {
+    const n = mxN(), p = mxP() / 100;
+    mxPmf = binom(n, p);
+    const ov = mxPmf.slice(CAP + 1).reduce((a, b) => a + b, 0);
+    NB.stat("mx-c", CAP + "<small>명 (패킷 교환: " + n + "명)</small>");
+    NB.stat("mx-avg", (n * p).toFixed(1) + "<small>명</small>");
+    const col = ov < 0.001 ? "var(--ok)" : ov < 0.05 ? "var(--warn)" : "var(--bad)";
+    NB.stat("mx-ov", `<span style="color:${col}">${ov < 1e-4 ? (ov * 100).toExponential(1) : (ov * 100).toFixed(ov < 0.01 ? 3 : 1)}</span><small>%</small>`);
+    let used = 0; mxPmf.forEach((q, k) => (used += q * Math.min(k, CAP)));
+    NB.stat("mx-u", (100 * used / CAP).toFixed(0) + "<small>% (회선 교환 " + (n >= CAP ? (p * 100).toFixed(0) : (n * p * 100 / CAP).toFixed(0)) + "%)</small>");
+    mxCv.redraw();
+  }
+  const mxCv = NB.canvas($("cv-mux"), (ctx, w, h) => {
+    const P = NB.palette(), n = mxN();
+    const small = w < 500;
+    const box = { x: small ? 42 : 56, y: 18, w: w - (small ? 42 : 56) - 14, h: h - 18 - 46 };
+    const ymax = Math.max(...mxPmf) * 1.15;
+    const ch = NB.chart(ctx, box, { x: [-0.5, n + 0.5], y: [0, ymax], xLabel: "동시에 보내는 사용자 수", yFmt: (v) => (v * 100).toFixed(0) + "%", xFmt: (v) => String(Math.round(v)) });
+    const bw = Math.max(1, (box.w / (n + 1)) * 0.8);
+    mxPmf.forEach((q, k) => {
+      const x = ch.X(k) - bw / 2, y = ch.Y(q);
+      ctx.fillStyle = k > CAP ? P.bad : P.accent;
+      ctx.fillRect(x, y, bw, box.y + box.h - y);
+    });
+    const xc = ch.X(CAP + 0.5);
+    ctx.strokeStyle = P.bad; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(xc, box.y); ctx.lineTo(xc, box.y + box.h); ctx.stroke(); ctx.setLineDash([]);
+    NB.text(ctx, "링크 용량 = 10명", xc + 6, box.y + 10, { size: 11.5, color: P.bad, bold: true });
+  }, { aspect: 0.4, minHeight: 220, maxHeight: 320 });
+  mxUpd();
+
+  /* ================= 3. 타임라인 ================= */
+  const PHOTO = 4e7;
+  const ERAS = [
+    { y: "1450년대", n: "조선 봉수", r: 2.32 / 43200, lat: "남해안→서울 약 12시간", d: "횃불 다섯 가지 상태(약 2.3비트)를 하루에 한 번꼴로 보낸다고 치면 초당 0.00005비트 수준이다. 하지만 “적이 왔다”는 가장 중요한 1~2비트를 반나절 만에 전국에 알렸다." },
+    { y: "1794", n: "샤프 광학 전신", r: 0.2, lat: "파리→릴 230 km 수 분~수십 분", d: "탑 꼭대기 막대 팔의 각도로 기호를 만든다. 기호 하나(약 6~7비트)를 넘기는 데 수십 초. 밤과 안개에는 멈췄다." },
+    { y: "1844", n: "모스 전신", r: 10, lat: "전기 신호는 거의 즉시, 중계·사람 손을 거쳐 수 분~수 시간", d: "전류를 끊어 점과 선을 보낸다. 숙련된 기사가 분당 20~30단어, 정보로 환산하면 초당 10비트 안팎." },
+    { y: "1866", n: "대서양 전신 케이블", r: 3, lat: "런던→뉴욕 배로 약 10일 → 수 분", d: "긴 해저 케이블이 신호를 뭉개 분당 약 8단어에 그쳤다. 속도는 육상 전신보다 느렸지만, 대륙 간 소식의 지연이 열흘에서 몇 분으로 줄었다." },
+    { y: "1962", n: "벨 103 모뎀", r: 300, lat: "전화망, 수십 ms", d: "컴퓨터 데이터를 전화선의 소리로 바꾸는 모뎀. 같은 해 텔스타 위성이 대서양 너머 TV를 처음 생중계했다." },
+    { y: "1969", n: "아파넷 IMP 회선", r: 5e4, lat: "미국 서부 대학 사이 수십 ms", d: "패킷 교환기(IMP)들을 50 kbps 전용선으로 이었다. 당시로서는 엄청난 속도였다." },
+    { y: "1998", n: "다이얼업 56k 모뎀", r: 5.6e4, lat: "왕복 100~200 ms", d: "전화를 걸어 접속하던 시절. “삐-삐리리” 소리와 함께 연결되고, 인터넷을 쓰는 동안 집 전화가 불통이었다." },
+    { y: "1999", n: "ADSL(한국)", r: 2e6, lat: "왕복 수십 ms", d: "같은 전화선의 높은 주파수를 써서 통화와 인터넷을 동시에(4장). 수 Mbps 속도로 한국 초고속 인터넷 붐을 일으켰다." },
+    { y: "2005", n: "아파트 광랜", r: 1e8, lat: "왕복 10~20 ms", d: "건물까지 광섬유, 집 안은 이더넷. 100 Mbps가 대중화되었다." },
+    { y: "2014", n: "기가 인터넷", r: 1e9, lat: "왕복 수 ms~10 ms", d: "광섬유를 집 안까지(FTTH). 사진 한 장은 눈 깜빡할 사이." },
+    { y: "2019", n: "5G 이동통신", r: 5e8, lat: "왕복 약 10~30 ms", d: "한국이 2019년 4월 세계 최초 상용화. 체감 속도는 수백 Mbps 수준, 이론 최고 속도는 수 Gbps." },
+    { y: "2020년대", n: "10기가 인터넷", r: 1e10, lat: "왕복 수 ms", d: "XGS-PON 같은 10G급 광 가입자망(5장). 4K 영화 한 편(약 20 GB)도 20초 안팎." },
+    { y: "2020년대", n: "해저 케이블 광섬유 한 쌍", r: 2e13, lat: "서울–LA 왕복 약 120 ms", d: "파장 분할 다중화(WDM)로 광섬유 한 쌍에 초당 약 20조 비트. 케이블 하나에 이런 쌍이 십수 개 들어간다." },
+  ];
+  const tlI = NB.range("tl-i", (v) => ERAS[v].y + " · " + ERAS[v].n, () => tlUpd());
+  $("tl-prev").onclick = () => tlI.set(Math.max(0, tlI() - 1));
+  $("tl-next").onclick = () => tlI.set(Math.min(ERAS.length - 1, tlI() + 1));
+  const fmtT = (s) => (s >= 3.156e7 * 1000 ? NB.kn(s / 3.156e7) + " 년" : NB.time(s));
+  function tlUpd() {
+    const i = tlI(), e = ERAS[i];
+    $("tl-desc").innerHTML = `<b class="yr">${e.y}</b><b>${e.n}</b> — ${e.d}`;
+    NB.stat("tl-rate", e.r < 1 ? e.r.toExponential(1) + "<small>bps</small>" : fmtBps(e.r));
+    NB.stat("tl-photo", fmtT(PHOTO / e.r));
+    NB.stat("tl-lat", e.lat);
+    if (i === 0) NB.stat("tl-x", "—");
+    else { const x = e.r / ERAS[i - 1].r; NB.stat("tl-x", x >= 1 ? "×" + NB.fmt(x, 3) + "<small> 빠름</small>" : "×" + NB.fmt(x, 2) + "<small> (느려짐)</small>"); }
+    tlCv.redraw();
+  }
+  const tlCv = NB.canvas($("cv-tl"), (ctx, w, h) => {
+    const P = NB.palette(), small = w < 560;
+    const lw = small ? 92 : 190, top = 14, rowH = (h - top - 30) / ERAS.length;
+    const x0 = lw + 8, x1 = w - (small ? 26 : 18);
+    const lmin = -6, lmax = 13; // log10 seconds
+    const X = (s) => x0 + ((Math.log10(s) - lmin) / (lmax - lmin)) * (x1 - x0);
+    // grid
+    const marks = [[1e-6, "1µs"], [1e-3, "1ms"], [1, "1초"], [3600, "1시간"], [86400 * 365, "1년"], [3.156e10, "천 년"], [3.156e12, "10만 년"]];
+    ctx.font = "10.5px " + NB.font();
+    marks.forEach(([s, lb]) => {
+      const x = X(s);
+      ctx.strokeStyle = P.grid; ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, h - 26); ctx.stroke();
+      if (!small || ["1ms", "1초", "1년", "10만 년"].includes(lb)) NB.text(ctx, lb, x, h - 14, { size: 10.5, color: P.dim, align: "center" });
+    });
+    const sel = tlI();
+    ERAS.forEach((e, i) => {
+      const y = top + i * rowH, t = PHOTO / e.r;
+      const on = i === sel;
+      NB.text(ctx, small ? e.n.replace("해저 케이블 광섬유 한 쌍", "광섬유 한 쌍").replace("대서양 전신 케이블", "대서양 케이블").replace("다이얼업 56k 모뎀", "56k 모뎀") : e.y + " " + e.n, lw, y + rowH / 2, { size: small ? 10.5 : 12, align: "right", color: on ? P.accent : P.dim, bold: on });
+      const bx = X(1e-6), bxx = X(Math.min(t, 1e13));
+      ctx.fillStyle = on ? P.accent : P.faint; ctx.globalAlpha = on ? 1 : 0.55;
+      NB.rrect(ctx, bx, y + rowH * 0.2, Math.max(2, bxx - bx), rowH * 0.6, 3); ctx.fill(); ctx.globalAlpha = 1;
+      if (on) {
+        const lab = fmtT(t);
+        const tw = ctx.measureText(lab).width;
+        const inside = bxx - bx > tw + 30;
+        NB.text(ctx, lab, inside ? bxx - 6 : bxx + 6, y + rowH / 2, { size: 12, bold: true, align: inside ? "right" : "left", color: inside ? "#fff" : P.accent });
+      }
+    });
+  }, { aspect: 0.55, minHeight: 300, maxHeight: 420 });
+  tlUpd();
+
+  /* ================= 4. 대역폭 성장 ================= */
+  const SER = [
+    { n: "가정용", d: [[1962, 300], [1984, 2400], [1991, 14400], [1994, 28800], [1998, 56000], [1999, 2e6], [2002, 2e7], [2005, 1e8], [2014, 1e9], [2018, 1e10]] },
+    { n: "이동통신", d: [[1992, 9600], [1996, 14400], [2000, 153000], [2003, 384000], [2006, 1.44e7], [2011, 7.5e7], [2013, 1.5e8], [2015, 3e8], [2019, 2e9]] },
+    { n: "이더넷", d: [[1973, 2.94e6], [1983, 1e7], [1995, 1e8], [1998, 1e9], [2002, 1e10], [2010, 1e11], [2017, 4e11], [2024, 8e11], [2026, 1.6e12]] },
+    { n: "광섬유", d: [[1988, 1.4e8], [1996, 5e9], [2001, 1.6e11], [2013, 1e13], [2017, 2e13]] },
+  ];
+  const bwY = NB.range("bw-y", (v) => v + "년", () => bwUpd());
+  ["bw-s0", "bw-s1", "bw-s2", "bw-s3", "bw-nl"].forEach((id) => ($(id).onchange = () => bwCv.redraw()));
+  const latest = (d, y) => { let v = null; d.forEach(([yy, r]) => { if (yy <= y) v = r; }); return v; };
+  function bwUpd() {
+    const y = bwY();
+    SER.forEach((s, i) => { const v = latest(s.d, y); NB.stat("bw-r" + i, v ? fmtBps(v) : "<small>아직 없음</small>"); });
+    bwCv.redraw();
+  }
+  const bwCv = NB.canvas($("cv-bw"), (ctx, w, h) => {
+    const P = NB.palette(), small = w < 500, y = bwY();
+    const cols = [P.accent, P.warn, P.ok, P.accent2];
+    const series = [];
+    const pts = [];
+    SER.forEach((s, i) => {
+      if (!$("bw-s" + i).checked) return;
+      series.push({ data: s.d, color: cols[i], width: 2.2 });
+      s.d.forEach(([xx, v]) => pts.push({ x: xx, y: v, color: cols[i], r: small ? 2.5 : 3.5 }));
+    });
+    pts.push({ x: 1844, y: 10, color: P.dim, r: 4, label: small ? "" : "모스 전신" }, { x: 1866, y: 3, color: P.dim, r: 4, label: small ? "" : "대서양 케이블" });
+    if ($("bw-nl").checked) {
+      const nd = []; for (let yy = 1980; yy <= 2030; yy++) nd.push([yy, 300 * Math.pow(1.5, yy - 1984)]);
+      series.push({ data: nd, color: P.bad, width: 1.6, dash: [6, 4] });
+    }
+    const box = { x: small ? 50 : 66, y: 14, w: w - (small ? 50 : 66) - 14, h: h - 14 - 46 };
+    const ch = NB.chart(ctx, box, {
+      x: [1840, 2030], y: [1, 1e14], logY: true, xLabel: "연도 (세로축: 초당 비트, 로그 눈금)",
+      yTicks: [1, 1e2, 1e4, 1e6, 1e8, 1e10, 1e12, 1e14], yFmt: (v) => NB.si(v, small ? "" : "bps", 1).trim(),
+      xTicks: small ? [1850, 1900, 1950, 2000] : [1850, 1875, 1900, 1925, 1950, 1975, 2000, 2025], xFmt: (v) => String(v),
+      series, points: pts, vlines: [{ x: y, color: P.text, dash: [3, 3] }],
+    });
+    const lg = [["가정용 유선", 0], ["이동통신", 1], ["이더넷", 2], ["광섬유 한 쌍", 3]].filter(([, i]) => $("bw-s" + i).checked);
+    lg.forEach(([n, i], k) => NB.text(ctx, "■ " + n, box.x + 8, box.y + 10 + k * 16, { size: 11.5, color: cols[i], bold: true }));
+    if ($("bw-nl").checked) NB.text(ctx, "┄ 닐슨의 법칙", box.x + 8, box.y + 10 + lg.length * 16, { size: 11.5, color: P.bad, bold: true });
+    void ch;
+  }, { aspect: 0.55, minHeight: 280, maxHeight: 440 });
+  bwUpd();
+
+  /* ================= 5. 행성 간 지연 ================= */
+  const AU = 149597870.7, CKM = 299792.458;
+  const DST = { moon: { n: "달", r: null, km: 384400 }, venus: { n: "금성", r: 0.723 }, mars: { n: "화성", r: 1.524 }, jupiter: { n: "목성", r: 5.203 }, saturn: { n: "토성", r: 9.537 }, voyager: { n: "보이저 1호", r: null, km: 171 * AU } };
+  const spDst = NB.seg("sp-dst", () => spUpd());
+  const spA = NB.range("sp-a", (v) => v + "°", () => spUpd());
+  let spDist = 0, pulse = 0;
+  const fmtLt = (s) => (s < 60 ? s.toFixed(s < 10 ? 2 : 1) + "<small>초</small>" : s < 3600 ? (s / 60).toFixed(1) + "<small>분</small>" : (s / 3600).toFixed(1) + "<small>시간</small>");
+  function spUpd() {
+    const D = DST[spDst()];
+    if (D.r) { const th = spA() * Math.PI / 180; spDist = Math.sqrt(1 + D.r * D.r - 2 * D.r * Math.cos(th)) * AU; }
+    else spDist = D.km;
+    spA.el.disabled = !D.r;
+    const t = spDist / CKM;
+    NB.stat("sp-d", spDist >= 1e8 ? (spDist / 1e8).toFixed(spDist >= 1e10 ? 0 : 1) + "<small>억 km</small>" : spDist >= 1e4 ? (spDist / 1e4).toFixed(spDist >= 1e6 ? 0 : 1) + "<small>만 km</small>" : Math.round(spDist).toLocaleString("en-US") + "<small>km</small>");
+    NB.stat("sp-1", fmtLt(t));
+    NB.stat("sp-2", fmtLt(2 * t));
+    NB.stat("sp-tcp", fmtLt(3 * t));
+    pulse = 0;
+    spCv.redraw();
+  }
+  const spCv = NB.canvas($("cv-space"), (ctx, w, h) => {
+    const P = NB.palette(), D = DST[spDst()];
+    const cx = w / 2, cy = h / 2, Rm = Math.min(w, h) / 2 - 18;
+    const rmax = 9.537;
+    const R = (au) => Math.sqrt(au / rmax) * Rm;
+    // orbits
+    [0.723, 1, 1.524, 5.203, 9.537].forEach((r) => { ctx.strokeStyle = r === 1 ? P.accent : P.grid; ctx.lineWidth = r === 1 ? 1.4 : 1; ctx.beginPath(); ctx.arc(cx, cy, R(r), 0, Math.PI * 2); ctx.stroke(); });
+    ctx.fillStyle = P.warn; ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.fill();
+    const ex = cx + R(1), ey = cy;
+    let tx, ty;
+    if (spDst() === "moon") { tx = ex + 14; ty = ey - 10; }
+    else if (spDst() === "voyager") { tx = w - 24; ty = 22; }
+    else { const th = -spA() * Math.PI / 180; tx = cx + R(D.r) * Math.cos(th); ty = cy + R(D.r) * Math.sin(th); }
+    ctx.strokeStyle = P.dim; ctx.setLineDash([4, 4]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(tx, ty); ctx.stroke(); ctx.setLineDash([]);
+    // pulse
+    const f = pulse % 1;
+    const px = NB.lerp(ex, tx, f), py = NB.lerp(ey, ty, f);
+    ctx.fillStyle = P.accent2; ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = P.accent; ctx.beginPath(); ctx.arc(ex, ey, 6, 0, Math.PI * 2); ctx.fill();
+    NB.text(ctx, "지구", ex + 2, ey + 16, { size: 11.5, color: P.accent, bold: true });
+    ctx.fillStyle = P.bad; ctx.beginPath(); ctx.arc(tx, ty, 6, 0, Math.PI * 2); ctx.fill();
+    NB.text(ctx, D.n, tx, ty - 14, { size: 12, color: P.text, bold: true, align: tx > w - 60 ? "right" : "center" });
+    NB.text(ctx, "태양", cx, cy + 18, { size: 11, color: P.dim, align: "center" });
+    const t = spDist / CKM;
+    NB.text(ctx, "빛 펄스 편도 " + (t < 60 ? t.toFixed(1) + "초" : t < 3600 ? (t / 60).toFixed(1) + "분" : (t / 3600).toFixed(1) + "시간"), 10, 16, { size: w < 460 ? 11 : 12.5, color: P.accent2, bold: true });
+    NB.text(ctx, "거리 눈금: 제곱근 압축", 10, h - 12, { size: 10.5, color: P.faint });
+  }, { aspect: 0.62, minHeight: 280, maxHeight: 440 });
+  spUpd();
+  NB.loop($("cv-space"), (dt) => {
+    const t = spDist / CKM;
+    const vis = 0.8 + 0.9 * Math.log10(1 + t); // 보기 좋은 애니메이션 시간(초)
+    pulse += dt / vis;
+    spCv.redraw();
+  });
+})();
+</script>
+</body>
+</html>

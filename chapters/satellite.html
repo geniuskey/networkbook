@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>위성 통신과 우주 인터넷 · NetworkBook</title>
+<meta name="description" content="정지 궤도·중궤도·저궤도의 차이와 케플러 법칙, 왕복 지연과 커버리지, 스타링크 같은 위성 군집, 위성 간 레이저 링크, 위상 배열 단말과 비 감쇠, GPS가 위치를 알아내는 원리를 시뮬레이터로 익힌다.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .sat-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 8px 18px; font-size: 13px; color: var(--text-dim); border-top: 1px solid var(--border); }
+  .sat-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
+</style>
+</head>
+<body data-chapter="satellite">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 15</div>
+    <h1>위성 통신과 우주 인터넷</h1>
+    <p class="lead">태평양 한가운데를 지나는 화물선, 사하라 사막의 연구 기지, 고도 11 km를 나는 비행기, 지진으로 기지국이 모두 무너진 마을. 이곳들에는 광케이블(5장)도 기지국(14장)도 닿지 않는다. 그래도 인터넷이 된다면, 그 신호는 하늘 위 수백~수만 km에 떠 있는 위성을 거쳐 온 것이다. 이 장에서는 위성이 어떻게 떠 있는지, 왜 높이에 따라 지연과 커버리지가 극적으로 달라지는지, 그리고 수천 기의 위성이 레이저로 서로 이어진 “우주 인터넷”이 어떻게 동작하는지 살펴본다.</p>
+    <ul class="objectives">
+      <li>정지 궤도(GEO)·중궤도(MEO)·저궤도(LEO)의 높이와 장단점을 비교한다.</li>
+      <li>케플러 제3법칙으로 고도에서 궤도 주기·속도·왕복 지연·커버리지를 계산한다.</li>
+      <li>위성 군집(constellation)이 지구 전체를 덮는 원리와 필요한 위성 수를 체험한다.</li>
+      <li>진공의 레이저 링크가 해저 광케이블보다 빠를 수 있는 이유를 계산으로 확인한다.</li>
+      <li>위상 배열 안테나, Ku/Ka 대역, 비 감쇠(rain fade)가 위성 단말에 주는 영향을 안다.</li>
+      <li>GPS가 위성 4개의 시간 차로 위치를 구하고, 상대론 보정이 왜 필요한지 설명한다.</li>
+      <li>우주 쓰레기, 궤도 혼잡, 천문 관측 방해 같은 문제를 이해한다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="why">
+    <h2>왜 위성인가: 케이블이 닿지 않는 곳</h2>
+    <p>지구 표면의 약 71%는 바다다. 육지에서도 사막, 극지, 산악 지대처럼 사람이 드문 곳에 광케이블을 묻고 기지국을 세우는 것은 수지가 맞지 않는다. 오늘날 이동통신 기지국이 닿는 면적은 사람이 사는 곳을 중심으로 지구 표면의 일부일 뿐이다. 반면 하늘 높이 떠 있는 위성 하나는 한 번에 대륙만 한 넓이를 내려다본다. 그래서 위성은 오래전부터 다음과 같은 곳을 맡아 왔다.</p>
+    <ul>
+      <li><b>바다와 하늘</b>: 선박과 항공기의 통신, 기내 Wi-Fi, 해상 조난 신호.</li>
+      <li><b>외딴 지역</b>: 산간 마을, 섬, 사막, 남극 기지, 광산과 유전.</li>
+      <li><b>방송</b>: 위성 TV는 한 위성이 대륙 전체에 같은 신호를 뿌리는, 위성에 가장 잘 맞는 일이다.</li>
+      <li><b>재난과 군사</b>: 지상망이 무너졌을 때 단말 하나만 들고 가면 바로 연결된다.</li>
+      <li><b>위치와 시각</b>: GPS 같은 위성 항법은 스마트폰 지도부터 통신망과 금융망의 시계 동기화까지 떠받친다.</li>
+    </ul>
+    <p>위성은 높이, 즉 <b>궤도</b>에 따라 성격이 완전히 달라진다. 크게 세 층으로 나눈다.</p>
+    <ul>
+      <li><span class="term">정지 궤도</span><span class="en">(GEO, geostationary orbit)</span>: 적도 위 고도 <b>35,786 km</b>. 위성이 지구 자전과 똑같이 24시간(정확히는 23시간 56분)에 한 바퀴 돌기 때문에 땅에서 보면 하늘의 한 점에 멈춰 있다. 위성 3기면 극지방을 뺀 지구 대부분을 덮는다. 위성 TV 접시 안테나를 한 방향으로 고정해 두는 이유다.</li>
+      <li><span class="term">중궤도</span><span class="en">(MEO, medium Earth orbit)</span>: 2,000~35,786 km 사이. GPS 위성(약 <b>20,200 km</b>, 주기 약 12시간)과 O3b mPOWER 같은 통신 위성(약 8,000 km)이 여기 있다.</li>
+      <li><span class="term">저궤도</span><span class="en">(LEO, low Earth orbit)</span>: 약 <b>300~2,000 km</b>. 국제우주정거장(약 420 km), 스타링크(주로 약 340~570 km), 원웹(약 1,200 km). 가까워서 지연이 짧고 신호가 강하지만, 90~110분에 한 바퀴씩 빠르게 지나가므로 한 지점에서 몇 분만 보인다. 그래서 수백~수천 기가 필요하다.</li>
+    </ul>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 430" role="img" aria-label="지구와 LEO, MEO(GPS), GEO 궤도를 실제 비율로 그린 그림">
+        <defs><marker id="sat1-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-dim)"/></marker></defs>
+        <!-- scale: 42164 km -> 196 px ; 1 px = 215 km -->
+        <circle cx="230" cy="215" r="196" fill="none" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="230" cy="215" r="123.6" fill="none" stroke="var(--accent-2)" stroke-width="2" stroke-dasharray="6 4"/>
+        <circle cx="230" cy="215" r="32.2" fill="none" stroke="var(--warn)" stroke-width="2"/>
+        <circle cx="230" cy="215" r="29.6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1"/>
+        <text x="230" y="219" text-anchor="middle" class="t-mono" style="font-size:9px">지구</text>
+        <circle cx="426" cy="215" r="6" fill="var(--accent)"/>
+        <circle cx="317" cy="128" r="5" fill="var(--accent-2)"/>
+        <circle cx="253" cy="193" r="3.5" fill="var(--warn)"/>
+        <path d="M262 186 L470 70" class="s-line" marker-end="url(#sat1-a)" style="stroke-width:1"/>
+        <path d="M324 122 L470 150" class="s-line" style="stroke-width:1"/>
+        <path d="M432 215 L470 245" class="s-line" style="stroke-width:1"/>
+        <g>
+          <rect x="474" y="44" width="310" height="66" rx="10" fill="color-mix(in srgb, var(--warn) 12%, transparent)" stroke="var(--warn)"/>
+          <text x="488" y="66" class="t" style="font-weight:700">LEO 저궤도 · 300~2,000 km</text>
+          <text x="488" y="86" class="t-dim">스타링크 약 550 km · 주기 약 95분</text>
+          <text x="488" y="102" class="t-dim">지구 표면에 거의 붙어 있다(그림 속 노란 원)</text>
+          <rect x="474" y="124" width="310" height="66" rx="10" class="f-acc2-soft"/>
+          <text x="488" y="146" class="t" style="font-weight:700">MEO 중궤도 · GPS 약 20,200 km</text>
+          <text x="488" y="166" class="t-dim">주기 약 11시간 58분(하루 두 바퀴)</text>
+          <text x="488" y="182" class="t-dim">항법 위성, 일부 통신 위성</text>
+          <rect x="474" y="220" width="310" height="66" rx="10" class="f-acc-soft"/>
+          <text x="488" y="242" class="t" style="font-weight:700">GEO 정지 궤도 · 35,786 km</text>
+          <text x="488" y="262" class="t-dim">주기 23시간 56분 = 지구 자전과 같다</text>
+          <text x="488" y="278" class="t-dim">적도 위 한 점에 멈춰 보인다 · 왕복 약 0.5초</text>
+        </g>
+        <text x="474" y="330" class="t-dim">지구 반지름 6,371 km 기준, 실제 비율로 그렸다.</text>
+        <text x="474" y="350" class="t-dim">GEO 궤도 반지름은 지구 반지름의 약 6.6배,</text>
+        <text x="474" y="370" class="t-dim">스타링크 궤도는 고작 1.09배다.</text>
+        <text x="474" y="396" class="t-mono">달까지는 384,400 km — 이 그림 밖, 약 9배 더 멀리.</text>
+      </svg>
+      <figcaption><b>그림 15-1.</b> 세 가지 궤도를 실제 비율로 그렸다. 저궤도(노란 원)는 지구를 감싼 얇은 껍질 수준이고, 정지 궤도는 저 멀리 떨어져 있다. 이 거리 차이가 곧 지연 차이다.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="kepler">
+    <h2>궤도의 물리: 높을수록 느리게 돈다</h2>
+    <p>위성은 엔진으로 떠 있는 것이 아니다. 대포알을 아주 세게 쏘면 땅으로 떨어지는 동안 둥근 지구 표면도 그만큼 휘어져 나가서, 영원히 “떨어지면서도 땅에 닿지 않는” 상태가 된다. 이것이 궤도다. 고도 550 km에서 그 속도는 초속 약 <b>7.6 km</b>, 서울에서 부산까지 1분이 안 걸리는 속도다.</p>
+    <p>높이 올라갈수록 지구 중력이 약해져 필요한 속도는 줄고, 돌아야 할 원은 커진다. 그래서 주기는 급격히 길어진다. 17세기 케플러가 행성에서 발견한 <span class="term">케플러 제3법칙</span><span class="en">(Kepler's third law)</span>이 그대로 적용된다.</p>
+    <div class="formula">
+      <div><b>주기</b> T = 2π √(a³ / μ) &nbsp;&nbsp;·&nbsp;&nbsp; <b>속도</b> v = √(μ / a)</div>
+      <div class="where">a = 지구 중심에서 위성까지 거리(지구 반지름 6,371 km + 고도), μ = 지구 중력 상수 398,600 km³/s². 거리가 4배가 되면 주기는 8배(4<sup>1.5</sup>)가 된다.</div>
+    </div>
+    <p>통신에서 중요한 값은 세 가지다. ① <b>왕복 지연</b>: 내 요청이 위성을 거쳐 지상국에 갔다가, 응답이 다시 위성을 거쳐 돌아오면 고도의 4배를 빛의 속도로 달린다. ② <b><span class="term">커버리지</span><span class="en">(coverage)</span></b>: 위성이 지평선 위로 충분히 높이(보통 앙각 25° 이상) 보이는 지역의 크기. ③ <b>보이는 시간</b>: 한 위성이 머리 위를 지나가는 동안 쓸 수 있는 시간. 이 셋은 서로 맞물려 있다.</p>
+    <div class="callout analogy"><strong>높은 등대와 낮은 손전등</strong><p>정지 궤도 위성은 아주 높은 등대다. 하나가 넓은 바다를 늘 비추지만, 빛이 오가는 거리가 멀다. 저궤도 위성은 사람 머리 바로 위를 빠르게 지나가는 손전등이다. 가깝고 밝지만 비추는 원이 작고 금세 지나가 버리니, 손전등 수천 개가 줄지어 계속 지나가야 빈틈이 없다. 택배로 치면 GEO는 먼 곳의 거대한 중앙 물류 창고 하나, LEO는 동네를 계속 순회하는 수천 대의 배송 트럭이다.</p></div>
+
+    <div class="sim" id="sim-orbit">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>궤도 계산기: 고도를 바꾸면 무엇이 달라지나</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cv-orbit"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>고도 <output id="ob-h-out"></output></span><input type="range" id="ob-h" min="0" max="1000" value="124"></label>
+          <div class="ctrl"><span>대표 궤도</span><div class="seg" id="ob-pre"><button data-value="420">ISS</button><button data-value="550" class="on">스타링크</button><button data-value="1200">원웹</button><button data-value="20200">GPS</button><button data-value="35786">정지</button></div></div>
+          <label class="ctrl"><span>최소 앙각(지평선 위 각도) <output id="ob-el-out"></output></span><input type="range" id="ob-el" min="0" max="45" value="25"></label>
+          <div class="ctrl"><span>시간 배속</span><div class="seg" id="ob-warp"><button data-value="300">×300</button><button data-value="1500" class="on">×1500</button><button data-value="6000">×6000</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">궤도 주기</span><span class="v" id="ob-T">—</span></div>
+        <div class="stat"><span class="k">위성 속도</span><span class="v" id="ob-v">—</span></div>
+        <div class="stat"><span class="k">최소 왕복 지연(머리 위)</span><span class="v" id="ob-rtt">—</span></div>
+        <div class="stat"><span class="k">왕복 지연(커버리지 가장자리)</span><span class="v" id="ob-rtt2">—</span></div>
+        <div class="stat"><span class="k">커버리지 반경</span><span class="v" id="ob-cov">—</span></div>
+        <div class="stat"><span class="k">한 지점에서 보이는 시간</span><span class="v" id="ob-pass">—</span></div>
+      </div>
+      <div class="sim-note">북극 위에서 내려다본 적도면 그림이다. 밝은 호는 위성이 앙각 기준 이상으로 보이는 지역, 작은 네모는 지구와 함께 자전하는 지상 단말이다. <b>해볼 것</b>: 고도를 GEO(35,786 km)에 맞추면 위성이 단말 위에 멈춰 있는 것을 확인하자. 스타링크 고도에서는 한 위성이 몇 분 만에 지나가 버린다. <b>단순화</b>: 원 궤도, 적도 궤도, 굽은 파이프(위성이 신호를 그대로 지상국에 되돌려 줌)를 가정했고, 단말과 지상국이 같은 위성 아래에 있다고 보았다. 실제 지연에는 지상국에서 서버까지의 육상 구간, 처리·대기 시간이 더해진다.</div>
+    </div>
+
+    <div class="table-wrap"><table>
+      <thead><tr><th>궤도</th><th>고도</th><th>주기</th><th>최소 왕복 지연</th><th>실제 체감 왕복 지연</th><th>지구 전체에 필요한 위성</th></tr></thead>
+      <tbody>
+        <tr><td>LEO (스타링크)</td><td>약 550 km</td><td>약 95분</td><td>약 7 ms</td><td>약 25~50 ms</td><td>수백~수천 기</td></tr>
+        <tr><td>LEO (원웹)</td><td>약 1,200 km</td><td>약 109분</td><td>약 16 ms</td><td>약 40~70 ms</td><td>수백 기</td></tr>
+        <tr><td>MEO (O3b mPOWER)</td><td>약 8,000 km</td><td>약 4.8시간</td><td>약 107 ms</td><td>약 120~150 ms</td><td>수십 기 이하</td></tr>
+        <tr><td>MEO (GPS)</td><td>약 20,200 km</td><td>약 12시간</td><td>— (항법 전용)</td><td>—</td><td>24기 이상(현재 약 31기)</td></tr>
+        <tr><td>GEO</td><td>35,786 km</td><td>23시간 56분</td><td>약 477 ms</td><td>약 550~700 ms</td><td>3기(극지 제외)</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="latency">
+    <h2>정지 궤도의 0.5초, 저궤도의 30밀리초</h2>
+    <p>빛은 1초에 약 30만 km를 간다. 정지 궤도까지 올라갔다 내려오는 데만 0.12초, 요청이 지상국에 갔다가 응답이 돌아오는 왕복이면 고도의 4배인 약 14만 3천 km, 즉 <b>최소 약 0.48초</b>다. 여기에 지상국에서 인터넷까지의 구간과 처리 시간이 더해져 실제 GEO 위성 인터넷의 핑은 보통 <b>600 ms 안팎</b>이다.</p>
+    <p>0.5초는 웹 페이지 하나를 여는 데도 크게 느껴진다. TCP 연결(3방향 악수, 9장), TLS 암호화 악수(22장), HTTP 요청이 모두 왕복을 몇 번씩 요구하기 때문에 첫 화면이 뜨기까지 2~3초가 걸리기 일쑤다. 화상 통화에서는 상대의 말이 끝나고 한참 뒤에 대답이 들려 서로 말이 겹친다. 온라인 게임은 거의 불가능하다. 그래서 GEO 위성 인터넷 업체들은 TCP를 중간에서 대신 처리해 주는 <b>성능 향상 프록시(PEP)</b> 같은 꼼수를 써 왔다.</p>
+    <p>저궤도는 이 문제를 물리로 해결한다. 550 km면 최소 왕복이 약 7 ms이고, 위성과 지상국을 오가는 비스듬한 경로, 지상국에서 인터넷 교환 지점까지의 거리, 위성 사이의 스케줄링 대기까지 합쳐도 실제 왕복은 <b>약 25~50 ms 수준</b>이다. 도시의 유선 인터넷(10~20 ms)보다는 길지만, 화상 회의와 게임이 충분히 된다. 이것이 2020년대에 위성 인터넷이 “최후의 수단”에서 “쓸 만한 인터넷”으로 바뀐 가장 큰 이유다.</p>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">위성의 고도를 550 km에서 1,100 km로 두 배 올리면, 위성 하나가 덮는 지역의 넓이(앙각 25° 기준)는 대략 어떻게 될까?</p><p class="wi-hint">궤도 계산기에서 고도를 550 → 1,100 km로 바꾸고 커버리지 반경을 비교해 보자.</p><div class="opts">
+      <button class="opt">두 배쯤 넓어진다</button>
+      <button class="opt" data-correct>네 배 가까이 넓어진다</button>
+      <button class="opt">거의 그대로다</button>
+      <button class="opt">오히려 좁아진다</button>
+    </div><div class="quiz-exp">낮은 고도에서 커버리지 반경은 고도에 거의 비례해 약 940 km → 약 1,740 km로 1.85배가 된다. 넓이는 반경의 제곱이므로 약 3.4배다. 그래서 고도를 올리면 위성 수를 크게 줄일 수 있지만, 그 대가로 지연이 늘고 신호가 약해지며(거리 제곱에 반비례) 한 위성이 나눠 써야 할 사용자도 많아진다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="constellation">
+    <h2>위성 군집: 수천 기가 함께 지구를 덮는다</h2>
+    <p>저궤도 위성 하나는 지구 표면의 1%도 덮지 못하고 몇 분 만에 지나간다. 그래서 여러 <b>궤도면</b>(위성이 도는 고리)을 지구 둘레에 부채처럼 펼쳐 놓고, 각 고리에 여러 위성을 일정한 간격으로 줄 세운다. 이렇게 함께 움직이는 위성 무리를 <span class="term">위성 군집</span><span class="en">(satellite constellation)</span>이라고 한다. 앞 위성이 지평선으로 넘어가기 전에 다음 위성이 떠올라야 연결이 끊기지 않는다. 단말은 몇 분마다, 실제로는 스타링크의 경우 15초 단위로 다른 위성으로 갈아탄다(이동통신의 핸드오버와 같다, 14장).</p>
+    <p>궤도면의 기울기, 즉 <b>경사각</b>(inclination)도 중요하다. 경사각 53°인 궤도는 위도 ±53° 사이만 지나므로 사람이 많이 사는 중위도에 위성이 몰리고 극지방은 비게 된다. 극지까지 덮으려면 경사각을 90° 가까이(극궤도) 둔다. 원웹(87.9°)과 이리듐(86.4°)이 그렇다.</p>
+    <div class="sim" id="sim-const">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>위성 군집 설계: 지구를 빈틈없이 덮으려면</h3></div>
+      <div class="sim-view"><canvas id="cv-const"></canvas></div>
+      <div class="sat-legend"><span><i style="background:var(--accent)"></i>위성 1기 이상 보임(진할수록 많음)</span><span><i style="background:color-mix(in srgb, var(--bad) 35%, transparent)"></i>아무 위성도 안 보이는 곳</span><span><i style="background:var(--warn)"></i>서울</span></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>실제 군집 예시</span><div class="seg" id="cs-pre"><button data-value="starlink" class="on">스타링크 1셸</button><button data-value="oneweb">원웹</button><button data-value="kuiper">카이퍼 1셸</button><button data-value="iridium">이리듐</button><button data-value="tiny">소규모</button></div></div>
+        <label class="ctrl"><span>궤도면 수 <output id="cs-p-out"></output></span><input type="range" id="cs-p" min="1" max="72" value="72"></label>
+        <label class="ctrl"><span>궤도면당 위성 수 <output id="cs-s-out"></output></span><input type="range" id="cs-s" min="1" max="40" value="22"></label>
+        <label class="ctrl"><span>고도 <output id="cs-h-out"></output></span><input type="range" id="cs-h" min="300" max="2000" step="10" value="550"></label>
+        <label class="ctrl"><span>경사각 <output id="cs-i-out"></output></span><input type="range" id="cs-i" min="0" max="98" value="53"></label>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn" id="cs-run">일시 정지</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">총 위성 수</span><span class="v" id="cs-n">—</span></div>
+        <div class="stat"><span class="k">지구 표면 커버리지</span><span class="v" id="cs-cov">—</span></div>
+        <div class="stat"><span class="k">서울에서 동시에 보이는 위성</span><span class="v" id="cs-seoul">—</span></div>
+        <div class="stat"><span class="k">위성 1기의 커버리지 반경</span><span class="v" id="cs-r">—</span></div>
+      </div>
+      <div class="sim-note">위성 위치는 실제 궤도 역학(원 궤도, 지구 자전 포함)으로 계산하고, 앙각 25° 이상으로 보이는 위성 수를 5° 격자마다 세어 색칠했다. 지도는 위경도를 그대로 편 도법이라 극지방이 옆으로 늘어나 보인다. <b>해볼 것</b>: ① “소규모”에서 궤도면 수를 늘려 빈틈이 사라지는 지점을 찾자. ② 스타링크 1셸(53°)과 원웹(87.9°)의 극지방 커버리지를 비교하자. ③ 고도를 낮추면 같은 위성 수로 커버리지가 얼마나 줄어드는지 보자. <b>단순화</b>: 하나의 셸만 그렸고(실제 스타링크는 고도·경사각이 다른 여러 셸), 위성 간 위상은 단순한 워커(Walker) 배치를 썼다.</div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>군집</th><th>운영</th><th>고도</th><th>규모</th><th>특징</th></tr></thead>
+      <tbody>
+        <tr><td>스타링크(Starlink)</td><td>SpaceX</td><td>약 340~570 km</td><td>2025년 기준 약 8,000기 이상 운용, 계속 증가</td><td>레이저 위성 간 링크, 사용자 수백만 명 이상, 휴대폰 직접 연결</td></tr>
+        <tr><td>원웹(OneWeb)</td><td>Eutelsat OneWeb</td><td>약 1,200 km</td><td>약 650기</td><td>극궤도, 주로 기업·정부·항공 대상</td></tr>
+        <tr><td>카이퍼(Kuiper)</td><td>Amazon</td><td>약 590~630 km</td><td>계획 3,236기, 2025년부터 발사</td><td>2020년대 후반 본격 서비스 목표</td></tr>
+        <tr><td>이리듐(Iridium)</td><td>Iridium</td><td>약 780 km</td><td>66기(+예비)</td><td>1998년 개시, 위성 간 링크를 처음 상용화한 위성 전화</td></tr>
+        <tr><td>GEO 위성(예: Viasat, 무궁화)</td><td>여러 회사</td><td>35,786 km</td><td>대륙당 1~수 기</td><td>방송, 해상·항공, 대용량 고처리량 위성(HTS)</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="isl">
+    <h2>위성 간 레이저 링크: 우주가 해저 케이블보다 빠를 수 있다</h2>
+    <p>초기 저궤도 인터넷은 <span class="term">벤트 파이프</span><span class="en">(bent pipe)</span> 방식이었다. 위성은 거울처럼 단말의 신호를 받아 근처 지상국(게이트웨이)으로 그대로 내려보낼 뿐이다. 그래서 반경 약 1,000 km 안에 지상국이 있어야 했고, 망망대해 한가운데서는 쓸 수 없었다. 이를 해결한 것이 <span class="term">위성 간 링크</span><span class="en">(ISL, inter-satellite link)</span>다. 스타링크 위성들은 적외선 레이저로 앞뒤·옆 궤도면의 위성과 이어져, 우주에 떠 있는 그물망 라우터가 된다(8장의 라우팅이 하늘에서 일어난다). 링크당 약 100 Gbps 수준의 속도로, 패킷은 위성에서 위성으로 건너뛰어 목적지 근처 지상국에서 내려온다.</p>
+    <p>여기서 흥미로운 사실이 나온다. 광섬유 속에서 빛은 유리의 굴절률(약 1.47) 때문에 진공보다 <b>약 1.5배 느리게</b>, 초속 약 20만 km로 간다(5장). 게다가 해저 케이블은 해안선과 해저 지형을 따라 구불구불 돌아간다. 반면 위성 사이의 레이저는 <b>진공</b>을 초속 30만 km로 곧게 달린다. 위성까지 올라갔다 내려오는 손해(약 1,100 km)만 만회할 수 있을 정도로 먼 거리라면, 위성 경로가 더 빠르다. 실제로 런던과 뉴욕 사이 초단타 금융 거래처럼 1 ms가 돈인 분야에서는 같은 이유로 진공에 가까운 공기를 지나는 마이크로파 중계망을 쓴다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 260" style="min-width:560px" role="img" aria-label="해저 광케이블 경로와 위성 레이저 링크 경로 비교">
+        <defs><marker id="sat2-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+        <marker id="sat2-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--warn)"/></marker></defs>
+        <path d="M30 200 Q400 245 770 200" fill="none" stroke="var(--border)" stroke-width="18" stroke-linecap="round"/>
+        <text x="400" y="250" text-anchor="middle" class="t-dim">지구 표면</text>
+        <rect x="40" y="168" width="70" height="28" rx="6" class="f-elev"/><text x="75" y="187" text-anchor="middle" class="t">런던</text>
+        <rect x="690" y="168" width="70" height="28" rx="6" class="f-elev"/><text x="725" y="187" text-anchor="middle" class="t">뉴욕</text>
+        <path d="M110 200 C190 230 240 214 300 226 S420 208 470 230 S600 214 690 198" fill="none" stroke="var(--warn)" stroke-width="2.5" marker-end="url(#sat2-b)"/>
+        <text x="400" y="206" text-anchor="middle" class="t" style="fill:var(--warn);font-weight:700">해저 광케이블 · 빛 속도의 약 2/3 · 구불구불</text>
+        <g fill="var(--accent)">
+          <rect x="100" y="64" width="16" height="10" rx="2"/><rect x="215" y="52" width="16" height="10" rx="2"/><rect x="335" y="46" width="16" height="10" rx="2"/><rect x="455" y="46" width="16" height="10" rx="2"/><rect x="575" y="52" width="16" height="10" rx="2"/><rect x="690" y="64" width="16" height="10" rx="2"/>
+        </g>
+        <path d="M80 168 L104 78" class="s-acc" marker-end="url(#sat2-a)"/>
+        <path d="M118 68 L212 58 M233 56 L332 51 M353 51 L452 51 M473 51 L572 56 M593 58 L688 68" stroke="var(--accent)" stroke-width="2" stroke-dasharray="7 4" fill="none"/>
+        <path d="M700 78 L720 166" class="s-acc" marker-end="url(#sat2-a)"/>
+        <text x="400" y="30" text-anchor="middle" class="t" style="fill:var(--accent);font-weight:700">위성 레이저 링크 · 진공에서 빛 속도 · 거의 직선</text>
+        <text x="400" y="100" text-anchor="middle" class="t-dim">위아래로 약 550 km씩 더 가지만, 1.5배 빠르다</text>
+        <text x="400" y="122" text-anchor="middle" class="t-mono">거리가 약 2,000~3,000 km를 넘으면 위성 경로가 유리해진다</text>
+      </svg></div>
+      <figcaption><b>그림 15-2.</b> 같은 두 도시를 잇는 두 길. 광케이블은 짧지만 느린 길(유리 속 빛), 위성 경로는 위아래로 돌아가지만 빠른 길(진공 속 빛)이다. 먼 거리일수록 속도 차이가 쌓여 위성 쪽이 이긴다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-isl">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>광섬유 대 위성 레이저: 어느 쪽이 먼저 도착할까</h3></div>
+      <div class="sim-view"><canvas id="cv-isl"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>구간</span><div class="seg" id="isl-route"><button data-value="0" class="on">런던–뉴욕</button><button data-value="1">서울–LA</button><button data-value="2">싱가포르–런던</button><button data-value="3">서울–부산</button></div></div>
+        <label class="ctrl"><span>케이블 우회 계수(실제 길이 ÷ 직선 거리) <output id="isl-fs-out"></output></span><input type="range" id="isl-fs" min="1" max="1.8" step="0.05" value="1.15"></label>
+        <label class="ctrl"><span>위성 고도 <output id="isl-h-out"></output></span><input type="range" id="isl-h" min="300" max="1500" step="10" value="550"></label>
+        <label class="ctrl"><span>레이저 경로 우회 계수 <output id="isl-ks-out"></output></span><input type="range" id="isl-ks" min="1" max="1.5" step="0.02" value="1.1"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">직선(대권) 거리</span><span class="v" id="isl-d">—</span></div>
+        <div class="stat"><span class="k">광섬유 왕복</span><span class="v" id="isl-f">—</span></div>
+        <div class="stat"><span class="k">위성 레이저 왕복</span><span class="v" id="isl-s">—</span></div>
+        <div class="stat"><span class="k">위성이 유리해지는 거리</span><span class="v" id="isl-x">—</span></div>
+      </div>
+      <div class="sim-note">곡선은 거리별 왕복 시간이다. 광섬유: 거리 × 우회 계수 ÷ (빛 속도 ÷ 1.468). 위성: (고도 × 2 + 위성 고도에서의 호 길이 × 우회 계수) ÷ 빛 속도. <b>해볼 것</b>: 서울–부산(약 325 km)처럼 가까운 거리에서는 위성이 손해다. 싱가포르–런던처럼 케이블이 크게 돌아가는 구간에서는 차이가 수십 ms까지 벌어진다. <b>단순화</b>: 위성 링크의 처리·전환 지연, 혼잡, 지상국에서 서버까지의 구간은 뺐다. 실제 서비스의 측정값은 이론값보다 크다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="terminal">
+    <h2>위성 단말: 움직이지 않고 하늘을 쫓는 안테나</h2>
+    <p>정지 궤도 위성은 하늘에 멈춰 있으니 접시 안테나를 한 번 맞춰 두면 끝이다. 하지만 저궤도 위성은 몇 분 만에 하늘을 가로지르고, 15초마다 다른 위성으로 갈아타야 한다. 모터로 접시를 돌려서는 감당할 수 없다. 해법은 12장에서 본 빔포밍을 극단까지 밀어붙인 <span class="term">위상 배열 안테나</span><span class="en">(phased array antenna)</span>다. 평평한 판에 작은 안테나 소자 수백~천여 개를 깔고, 각 소자가 내보내는 전파의 <b>위상</b>(파동의 타이밍)을 조금씩 어긋나게 하면 합쳐진 파면이 비스듬히 기울어 원하는 방향으로 날아간다. 기계 부품 없이 마이크로초 단위로 빔 방향을 바꾸는 <b>전자식 빔 조향</b>이다.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 300" role="img" aria-label="위상 배열 안테나의 전자식 빔 조향">
+        <defs><marker id="sat3-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <g transform="translate(40,0)">
+          <text x="170" y="24" text-anchor="middle" class="t" style="font-weight:700">위상을 똑같이 → 빔이 바로 위로</text>
+          <g class="f-acc-soft"><rect x="40" y="240" width="30" height="14" rx="3"/><rect x="95" y="240" width="30" height="14" rx="3"/><rect x="150" y="240" width="30" height="14" rx="3"/><rect x="205" y="240" width="30" height="14" rx="3"/><rect x="260" y="240" width="30" height="14" rx="3"/></g>
+          <g class="t-mono" text-anchor="middle"><text x="55" y="272">0°</text><text x="110" y="272">0°</text><text x="165" y="272">0°</text><text x="220" y="272">0°</text><text x="275" y="272">0°</text></g>
+          <g fill="none" stroke="var(--accent)" stroke-width="1.6" opacity=".8"><path d="M30 200 H300"/><path d="M30 160 H300"/><path d="M30 120 H300"/></g>
+          <path d="M165 230 V60" class="s-acc" marker-end="url(#sat3-a)" style="stroke-width:3"/>
+          <text x="300" y="70" class="t-dim" text-anchor="end">파면(같은 위상의 선)</text>
+        </g>
+        <g transform="translate(420,0)">
+          <text x="170" y="24" text-anchor="middle" class="t" style="font-weight:700">위상을 조금씩 늦추면 → 빔이 기운다</text>
+          <g class="f-acc-soft"><rect x="40" y="240" width="30" height="14" rx="3"/><rect x="95" y="240" width="30" height="14" rx="3"/><rect x="150" y="240" width="30" height="14" rx="3"/><rect x="205" y="240" width="30" height="14" rx="3"/><rect x="260" y="240" width="30" height="14" rx="3"/></g>
+          <g class="t-mono" text-anchor="middle"><text x="55" y="272">0°</text><text x="110" y="272">60°</text><text x="165" y="272">120°</text><text x="220" y="272">180°</text><text x="275" y="272">240°</text></g>
+          <g fill="none" stroke="var(--accent)" stroke-width="1.6" opacity=".8"><path d="M30 225 L300 150"/><path d="M30 185 L300 110"/><path d="M30 145 L300 70"/></g>
+          <path d="M150 230 L102 58" class="s-acc" marker-end="url(#sat3-a)" style="stroke-width:3"/>
+          <rect x="70" y="36" width="20" height="12" rx="2" fill="var(--accent-2)"/><text x="96" y="46" class="t-mono">위성</text>
+        </g>
+        <text x="400" y="296" text-anchor="middle" class="t-dim">소자 수가 많을수록 빔이 좁고 강해진다. 스타링크 단말 한 장에는 이런 소자가 수백~천여 개 들어 있다.</text>
+      </svg>
+      <figcaption><b>그림 15-3.</b> 위상 배열의 원리. 모든 소자가 같은 위상으로 쏘면 파면이 수평이라 빔은 바로 위로 간다. 옆 소자로 갈수록 위상을 일정하게 늦추면 파면이 기울고, 빔은 그 반대쪽으로 꺾인다. 위상만 바꾸면 되므로 움직이는 부품 없이 위성을 따라간다.</figcaption>
+    </figure>
+    <p>위성 통신은 주로 마이크로파 대역을 쓴다. 오래된 C 대역(4~8 GHz)은 비에 강하지만 안테나가 크다. 위성 TV와 스타링크 사용자 링크는 <span class="term">Ku 대역</span><span class="en">(Ku band, 약 12~18 GHz)</span>, 대용량 위성과 지상국 링크는 <span class="term">Ka 대역</span><span class="en">(Ka band, 약 26.5~40 GHz)</span>, 최신 게이트웨이는 그보다 높은 Q/V·E 대역까지 쓴다. 주파수가 높을수록 같은 크기 안테나로 빔이 좁아지고 쓸 수 있는 대역폭이 넓어지지만(2장의 섀넌 한계를 기억하자), 대가가 있다. 빗방울의 크기(수 mm)가 전파의 파장(Ku 약 2.5 cm, Ka 약 1 cm)과 비슷해지면서 빗방울이 전파를 흡수하고 흩뜨린다. 이것이 <span class="term">비 감쇠</span><span class="en">(rain fade)</span>다. 위성 TV가 폭우 때 끊기는 바로 그 현상이다.</p>
+    <div class="sim" id="sim-rain">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>비 감쇠: 소나기가 오면 신호가 얼마나 약해지나</h3></div>
+      <div class="sim-view"><canvas id="cv-rain"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>주파수 대역</span><div class="seg" id="rn-band"><button data-value="0" class="on">Ku 12 GHz</button><button data-value="1">Ka 20 GHz</button><button data-value="2">Ka 30 GHz</button><button data-value="3">Q/V 40 GHz</button></div></div>
+        <label class="ctrl"><span>강우 강도 <output id="rn-r-out"></output></span><input type="range" id="rn-r" min="0" max="100" value="25"></label>
+        <label class="ctrl"><span>위성 앙각 <output id="rn-el-out"></output></span><input type="range" id="rn-el" min="15" max="90" value="40"></label>
+        <label class="ctrl"><span>링크 여유(마진) <output id="rn-m-out"></output></span><input type="range" id="rn-m" min="2" max="20" value="8"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">빗속 전파 경로</span><span class="v" id="rn-L">—</span></div>
+        <div class="stat"><span class="k">비 감쇠</span><span class="v" id="rn-A">—</span></div>
+        <div class="stat"><span class="k">남는 신호 세기</span><span class="v" id="rn-p">—</span></div>
+        <div class="stat"><span class="k">링크 상태</span><span class="v" id="rn-st">—</span></div>
+      </div>
+      <div class="sim-note">감쇠(dB) = 빗속 1 km당 감쇠(ITU-R P.838 계수, 수평 편파) × 빗속 경로 길이 × 경로 축소 계수. 비구름 높이를 5 km로 두고, 앙각이 낮을수록 빗속을 비스듬히 오래 지난다. 참고: 이슬비 약 2.5 mm/h, 강한 비 약 25 mm/h, 장대비 50 mm/h, 열대 폭우 100 mm/h 이상. <b>해볼 것</b>: 같은 비에서 Ku와 Ka의 감쇠를 비교하자. 감쇠가 마진을 넘으면 연결이 끊긴다. 실제 단말은 그 전에 변조를 낮춰(12장의 적응 변조) 속도를 줄여서라도 연결을 유지한다. <b>단순화</b>: 구름·수증기 흡수, 신틸레이션, 국지적인 비의 분포는 무시했다.</div>
+    </div>
+    <h3>휴대폰이 위성에 바로 연결된다면</h3>
+    <p>위성 단말 없이 평범한 스마트폰이 위성과 직접 통신하는 <span class="term">위성 직접 연결</span><span class="en">(direct-to-cell, D2C)</span>도 현실이 되었다. 2022년 아이폰의 위성 긴급 SOS 문자를 시작으로, 3GPP는 Release 17(2022)에서 <span class="term">비지상 네트워크</span><span class="en">(NTN, non-terrestrial network)</span>를 5G 표준에 넣었다. 위성을 “하늘에 있는 아주 높은 기지국”으로 취급하되, 큰 지연과 위성 이동이 만드는 도플러 편이(초속 7.6 km!)를 단말이 미리 보정하도록 한 것이다. 휴대폰 안테나는 작고 출력이 약하므로, 위성 쪽에 수십 m²에 이르는 거대한 위상 배열을 달아 약한 신호를 듣는다. 아직은 문자와 저속 데이터 수준이지만, 산속과 바다에서 “통신 불가 지역”을 없애는 방향으로 빠르게 발전하고 있다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="gnss">
+    <h2>GPS: 시계를 실은 위성이 위치를 알려 준다</h2>
+    <p>지금까지는 위성이 데이터를 나르는 이야기였다. 통신 위성만큼 중요한 또 하나의 위성 시스템이 <span class="term">GNSS</span><span class="en">(global navigation satellite system, 위성 항법 시스템)</span>다. 미국의 GPS, 러시아의 GLONASS, 유럽의 Galileo, 중국의 BeiDou가 있고, 한국도 한반도 지역 위성 항법 시스템 KPS를 개발 중이다. GPS 위성은 약 20,200 km 높이의 6개 궤도면에 30기 남짓이 돌며, 어디서든 하늘에 보통 6~12기가 보인다.</p>
+    <p>원리는 놀랍도록 단순하다. 각 위성은 <span class="term">원자시계</span><span class="en">(atomic clock)</span>가 알려 주는 정확한 시각과 자기 위치를 계속 방송한다. 수신기는 신호가 “몇 시 몇 분 몇 초.000000에 보냈다”고 적힌 것을 받아, 받은 시각과의 차이에 빛의 속도를 곱해 위성까지 거리를 안다. 위성 하나와의 거리를 알면 나는 그 위성을 중심으로 한 구 위 어딘가에 있고, 세 위성이면 세 구가 만나는 한 점으로 좁혀진다. 이를 <span class="term">삼변측량</span><span class="en">(trilateration)</span>이라 한다.</p>
+    <p>문제는 내 휴대폰의 시계다. 빛은 1 나노초(10억분의 1초)에 약 30 cm를 간다. 휴대폰의 수정 시계가 고작 1 마이크로초만 틀려도 모든 거리가 300 m씩 틀린다. 그래서 수신기는 <b>자기 시계의 오차를 네 번째 미지수</b>로 놓고 함께 푼다. 3차원 위치(x, y, z)와 시계 오차까지 미지수가 4개이므로 위성이 <b>최소 4기</b> 필요하다. 덕분에 값싼 수신기도 위성의 원자시계 수준으로 정확한 시각을 얻는다. 이동통신 기지국과 데이터센터가 GPS를 시계로 쓰는 이유다.</p>
+    <div class="sim" id="sim-gnss">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>삼변측량: 시계가 틀리면 위치도 틀린다</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cv-gnss" style="cursor:crosshair"></canvas></div>
+        <div class="sim-controls">
+          <label class="ctrl"><span>수신기 시계 오차 <output id="gn-dt-out"></output></span><input type="range" id="gn-dt" min="-1000" max="1000" step="10" value="300"></label>
+          <label class="ctrl"><span>거리 측정 잡음 <output id="gn-nz-out"></output></span><input type="range" id="gn-nz" min="0" max="60" value="0"></label>
+          <div class="ctrl"><span>위성 수</span><div class="seg" id="gn-n"><button data-value="3" class="on">3기</button><button data-value="4">4기</button><button data-value="5">5기</button></div></div>
+          <div class="ctrl"><span>위성 배치</span><div class="seg" id="gn-geo"><button data-value="good" class="on">고르게 퍼짐</button><button data-value="bad">한쪽에 몰림</button></div></div>
+          <label class="check"><input type="checkbox" id="gn-clk" checked> 시계 오차도 미지수로 풀기</label>
+          <div class="btn-row"><button class="btn" id="gn-re">다시 측정(잡음)</button></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">시계 오차가 만드는 거리 오차</span><span class="v" id="gn-cd">—</span></div>
+        <div class="stat"><span class="k">추정 위치 오차</span><span class="v" id="gn-err">—</span></div>
+        <div class="stat"><span class="k">추정한 시계 오차</span><span class="v" id="gn-best">—</span></div>
+      </div>
+      <div class="sim-note">2차원 모형이다(위치 x, y). 그래서 시계 오차까지 풀려면 위성 3기면 되고, 실제 3차원에서는 4기가 필요하다. 원은 측정된 거리(가짜 거리, pseudorange)다. 시계가 틀리면 모든 원이 같은 만큼 부풀어 한 점에서 만나지 않는다. <b>해볼 것</b>: ① “시계 오차도 미지수로 풀기”를 끄고 시계 오차를 바꿔 보자. ② 다시 켜면 시계 오차가 있어도 정확한 위치가 나온다. ③ 잡음을 넣고 배치를 “한쪽에 몰림”으로 바꾸면 같은 잡음에도 오차가 크게 늘어난다(정밀도 저하, DOP). 캔버스를 누르면 수신기 위치를 옮길 수 있다. 거리 축척은 실제보다 훨씬 줄였다.</div>
+    </div>
+    <div class="callout deep"><strong>GPS는 상대성 이론 없이는 하루 만에 고장 난다</strong><p>GPS 위성은 초속 약 3.9 km로 움직여서 특수 상대론에 따라 시계가 하루 약 <b>7 µs</b> 느려진다. 반면 지구 중력이 약한 높은 곳에 있어 일반 상대론에 따라 하루 약 <b>45 µs</b> 빨라진다. 합하면 위성의 시계는 지상보다 하루에 약 <b>38 µs</b> 빨리 간다. 38 µs × 빛의 속도 ≈ <b>11 km</b>. 보정하지 않으면 위치 오차가 하루에 10 km 넘게 쌓인다. 그래서 GPS 위성의 원자시계는 발사 전에 기준 주파수(10.23 MHz)를 일부러 약 0.00457 Hz 낮게 맞춰 둔다. 아인슈타인의 이론이 매일 수십억 대의 휴대폰에서 검증되고 있는 셈이다.</p></div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">시계 오차를 미지수로 풀지 않는 수신기에서, 시계가 1 µs(백만분의 1초) 틀리면 위치 오차는 대략 얼마일까?</p><p class="wi-hint">삼변측량 시뮬레이터에서 “시계 오차도 미지수로 풀기”를 끄고 시계 오차를 1,000 ns로 맞춰 보자.</p><div class="opts">
+      <button class="opt">약 30 cm</button>
+      <button class="opt">약 3 m</button>
+      <button class="opt" data-correct>수백 m</button>
+      <button class="opt">수천 km</button>
+    </div><div class="quiz-exp">1 µs 동안 빛은 약 300 m를 간다. 모든 거리가 300 m씩 틀리므로 위치도 수백 m 어긋난다(위성 배치에 따라 더 커질 수도 있다). 수정 시계로는 마이크로초 정확도를 유지할 수 없으니, 시계 오차를 함께 풀어내는 것이 GPS의 핵심 요령이다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="crowded">
+    <h2>붐비는 하늘: 우주 쓰레기와 밤하늘</h2>
+    <p>위성이 수천에서 수만 기로 늘면서 새로운 문제가 생겼다. 지상에서 추적되는 10 cm 이상의 물체만 해도 수만 개이고, 더 작은 파편은 1 cm 이상만 해도 100만 개가 넘는 것으로 추정된다. 초속 7~8 km에서는 1 cm 알루미늄 조각도 수류탄급 에너지를 가진다. 충돌이 파편을 만들고 그 파편이 또 다른 충돌을 일으키는 연쇄 반응을 <span class="term">케슬러 증후군</span><span class="en">(Kessler syndrome)</span>이라 부르며, 최악의 경우 특정 고도를 오랫동안 쓸 수 없게 만든다.</p>
+    <ul>
+      <li><b>낮은 고도의 장점</b>: 550 km 이하에서는 대기 저항 때문에 고장 난 위성도 수년 안에 떨어져 불타 버린다. 1,200 km 위성은 수백 년, 정지 궤도는 사실상 영원히 남는다. 그래서 수명이 끝난 GEO 위성은 약 300 km 위의 “무덤 궤도”로 올려 보낸다.</li>
+      <li><b>충돌 회피</b>: 대형 군집의 위성들은 추적 데이터를 받아 스스로 궤도를 살짝 바꿔 충돌을 피한다. 한 해에 수만 번에 이르는 회피 기동이 이루어진다.</li>
+      <li><b>천문 관측</b>: 해 뜨기 전과 해 진 뒤, 햇빛을 반사하는 위성이 망원경 사진에 줄무늬를 남긴다. 위성 표면을 어둡게 칠하거나 차양을 다는 대책이 쓰이지만, 넓은 하늘을 오래 찍는 관측과 미약한 전파를 듣는 전파 천문학에는 여전히 부담이다.</li>
+      <li><b>주파수와 궤도 자원</b>: 정지 궤도의 자리와 주파수는 국제전기통신연합(ITU)이 국가별로 조정한다. 저궤도 군집도 서로 간섭하지 않도록 ITU에 신청하고 조정해야 한다.</li>
+    </ul>
+    <div class="callout tip"><strong>위성이 지상망을 대체할까?</strong><p>위성 하나의 용량은 수백 Gbps~1 Tbps 수준이고 이를 넓은 지역의 사용자가 나눠 쓴다. 도시처럼 사람이 빽빽한 곳에서는 광케이블과 기지국을 이길 수 없다. 위성 인터넷은 “지상망이 닿지 않는 곳”과 “움직이는 곳”을 채우는 보완재이며, 6G에서는 지상망과 위성망을 하나로 묶는 것이 목표다(14장, 25장).</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>위성 궤도는 높이에 따라 LEO(300~2,000 km), MEO(GPS 약 20,200 km), GEO(35,786 km)로 나뉜다. 정지 궤도는 지구 자전과 같은 주기로 돌아 하늘에 멈춰 보인다.</li>
+      <li>케플러 제3법칙에 따라 주기는 궤도 반지름의 1.5제곱에 비례한다. 높을수록 느리게 돌고, 넓게 보고, 지연이 길다.</li>
+      <li>GEO의 최소 왕복 지연은 약 0.48초, LEO(550 km)는 약 7 ms이며 실제로는 약 25~50 ms 수준이다. 이 차이가 위성 인터넷의 체감을 바꿨다.</li>
+      <li>저궤도는 위성 하나의 커버리지가 작고 금방 지나가므로, 여러 궤도면에 수백~수천 기를 배치한 위성 군집으로 지구를 덮는다.</li>
+      <li>위성 간 레이저 링크는 진공 속 빛(광섬유보다 약 1.5배 빠름)을 쓰므로 수천 km 이상 먼 거리에서는 해저 케이블보다 빠를 수 있다.</li>
+      <li>위성 단말은 위상 배열 안테나로 빔을 전자식으로 조향한다. 높은 주파수(Ku, Ka)는 대역폭이 넓지만 비 감쇠에 약하다.</li>
+      <li>GPS는 위성의 원자시계 신호가 도착한 시간 차로 거리를 재고, 위치 3개 + 수신기 시계 오차 1개를 풀기 위해 위성 4기 이상을 쓴다. 상대론 보정(하루 약 38 µs)이 필수다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>정지 궤도 위성이 땅에서 볼 때 하늘의 한 점에 멈춰 있는 이유는?</p><div class="opts">
+        <button class="opt">위성이 엔진으로 한 자리에 떠 있기 때문에</button>
+        <button class="opt">고도가 너무 높아 움직임이 보이지 않기 때문에</button>
+        <button class="opt" data-correct>적도 위에서 지구 자전과 같은 주기(약 23시간 56분)로 돌기 때문에</button>
+        <button class="opt">지구 중력이 닿지 않는 곳에 있기 때문에</button>
+      </div><div class="quiz-exp">고도 35,786 km에서는 궤도 주기가 지구 자전 주기와 같아진다. 적도면에서 같은 방향으로 돌면 땅과 함께 움직이므로 멈춘 것처럼 보인다.</div></div>
+      <div class="quiz-q"><p>GEO 위성 인터넷의 왕복 지연이 최소 약 0.48초가 되는 이유로 가장 알맞은 것은?</p><div class="opts">
+        <button class="opt" data-correct>요청과 응답이 각각 위성을 거쳐 오르내리므로 고도의 약 4배(약 14만 km)를 빛의 속도로 가야 하기 때문에</button>
+        <button class="opt">위성 안의 컴퓨터가 느리기 때문에</button>
+        <button class="opt">위성 신호가 약해서 재전송이 많기 때문에</button>
+        <button class="opt">대기권에서 빛이 느려지기 때문에</button>
+      </div><div class="quiz-exp">35,786 km × 4 ≈ 143,000 km ÷ 300,000 km/s ≈ 0.48초. 물리 법칙이 정한 하한이라 장비를 바꿔도 줄일 수 없다.</div></div>
+      <div class="quiz-q"><p>스타링크가 수천 기의 위성을 필요로 하는 가장 근본적인 이유는?</p><div class="opts">
+        <button class="opt">위성이 고장 나기 쉬워서 예비가 많이 필요하다</button>
+        <button class="opt" data-correct>저궤도 위성 하나가 덮는 지역이 작고 한 지점 위를 몇 분 만에 지나가기 때문이다</button>
+        <button class="opt">위성마다 한 나라만 담당하도록 법으로 정해져 있다</button>
+        <button class="opt">위성 간 레이저 링크는 짧은 거리만 연결할 수 있다</button>
+      </div><div class="quiz-exp">고도 550 km 위성의 커버리지 반경은 약 1,000 km 수준이고 90분에 지구를 한 바퀴 돈다. 어디서나 늘 위성이 보이게 하려면 여러 궤도면에 촘촘히 배치해야 한다. 사용자 수가 늘면 용량을 위해서도 더 많은 위성이 필요하다.</div></div>
+      <div class="quiz-q"><p>런던–뉴욕처럼 먼 거리에서 위성 레이저 경로가 해저 광케이블보다 빠를 수 있는 이유는?</p><div class="opts">
+        <button class="opt">레이저는 광섬유보다 주파수가 높기 때문에</button>
+        <button class="opt">위성 경로가 항상 더 짧기 때문에</button>
+        <button class="opt">위성은 패킷을 압축해 보내기 때문에</button>
+        <button class="opt" data-correct>진공 속 빛은 유리 속 빛보다 약 1.5배 빠르고, 위성 경로는 거의 직선이기 때문에</button>
+      </div><div class="quiz-exp">광섬유의 굴절률(약 1.47) 때문에 빛이 초속 약 20만 km로 느려진다. 위아래로 오르내리는 손해를 감수해도 먼 거리에서는 속도 이득이 더 크다.</div></div>
+      <div class="quiz-q"><p>폭우가 쏟아질 때 위성 신호가 가장 크게 약해지는 대역은?</p><div class="opts">
+        <button class="opt">C 대역(4~8 GHz)</button>
+        <button class="opt">Ku 대역(12~18 GHz)</button>
+        <button class="opt" data-correct>Ka 대역(26.5~40 GHz)</button>
+        <button class="opt">모두 같다</button>
+      </div><div class="quiz-exp">파장이 빗방울 크기에 가까워질수록 흡수와 산란이 커진다. Ka 대역은 같은 비에서 Ku 대역보다 몇 배 큰 감쇠를 겪는다.</div></div>
+      <div class="quiz-q"><p>3차원 위치를 구하는 GPS 수신기에 위성이 최소 4기 필요한 이유는?</p><div class="opts">
+        <button class="opt">위성 하나가 고장 날 때를 대비해서</button>
+        <button class="opt" data-correct>x, y, z 위치와 함께 수신기 시계 오차까지 미지수 4개를 풀어야 하기 때문에</button>
+        <button class="opt">위성마다 위도, 경도, 고도, 시간 중 하나씩만 알려 주기 때문에</button>
+        <button class="opt">상대론 보정을 위해 위성 하나가 더 필요해서</button>
+      </div><div class="quiz-exp">수신기의 값싼 시계는 정확하지 않으므로 그 오차를 네 번째 미지수로 함께 푼다. 덕분에 수신기는 위치와 함께 원자시계 수준의 정확한 시각도 얻는다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const MU = 398600.4418, RE = 6371, C = 299792.458, WE = (2 * Math.PI) / 86164.1, D2R = Math.PI / 180;
+  const fmtKm = (v) => (v >= 1000 ? Math.round(v).toLocaleString("en-US") : NB.fmt(v, 3)) + " km";
+  const fmtMs = (s) => (s * 1000 >= 100 ? Math.round(s * 1000) : NB.fmt(s * 1000, 3)) + " ms";
+  const fmtDur = (s) => {
+    if (!isFinite(s)) return "계속 보임";
+    if (s < 3600) return Math.round(s / 60) + "분" + (s < 600 ? " " + Math.round(s % 60) + "초" : "");
+    const hh = Math.floor(s / 3600), mm = Math.round((s % 3600) / 60);
+    return hh + "시간 " + mm + "분";
+  };
+  function orbit(h, elDeg) {
+    const a = RE + h, e = elDeg * D2R;
+    const T = 2 * Math.PI * Math.sqrt((a * a * a) / MU);
+    const v = Math.sqrt(MU / a);
+    const lam = Math.max(0, Math.acos(Math.min(1, (RE * Math.cos(e)) / a)) - e);
+    const slant = Math.sqrt(a * a - Math.pow(RE * Math.cos(e), 2)) - RE * Math.sin(e);
+    const wrel = (2 * Math.PI) / T - WE;
+    const pass = Math.abs(wrel) < 2 * Math.PI / (86400 * 30) ? Infinity : (2 * lam) / Math.abs(wrel);
+    return { a, T, v, lam, slant, pass, wrel };
+  }
+
+  /* ================= 1. 궤도 계산기 ================= */
+  const hOf = (v) => 300 * Math.pow(40000 / 300, v / 1000);
+  const vOf = (h) => Math.round((1000 * Math.log(h / 300)) / Math.log(40000 / 300));
+  let obH = 550, simT = 0;
+  const obSlider = NB.range("ob-h", (v) => { obH = hOf(v); return fmtKm(obH); }, () => { obUpdate(); });
+  const obEl = NB.range("ob-el", (v) => v + "°", () => obUpdate());
+  const obWarp = NB.seg("ob-warp");
+  NB.seg("ob-pre", (v) => { obSlider.set(vOf(+v)); obH = +v; obUpdate(); });
+  obH = 550;
+  let OB = orbit(550, 25);
+  function obUpdate() {
+    OB = orbit(obH, obEl());
+    $("ob-h-out").textContent = fmtKm(obH);
+    const T = OB.T;
+    NB.stat("ob-T", T < 3 * 3600 ? (T / 60).toFixed(1) + "<small>분</small>" : (T / 3600).toFixed(2) + "<small>시간</small>");
+    NB.stat("ob-v", OB.v.toFixed(2) + "<small>km/s</small>");
+    NB.stat("ob-rtt", fmtMs((4 * obH) / C));
+    NB.stat("ob-rtt2", fmtMs((4 * OB.slant) / C));
+    const frac = (1 - Math.cos(OB.lam)) / 2;
+    NB.stat("ob-cov", Math.round(RE * OB.lam).toLocaleString("en-US") + "<small>km · 지표의 " + (frac * 100).toFixed(frac < 0.01 ? 2 : 1) + "%</small>");
+    NB.stat("ob-pass", OB.pass > 86400 * 3 ? "계속(정지 궤도)" : "최대 " + fmtDur(OB.pass));
+    obCv.redraw();
+  }
+  const obCv = NB.canvas($("cv-orbit"), (ctx, w, h) => {
+    const P = NB.palette();
+    const cx = w / 2, cy = h / 2 + 6;
+    const Rmax = Math.min(w, h) / 2 - 22;
+    const s = Rmax / (RE + obH);
+    const re = RE * s;
+    // reference rings
+    [[550, "LEO 550"], [20200, "GPS"], [35786, "GEO"]].forEach(([alt, lb]) => {
+      const r = (RE + alt) * s;
+      if (r > Rmax * 1.02 || Math.abs(alt - obH) / obH < 0.03) return;
+      if (r - re < 6) return;
+      ctx.strokeStyle = P.faint; ctx.setLineDash([3, 5]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      NB.text(ctx, lb, cx + r * 0.71 + 4, cy - r * 0.71 - 4, { size: 10.5, color: P.faint });
+    });
+    // orbit
+    const ro = (RE + obH) * s;
+    ctx.strokeStyle = P.accent; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, ro, 0, Math.PI * 2); ctx.stroke();
+    // earth
+    ctx.fillStyle = P.surface; ctx.strokeStyle = P.border; ctx.beginPath(); ctx.arc(cx, cy, re, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    const phiE = WE * simT;
+    // meridian marks (rotate with earth)
+    ctx.strokeStyle = P.grid; ctx.lineWidth = 1;
+    for (let k = 0; k < 12; k++) { const a = phiE + (k * Math.PI) / 6; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + re * Math.cos(a), cy - re * Math.sin(a)); ctx.stroke(); }
+    // satellite
+    const th = (2 * Math.PI / OB.T) * simT + 0.6;
+    const sx = cx + ro * Math.cos(th), sy = cy - ro * Math.sin(th);
+    // coverage arc on earth
+    const lam = OB.lam;
+    if (lam > 0) {
+      const ex1 = [cx + re * Math.cos(th - lam), cy - re * Math.sin(th - lam)], ex2 = [cx + re * Math.cos(th + lam), cy - re * Math.sin(th + lam)];
+      ctx.fillStyle = P.accent; ctx.globalAlpha = 0.13;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex1[0], ex1[1]); ctx.arc(cx, cy, re, -(th - lam), -(th + lam), true); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.strokeStyle = P.accent; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(cx, cy, re, -(th - lam), -(th + lam), true); ctx.stroke();
+    }
+    // ground station
+    const gA = phiE + 0.6;
+    const gx = cx + re * Math.cos(gA), gy = cy - re * Math.sin(gA);
+    let dAng = Math.atan2(Math.sin(th - gA), Math.cos(th - gA));
+    const vis = Math.abs(dAng) <= lam;
+    if (vis) { ctx.strokeStyle = P.ok; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(sx, sy); ctx.stroke(); ctx.setLineDash([]); }
+    ctx.fillStyle = vis ? P.ok : P.bad; ctx.fillRect(gx - 4.5, gy - 4.5, 9, 9);
+    ctx.fillStyle = P.accent2; ctx.beginPath(); ctx.arc(sx, sy, 5.5, 0, Math.PI * 2); ctx.fill();
+    // text overlay
+    const small = w < 460;
+    const t = simT;
+    const hh = Math.floor(t / 3600), mm = Math.floor((t % 3600) / 60);
+    NB.text(ctx, "경과 " + hh + "시간 " + String(mm).padStart(2, "0") + "분", 10, 16, { size: small ? 11 : 12, color: P.dim, mono: true });
+    NB.text(ctx, vis ? "단말: 위성 보임" : "단말: 위성 안 보임", 10, 34, { size: small ? 11 : 12, color: vis ? P.ok : P.bad, bold: true });
+    NB.text(ctx, "고도 " + fmtKm(obH), w - 10, 16, { size: small ? 11 : 12, color: P.accent, align: "right", bold: true });
+    NB.text(ctx, "지구 반지름 = 6,371 km (실제 비율)", w - 10, h - 12, { size: 10.5, color: P.faint, align: "right" });
+  }, { aspect: 0.75, minHeight: 300, maxHeight: 440 });
+  obUpdate();
+  NB.loop($("cv-orbit"), (dt) => { simT += dt * +obWarp(); obCv.redraw(); });
+
+  /* ================= 2. 위성 군집 ================= */
+  const CONT = [
+    [[-168,66],[-140,70],[-95,72],[-80,64],[-92,57],[-78,52],[-62,58],[-55,50],[-67,44],[-76,37],[-81,30],[-80,25],[-90,29],[-97,26],[-97,19],[-88,15],[-79,8],[-86,13],[-95,16],[-105,20],[-112,30],[-118,34],[-124,40],[-124,48],[-135,58],[-150,60],[-165,60]],
+    [[-55,60],[-42,60],[-20,70],[-20,80],[-60,82],[-72,77],[-55,68]],
+    [[-79,8],[-60,10],[-50,0],[-35,-6],[-40,-22],[-48,-28],[-58,-38],[-65,-42],[-68,-55],[-74,-50],[-72,-30],[-70,-18],[-76,-14],[-81,-5],[-80,2]],
+    [[-10,36],[-9,43],[-2,44],[-5,48],[3,51],[8,54],[12,56],[5,58],[5,62],[15,69],[28,71],[42,68],[60,70],[80,73],[100,77],[140,72],[170,70],[180,66],[175,62],[160,60],[155,52],[140,54],[135,44],[129,42],[129,35],[126,35],[125,39],[122,40],[120,32],[122,25],[110,20],[108,12],[104,8],[100,13],[98,16],[92,22],[80,15],[77,8],[72,20],[67,24],[57,26],[51,30],[48,30],[56,22],[59,22],[52,16],[43,13],[39,21],[35,28],[33,31],[35,36],[27,37],[24,40],[20,40],[15,40],[12,44],[8,44],[3,43],[0,39],[-5,36]],
+    [[-17,21],[-10,30],[-6,35],[10,37],[20,32],[32,31],[35,28],[43,12],[51,12],[40,-2],[40,-15],[35,-24],[27,-34],[18,-34],[12,-18],[13,-6],[9,4],[-8,4],[-17,14]],
+    [[114,-22],[122,-18],[130,-12],[137,-12],[142,-11],[146,-19],[153,-26],[150,-37],[140,-38],[132,-32],[115,-34]],
+    [[130,31],[135,34],[140,36],[141,41],[145,44],[141,45],[139,38],[133,34]],
+    [[-6,50],[2,51],[0,54],[-3,58],[-6,57]],
+    [[95,5],[105,-6],[115,-8],[120,-9],[110,-2],[118,2],[117,7],[100,2]],
+  ];
+  const PRE = { starlink: [72, 22, 550, 53], oneweb: [18, 36, 1200, 88], kuiper: [34, 34, 630, 52], iridium: [6, 11, 780, 86], tiny: [4, 6, 550, 53] };
+  let csRun = true, csT = 0, sats = [], grid = null, lastGrid = -1, csLam = 0;
+  const cP = NB.range("cs-p", (v) => v + "개", () => csParam());
+  const cS = NB.range("cs-s", (v) => v + "기", () => csParam());
+  const cH = NB.range("cs-h", (v) => v.toLocaleString("en-US") + " km", () => csParam());
+  const cI = NB.range("cs-i", (v) => v + "°", () => csParam());
+  NB.seg("cs-pre", (k) => { const p = PRE[k]; cP.el.value = p[0]; cS.el.value = p[1]; cH.el.value = p[2]; cI.el.value = p[3]; [cP, cS, cH, cI].forEach((g) => g.el.dispatchEvent(new Event("input"))); });
+  $("cs-run").onclick = () => { csRun = !csRun; $("cs-run").textContent = csRun ? "일시 정지" : "다시 움직이기"; };
+  // grid cells (5°)
+  const NX = 72, NY = 36, cells = [];
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+    const lat = (90 - (j + 0.5) * 5) * D2R, lon = (-180 + (i + 0.5) * 5) * D2R;
+    cells.push([Math.cos(lat) * Math.cos(lon), Math.cos(lat) * Math.sin(lon), Math.sin(lat), Math.cos(lat)]);
+  }
+  const SEOUL = [37.57, 126.98];
+  const seoulV = [Math.cos(SEOUL[0] * D2R) * Math.cos(SEOUL[1] * D2R), Math.cos(SEOUL[0] * D2R) * Math.sin(SEOUL[1] * D2R), Math.sin(SEOUL[0] * D2R)];
+  function csParam() { lastGrid = -1; csCompute(); csCv.redraw(); }
+  function csCompute() {
+    const Pn = cP(), Sn = cS(), h = cH(), inc = cI() * D2R;
+    const o = orbit(h, 25); csLam = o.lam;
+    const n = (2 * Math.PI) / o.T, rot = WE * csT;
+    sats = [];
+    for (let p = 0; p < Pn; p++) {
+      const raan = (2 * Math.PI * p) / Pn;
+      for (let s = 0; s < Sn; s++) {
+        const u = (2 * Math.PI * s) / Sn + (2 * Math.PI * p) / (Pn * Sn) + n * csT;
+        const xo = Math.cos(u), yo = Math.sin(u);
+        const x = xo * Math.cos(raan) - yo * Math.cos(inc) * Math.sin(raan);
+        const y = xo * Math.sin(raan) + yo * Math.cos(inc) * Math.cos(raan);
+        const z = yo * Math.sin(inc);
+        // earth-fixed
+        const xe = x * Math.cos(rot) + y * Math.sin(rot), ye = -x * Math.sin(rot) + y * Math.cos(rot);
+        sats.push([xe, ye, z]);
+      }
+    }
+    const cl = Math.cos(csLam);
+    let sv = 0; sats.forEach((v) => { if (v[0] * seoulV[0] + v[1] * seoulV[1] + v[2] * seoulV[2] >= cl) sv++; });
+    if (lastGrid < 0 || csT - lastGrid > 40 || lastGrid > csT) {
+      lastGrid = csT;
+      grid = new Uint16Array(cells.length);
+      let cov = 0, tot = 0;
+      for (let c = 0; c < cells.length; c++) {
+        const q = cells[c]; let k = 0;
+        for (let m = 0; m < sats.length; m++) { const v = sats[m]; if (v[0] * q[0] + v[1] * q[1] + v[2] * q[2] >= cl) k++; }
+        grid[c] = k; tot += q[3]; if (k) cov += q[3];
+      }
+      NB.stat("cs-cov", (100 * cov / tot).toFixed(1) + "<small>%</small>");
+    }
+    NB.stat("cs-n", (Pn * Sn).toLocaleString("en-US") + "<small>기</small>");
+    NB.stat("cs-seoul", sv + "<small>기</small>");
+    NB.stat("cs-r", Math.round(RE * csLam).toLocaleString("en-US") + "<small>km</small>");
+  }
+  const csCv = NB.canvas($("cv-const"), (ctx, w, h) => {
+    const P = NB.palette();
+    const mw = w, mh = h;
+    const X = (lon) => ((lon + 180) / 360) * mw, Y = (lat) => ((90 - lat) / 180) * mh;
+    const cw = mw / NX, ch = mh / NY;
+    if (grid) for (let c = 0; c < grid.length; c++) {
+      const i = c % NX, j = (c / NX) | 0, k = grid[c];
+      if (k === 0) { ctx.fillStyle = P.bad; ctx.globalAlpha = 0.22; }
+      else { ctx.fillStyle = P.accent; ctx.globalAlpha = 0.1 + 0.45 * Math.min(k, 8) / 8; }
+      ctx.fillRect(i * cw, j * ch, cw + 0.5, ch + 0.5);
+    }
+    ctx.globalAlpha = 1;
+    // grid lines
+    ctx.strokeStyle = P.grid; ctx.lineWidth = 1;
+    for (let lat = -60; lat <= 60; lat += 30) { ctx.beginPath(); ctx.moveTo(0, Y(lat)); ctx.lineTo(mw, Y(lat)); ctx.stroke(); }
+    for (let lon = -120; lon <= 120; lon += 60) { ctx.beginPath(); ctx.moveTo(X(lon), 0); ctx.lineTo(X(lon), mh); ctx.stroke(); }
+    // continents
+    CONT.forEach((poly) => {
+      ctx.beginPath(); poly.forEach(([lo, la], i) => (i ? ctx.lineTo(X(lo), Y(la)) : ctx.moveTo(X(lo), Y(la)))); ctx.closePath();
+      ctx.fillStyle = P.text; ctx.globalAlpha = 0.07; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.strokeStyle = P.dim; ctx.lineWidth = 1; ctx.stroke();
+    });
+    // satellites
+    const r = (sats.length > 600 ? 1.6 : sats.length > 150 ? 2.2 : 3) * (w < 500 ? 0.7 : 1);
+    ctx.fillStyle = P.text;
+    sats.forEach((v) => {
+      const lat = Math.asin(Math.max(-1, Math.min(1, v[2]))) / D2R, lon = Math.atan2(v[1], v[0]) / D2R;
+      ctx.beginPath(); ctx.arc(X(lon), Y(lat), r, 0, Math.PI * 2); ctx.fill();
+    });
+    // coverage circle of a few sats when small constellation
+    if (sats.length <= 60) {
+      ctx.strokeStyle = P.accent; ctx.lineWidth = 1;
+      sats.forEach((v) => {
+        const lat = Math.asin(v[2]), lon = Math.atan2(v[1], v[0]);
+        ctx.beginPath();
+        let lx = 0;
+        for (let k = 0; k <= 48; k++) {
+          const b = (k / 48) * 2 * Math.PI;
+          const la2 = Math.asin(Math.sin(lat) * Math.cos(csLam) + Math.cos(lat) * Math.sin(csLam) * Math.cos(b));
+          const lo2 = lon + Math.atan2(Math.sin(b) * Math.sin(csLam) * Math.cos(lat), Math.cos(csLam) - Math.sin(lat) * Math.sin(la2));
+          let L = ((lo2 / D2R + 540) % 360) - 180;
+          const px = X(L), py = Y(la2 / D2R);
+          if (!k || Math.abs(px - lx) > mw / 2) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          lx = px;
+        }
+        ctx.stroke();
+      });
+    }
+    // Seoul
+    const sx = X(SEOUL[1]), sy = Y(SEOUL[0]);
+    ctx.fillStyle = P.warn; ctx.strokeStyle = P.bg; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (w >= 420) { ctx.font = "700 12px " + NB.font(); ctx.lineWidth = 3; ctx.strokeStyle = P.bg; ctx.lineJoin = "round"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.strokeText("서울", sx + 8, sy - 10); NB.text(ctx, "서울", sx + 8, sy - 10, { size: 12, bold: true, color: P.warn, base: "alphabetic" }); }
+    ctx.strokeStyle = P.border; ctx.strokeRect(0.5, 0.5, mw - 1, mh - 1);
+  }, { aspect: 0.5, minHeight: 180, maxHeight: 460 });
+  csCompute(); csCv.redraw();
+  NB.loop($("cv-const"), (dt) => { if (!csRun) return; csT += dt * 120; csCompute(); csCv.redraw(); });
+
+  /* ================= 3. 광섬유 vs 위성 ================= */
+  const ROUTES = [
+    { a: [51.51, -0.13], b: [40.71, -74.01], fs: 1.15 },
+    { a: [37.57, 126.98], b: [34.05, -118.24], fs: 1.25 },
+    { a: [1.35, 103.82], b: [51.51, -0.13], fs: 1.55 },
+    { a: [37.57, 126.98], b: [35.18, 129.08], fs: 1.25 },
+  ];
+  const gc = (p, q) => { const [la1, lo1] = p.map((x) => x * D2R), [la2, lo2] = q.map((x) => x * D2R); const d = Math.sin((la2 - la1) / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin((lo2 - lo1) / 2) ** 2; return 2 * RE * Math.asin(Math.sqrt(d)); };
+  const NF = 1.468;
+  const fFs = NB.range("isl-fs", (v) => v.toFixed(2), () => islUpd());
+  const fH = NB.range("isl-h", (v) => v.toLocaleString("en-US") + " km", () => islUpd());
+  const fK = NB.range("isl-ks", (v) => v.toFixed(2), () => islUpd());
+  const route = NB.seg("isl-route", (v) => { fFs.set(ROUTES[+v].fs); });
+  const fibRtt = (d) => (2 * d * fFs() * NF) / C;
+  const satRtt = (d) => { const h = fH(); return (2 * (2 * h + d * ((RE + h) / RE) * fK())) / C; };
+  function islUpd() {
+    const R = ROUTES[+route()], d = gc(R.a, R.b);
+    NB.stat("isl-d", Math.round(d).toLocaleString("en-US") + "<small>km</small>");
+    const f = fibRtt(d), s = satRtt(d);
+    NB.stat("isl-f", (f * 1000).toFixed(1) + "<small>ms</small>");
+    NB.stat("isl-s", `<span style="color:${s < f ? "var(--ok)" : "var(--bad)"}">${(s * 1000).toFixed(1)}</span><small>ms ${s < f ? "· 위성이 " + ((f - s) * 1000).toFixed(1) + " ms 빠름" : "· 광섬유가 빠름"}</small>`);
+    const h = fH(), k = fK() * ((RE + h) / RE), den = fFs() * NF - k;
+    NB.stat("isl-x", den > 0 ? "약 " + Math.round((2 * h) / den).toLocaleString("en-US") + "<small>km 이상</small>" : "없음<small>(항상 광섬유)</small>");
+    islCv.redraw();
+  }
+  const islCv = NB.canvas($("cv-isl"), (ctx, w, h) => {
+    const P = NB.palette();
+    const R = ROUTES[+route()], d = gc(R.a, R.b);
+    const fib = [], sat = [], vac = [];
+    for (let x = 0; x <= 20000; x += 250) { fib.push([x, fibRtt(x) * 1000]); sat.push([x, satRtt(x) * 1000]); vac.push([x, (2 * x) / C * 1000]); }
+    const small = w < 500;
+    const ch = NB.chart(ctx, { x: small ? 46 : 58, y: 16, w: w - (small ? 46 : 58) - 16, h: h - 16 - 46 }, {
+      x: [0, 20000], y: [0, 300], xLabel: "두 도시 사이 직선 거리 (km)", yLabel: small ? "" : "왕복 시간 (ms)",
+      xFmt: (v) => (v / 1000) + (v ? "천" : ""),
+      series: [{ data: fib, color: P.warn, width: 2.5 }, { data: sat, color: P.accent, width: 2.5 }, { data: vac, color: P.faint, width: 1.2, dash: [4, 4] }],
+      vlines: [{ x: d, color: P.dim }],
+      points: [{ x: d, y: fibRtt(d) * 1000, color: P.warn, r: 5 }, { x: d, y: satRtt(d) * 1000, color: P.accent, r: 5 }],
+    });
+    const bx = ch.box.x + 10;
+    NB.text(ctx, "■ 광섬유", bx, 28, { size: 12, color: P.warn, bold: true });
+    NB.text(ctx, "■ 위성 레이저", bx, 46, { size: 12, color: P.accent, bold: true });
+    NB.text(ctx, "┄ 진공 직선(이론 하한)", bx, 64, { size: 11.5, color: P.dim });
+  }, { aspect: 0.45, minHeight: 240, maxHeight: 360 });
+  islUpd();
+
+  /* ================= 4. 비 감쇠 ================= */
+  const BANDS = [{ n: "Ku 12 GHz", k: 0.02386, a: 1.1825 }, { n: "Ka 20 GHz", k: 0.09164, a: 1.0568 }, { n: "Ka 30 GHz", k: 0.2403, a: 0.9485 }, { n: "Q/V 40 GHz", k: 0.4431, a: 0.8673 }];
+  const rR = NB.range("rn-r", (v) => v + " mm/h", () => rnUpd());
+  const rEl = NB.range("rn-el", (v) => v + "°", () => rnUpd());
+  const rM = NB.range("rn-m", (v) => v + " dB", () => rnUpd());
+  const rB = NB.seg("rn-band", () => rnUpd());
+  const HR = 5;
+  function atten(bi, R, el) {
+    if (R <= 0) return { A: 0, L: HR / Math.sin(el * D2R) };
+    const b = BANDS[bi], g = b.k * Math.pow(R, b.a), e = el * D2R;
+    const Ls = HR / Math.sin(e), LG = Ls * Math.cos(e), L0 = 35 * Math.exp(-0.015 * Math.min(R, 100));
+    const r = 1 / (1 + LG / L0);
+    return { A: g * Ls * r, L: Ls * r };
+  }
+  function rnUpd() {
+    const o = atten(+rB(), rR(), rEl()), m = rM();
+    NB.stat("rn-L", o.L.toFixed(1) + "<small>km(유효)</small>");
+    NB.stat("rn-A", o.A.toFixed(1) + "<small>dB</small>");
+    const left = Math.pow(10, -o.A / 10) * 100;
+    NB.stat("rn-p", (left >= 10 ? left.toFixed(0) : left >= 0.1 ? left.toFixed(1) : left.toExponential(0)) + "<small>%</small>");
+    const st = o.A < m * 0.5 ? ["정상", "var(--ok)"] : o.A < m ? ["속도 낮춰 유지", "var(--warn)"] : ["끊김", "var(--bad)"];
+    NB.stat("rn-st", `<span style="color:${st[1]}">${st[0]}</span>`);
+    rnCv.redraw();
+  }
+  const rnCv = NB.canvas($("cv-rain"), (ctx, w, h) => {
+    const P = NB.palette(), el = rEl(), bi = +rB();
+    const cols = [P.ok, P.accent, P.accent2, P.bad];
+    const series = BANDS.map((b, i) => { const d = []; for (let R = 0; R <= 100; R += 2) d.push([R, atten(i, R, el).A]); return { data: d, color: cols[i], width: i === bi ? 3.2 : 1.4, dash: i === bi ? [] : [5, 4] }; });
+    const small = w < 500;
+    const ch = NB.chart(ctx, { x: small ? 40 : 56, y: 14, w: w - (small ? 40 : 56) - 14, h: h - 14 - 46 }, {
+      x: [0, 100], y: [0, 60], xLabel: "강우 강도 (mm/h)", yLabel: small ? "" : "비 감쇠 (dB)",
+      series, hlines: [{ y: rM(), color: P.warn, dash: [6, 4] }],
+      points: [{ x: rR(), y: Math.min(60, atten(bi, rR(), el).A), color: cols[bi], r: 6 }],
+    });
+    NB.text(ctx, "링크 마진 " + rM() + " dB", ch.box.x + ch.box.w - 4, ch.Y(rM()) - 9, { size: 11, color: P.warn, align: "right" });
+    BANDS.forEach((b, i) => NB.text(ctx, "■ " + b.n, ch.box.x + 8, 26 + i * 17, { size: 11.5, color: cols[i], bold: i === bi }));
+  }, { aspect: 0.42, minHeight: 230, maxHeight: 340 });
+  rnUpd();
+
+  /* ================= 5. GNSS 삼변측량 ================= */
+  const W = 2000, H = 1200;
+  const GEOS = { good: [[180, 160], [1820, 220], [1000, 1130], [160, 1060], [1880, 980]], bad: [[1450, 90], [1720, 160], [1900, 420], [1580, 260], [1860, 80]] };
+  let rx = [880, 620], noiseN = [];
+  const regen = () => { noiseN = [0, 1, 2, 3, 4].map(() => NB.randn()); };
+  regen();
+  const gDt = NB.range("gn-dt", (v) => (v > 0 ? "+" : "") + v + " ns", () => gnUpd());
+  const gNz = NB.range("gn-nz", (v) => "±" + v + " m", () => gnUpd());
+  const gN = NB.seg("gn-n", () => gnUpd());
+  const gGeo = NB.seg("gn-geo", () => gnUpd());
+  $("gn-clk").onchange = () => gnUpd();
+  $("gn-re").onclick = () => { regen(); gnUpd(); };
+  const CM = 0.299792458; // m per ns
+  let gnSol = null, gnMeas = [];
+  function solve(sat, rho, withClk) {
+    let x = W / 2, y = H / 2, b = 0;
+    for (let it = 0; it < 30; it++) {
+      const n = withClk ? 3 : 2;
+      const A = Array.from({ length: n }, () => new Array(n).fill(0)), g = new Array(n).fill(0);
+      sat.forEach((s, i) => {
+        const dx = x - s[0], dy = y - s[1], d = Math.hypot(dx, dy) || 1;
+        const J = withClk ? [dx / d, dy / d, 1] : [dx / d, dy / d];
+        const r = rho[i] - (d + (withClk ? b : 0));
+        for (let p = 0; p < n; p++) { g[p] += J[p] * r; for (let q = 0; q < n; q++) A[p][q] += J[p] * J[q]; }
+      });
+      // gaussian elimination
+      const M = A.map((row, i) => [...row, g[i]]);
+      for (let c = 0; c < n; c++) {
+        let piv = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
+        [M[c], M[piv]] = [M[piv], M[c]];
+        if (Math.abs(M[c][c]) < 1e-12) return { x, y, b };
+        for (let r = 0; r < n; r++) if (r !== c) { const f = M[r][c] / M[c][c]; for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
+      }
+      const dlt = M.map((row, i) => row[n] / row[i]);
+      x += dlt[0]; y += dlt[1]; if (withClk) b += dlt[2];
+      if (Math.abs(dlt[0]) + Math.abs(dlt[1]) < 1e-4) break;
+    }
+    return { x, y, b };
+  }
+  function gnUpd() {
+    const sat = GEOS[gGeo()].slice(0, +gN());
+    const bias = gDt() * CM, nz = gNz();
+    gnMeas = sat.map((s, i) => Math.hypot(rx[0] - s[0], rx[1] - s[1]) + bias + nz * noiseN[i]);
+    const withClk = $("gn-clk").checked;
+    gnSol = solve(sat, gnMeas, withClk);
+    const err = Math.hypot(gnSol.x - rx[0], gnSol.y - rx[1]);
+    NB.stat("gn-cd", (bias >= 0 ? "+" : "") + bias.toFixed(0) + "<small>m</small>");
+    NB.stat("gn-err", `<span style="color:${err < 15 ? "var(--ok)" : err < 80 ? "var(--warn)" : "var(--bad)"}">${err.toFixed(err < 10 ? 1 : 0)}</span><small>m</small>`);
+    NB.stat("gn-best", withClk ? (gnSol.b / CM).toFixed(0) + "<small>ns</small>" : "<small>풀지 않음</small>");
+    gnCv.redraw();
+  }
+  const gnCv = NB.canvas($("cv-gnss"), (ctx, w, h) => {
+    const P = NB.palette();
+    const s = Math.min(w / W, h / H), ox = (w - W * s) / 2, oy = (h - H * s) / 2;
+    const T = (p) => [ox + p[0] * s, oy + p[1] * s];
+    ctx.strokeStyle = P.border; ctx.strokeRect(ox + 0.5, oy + 0.5, W * s - 1, H * s - 1);
+    const sat = GEOS[gGeo()].slice(0, +gN());
+    ctx.save(); ctx.beginPath(); ctx.rect(ox, oy, W * s, H * s); ctx.clip();
+    sat.forEach((sp, i) => {
+      const [x, y] = T(sp);
+      ctx.strokeStyle = P.series[i % 5]; ctx.lineWidth = 1.6; ctx.globalAlpha = 0.85;
+      ctx.beginPath(); ctx.arc(x, y, Math.max(1, gnMeas[i] * s), 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
+    });
+    ctx.restore();
+    sat.forEach((sp, i) => {
+      const [x, y] = T(sp);
+      ctx.fillStyle = P.series[i % 5]; ctx.fillRect(x - 7, y - 5, 14, 10);
+      ctx.fillRect(x - 15, y - 2, 6, 4); ctx.fillRect(x + 9, y - 2, 6, 4);
+      NB.text(ctx, "위성" + (i + 1), x, y + (sp[1] > H / 2 ? -14 : 16), { size: 11, align: "center", color: P.text, bold: true });
+    });
+    // true position
+    const [tx, ty] = T(rx);
+    ctx.strokeStyle = P.text; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(tx - 7, ty - 7); ctx.lineTo(tx + 7, ty + 7); ctx.moveTo(tx + 7, ty - 7); ctx.lineTo(tx - 7, ty + 7); ctx.stroke();
+    if (gnSol) {
+      const [ex, ey] = T([gnSol.x, gnSol.y]);
+      ctx.strokeStyle = P.bad; ctx.setLineDash([3, 3]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = P.bad; ctx.beginPath(); ctx.arc(ex, ey, 5.5, 0, Math.PI * 2); ctx.fill();
+    }
+    const sm = w < 460 ? 10.5 : 12;
+    NB.text(ctx, "✕ 실제 위치   ● 계산한 위치", ox + 8, oy + H * s - 12, { size: sm, color: P.dim });
+    NB.text(ctx, "가로 2 km 모형", ox + W * s - 8, oy + 12, { size: 10.5, color: P.faint, align: "right" });
+  }, { aspect: 0.6, minHeight: 230, maxHeight: 420 });
+  $("cv-gnss").addEventListener("click", (e) => {
+    const r = e.currentTarget.getBoundingClientRect(), w = r.width, h = r.height;
+    const s = Math.min(w / W, h / H), ox = (w - W * s) / 2, oy = (h - H * s) / 2;
+    rx = [NB.clamp((e.clientX - r.left - ox) / s, 60, W - 60), NB.clamp((e.clientY - r.top - oy) / s, 60, H - 60)];
+    gnUpd();
+  });
+  gnUpd();
+})();
+</script>
+</body>
+</html>
