@@ -684,7 +684,7 @@
     for (let l = LAS - z; l <= LAS + z; l += 0.002) { zoom.push([l, dB(ringT(l, res, fsr))]); wide0.push([l, dB(ringT(l, res0, fsr))]); }
     const y2 = 20 + hh + 34;
     NB.text(ctx, "레이저 파장 근처 확대 (±0.4 nm)", L, y2 - 10, { size: 12, bold: true, color: P.dim });
-    const ch = NB.chart(ctx, { x: L, y: y2, w: w - L - 14, h: hh - 14 }, { x: [LAS - z, LAS + z], y: [-25, 1], xLabel: "파장 (nm)", xFmt: (v) => v.toFixed(1), yTicks: [-20, -10, 0], series: [{ data: wide0, color: P.faint, width: 1.4, dash: [4, 3] }, { data: zoom, color: P.accent, width: 2.4 }], vlines: [{ x: LAS, color: P.warn, dash: [], width: 2, label: "레이저" }] });
+    const ch = NB.chart(ctx, { x: L, y: y2, w: w - L - 14, h: hh - 14 }, { x: [LAS - z, LAS + z], y: [-25, 1], xLabel: "파장 (nm)", xFmt: (v) => v.toFixed(1), xTicks: [1309.7, 1309.9, 1310.1, 1310.3], yTicks: [-20, -10, 0], series: [{ data: wide0, color: P.faint, width: 1.4, dash: [4, 3] }, { data: zoom, color: P.accent, width: 2.4 }], vlines: [{ x: LAS, color: P.warn, dash: [], width: 2, label: "레이저" }] });
     const tl = ringT(LAS, res, fsr), t0 = ringT(LAS, res0, fsr);
     ctx.fillStyle = P.warn; ctx.beginPath(); ctx.arc(ch.X(LAS), ch.Y(Math.max(-25, dB(tl))), 5, 0, 7); ctx.fill();
     NB.text(ctx, "dB", 6, 30, { size: 10.5, color: P.faint });
@@ -727,7 +727,7 @@
     NB.stat("cp-o-mod", (pj.plug * 1e-12 * port * 1e9).toFixed(1) + " W");
     NB.stat("cp-o-save", fmtW(save) + "<small>" + Math.round((save / (rows[0].opt + rows[0].host)) * 100) + "% ↓</small>");
     NB.stat("cp-o-tot", fmtW(save * cpN()));
-  }, { aspect: 0.32, minHeight: 210, maxHeight: 250 });
+  }, { aspect: 0.26, minHeight: 200, maxHeight: 220 });
 })();
 </script>
 </body>

@@ -57,6 +57,9 @@
           <g stroke="var(--accent-2)" stroke-width="1.6" fill="none">
             <path d="M480 60 L600 45 L720 60 L750 130 L700 200 L600 210 L500 200 L450 130 Z M480 60 L700 200 M600 45 L600 210 M720 60 L500 200 M450 130 L750 130"/>
           </g>
+          <g fill="var(--bg-elev)">
+            <circle cx="480" cy="60" r="15"/><circle cx="600" cy="45" r="15"/><circle cx="720" cy="60" r="15"/><circle cx="750" cy="130" r="15"/><circle cx="700" cy="200" r="15"/><circle cx="600" cy="210" r="15"/><circle cx="500" cy="200" r="15"/><circle cx="450" cy="130" r="15"/>
+          </g>
           <g class="f-acc2-soft">
             <circle cx="480" cy="60" r="15"/><circle cx="600" cy="45" r="15"/><circle cx="720" cy="60" r="15"/><circle cx="750" cy="130" r="15"/><circle cx="700" cy="200" r="15"/><circle cx="600" cy="210" r="15"/><circle cx="500" cy="200" r="15"/><circle cx="450" cy="130" r="15"/>
           </g>
@@ -212,7 +215,7 @@ Set-Cookie: theme=<span class="s">dark</span>; Secure; HttpOnly
           <text x="460" y="66" class="t-dim">응답이 끝나야 다음 요청 (연결마다 대기)</text>
         </g>
         <g>
-          <rect x="70" y="144" width="560" height="22" rx="5" class="f-surface"/>
+          <rect x="70" y="144" width="650" height="22" rx="5" class="f-surface"/>
           <g id="h2f">
             <rect x="74" y="148" width="26" height="14" rx="2" fill="var(--accent)"/><rect x="104" y="148" width="26" height="14" rx="2" fill="var(--accent-2)"/><rect x="134" y="148" width="26" height="14" rx="2" fill="var(--warn)"/><rect x="164" y="148" width="26" height="14" rx="2" fill="var(--ok)"/>
             <rect x="194" y="148" width="26" height="14" rx="2" fill="var(--accent)"/><rect x="224" y="148" width="26" height="14" rx="2" fill="var(--accent-2)"/>
@@ -222,7 +225,7 @@ Set-Cookie: theme=<span class="s">dark</span>; Secure; HttpOnly
           <text x="410" y="160" class="t-dim" style="font-size:11.5px">← 하나(주황)가 빠지면 뒤의 모든 색이 대기</text>
         </g>
         <g>
-          <rect x="70" y="210" width="560" height="22" rx="5" class="f-surface"/>
+          <rect x="70" y="210" width="650" height="22" rx="5" class="f-surface"/>
           <rect x="74" y="214" width="26" height="14" rx="2" fill="var(--accent)"/><rect x="104" y="214" width="26" height="14" rx="2" fill="var(--accent-2)"/><rect x="134" y="214" width="26" height="14" rx="2" fill="var(--warn)"/><rect x="164" y="214" width="26" height="14" rx="2" fill="var(--ok)"/>
           <rect x="194" y="214" width="26" height="14" rx="2" fill="var(--accent)"/><rect x="224" y="214" width="26" height="14" rx="2" fill="var(--accent-2)"/>
           <text x="267" y="226" text-anchor="middle" class="t" style="fill:var(--bad);font-weight:700">✕</text>
@@ -269,7 +272,7 @@ Set-Cookie: theme=<span class="s">dark</span>; Secure; HttpOnly
         </g>
         <rect x="160" y="88" width="100" height="44" rx="10" class="f-acc"/><text x="210" y="108" text-anchor="middle" class="t" style="fill:#fff;font-weight:700">오리진</text><text x="210" y="124" text-anchor="middle" class="t-mono" style="fill:#fff">미국 동부</text>
         <g class="f-acc2-soft">
-          <rect x="80" y="44" width="80" height="30" rx="8"/><rect x="90" y="166" width="80" height="30" rx="8"/><rect x="360" y="54" width="80" height="30" rx="8"/><rect x="520" y="64" width="80" height="30" rx="8"/><rect x="580" y="166" width="80" height="30" rx="8"/><rect x="320" y="176" width="80" height="30" rx="8"/>
+          <rect x="62" y="44" width="116" height="30" rx="8"/><rect x="72" y="166" width="116" height="30" rx="8"/><rect x="342" y="54" width="116" height="30" rx="8"/><rect x="510" y="64" width="100" height="30" rx="8"/><rect x="570" y="166" width="100" height="30" rx="8"/><rect x="302" y="176" width="116" height="30" rx="8"/>
         </g>
         <g class="t-mono" style="font-size:10.5px;fill:var(--text)">
           <text x="120" y="63" text-anchor="middle">엣지 미국 서부</text><text x="130" y="185" text-anchor="middle">엣지 상파울루</text><text x="400" y="73" text-anchor="middle">엣지 프랑크푸르트</text><text x="560" y="83" text-anchor="middle">엣지 서울</text><text x="620" y="185" text-anchor="middle">엣지 시드니</text><text x="360" y="195" text-anchor="middle">엣지 요하네스버그</text>
@@ -309,7 +312,7 @@ Set-Cookie: theme=<span class="s">dark</span>; Secure; HttpOnly
         <rect x="210" y="50" width="130" height="56" rx="10" class="f-surface"/><text x="275" y="74" text-anchor="middle" class="t" style="font-weight:700">내 메일 서버</text><text x="275" y="94" text-anchor="middle" class="t-mono">a.example</text>
         <rect x="460" y="50" width="130" height="56" rx="10" class="f-surface"/><text x="525" y="74" text-anchor="middle" class="t" style="font-weight:700">상대 메일 서버</text><text x="525" y="94" text-anchor="middle" class="t-mono">b.example 사서함</text>
         <rect x="670" y="50" width="120" height="56" rx="10" class="f-acc2-soft"/><text x="730" y="74" text-anchor="middle" class="t" style="font-weight:700">받는 사람</text><text x="730" y="94" text-anchor="middle" class="t-mono">메일 앱</text>
-        <path d="M130 78 H206" class="s-acc" marker-end="url(#ml-a)"/><path d="M340 78 H456" class="s-acc" marker-end="url(#ml-a)"/><path d="M670 78 H594" class="s-acc" marker-start="url(#ml-a)"/>
+        <path d="M130 78 H206" class="s-acc" marker-end="url(#ml-a)"/><path d="M340 78 H456" class="s-acc" marker-end="url(#ml-a)"/><path d="M594 78 H666" class="s-acc" marker-end="url(#ml-a)"/>
         <g class="t-mono" style="font-size:10.5px">
           <text x="168" y="70" text-anchor="middle">SMTP</text><text x="168" y="124" text-anchor="middle">587 (제출)</text>
           <text x="398" y="70" text-anchor="middle">SMTP 25</text><text x="398" y="124" text-anchor="middle">서버 → 서버</text>
@@ -877,8 +880,8 @@ Set-Cookie: theme=<span class="s">dark</span>; Secure; HttpOnly
     const N = nOf(p2pN()), u = p2pU(), us = p2pS();
     const cs = [], pp = [];
     for (let v = 0; v <= 40; v += 0.5) { const n = Math.pow(10, v / 10); cs.push([n, dcs(n, us)]); pp.push([n, dp2p(n, us, u)]); }
-    const tf = (s) => (s >= 3600 ? Math.round(s / 3600) + "h" : s >= 60 ? Math.round(s / 60) + "m" : Math.round(s) + "s");
-    NB.chart(ctx, null, { x: [1, 10000], y: [10, 1e6], logX: true, logY: true, xLabel: "받는 사람 수 N", yLabel: "모두 받을 때까지", yFmt: tf, xFmt: (v) => (v >= 1000 ? v / 1000 + "천" : String(v)),
+    const tf = (s) => (s >= 3600 ? Math.round(s / 3600) + "시간" : s >= 60 ? Math.round(s / 60) + "분" : Math.round(s) + "초");
+    NB.chart(ctx, null, { x: [1, 10000], y: [10, 4e5], logX: true, logY: true, yTicks: [10, 60, 600, 3600, 36000, 360000], xLabel: "받는 사람 수 N", yLabel: "모두 받을 때까지", yFmt: tf, xFmt: (v) => (v >= 1000 ? v / 1000 + "천" : String(v)),
       series: [{ data: cs, color: P.bad, width: 2.4 }, { data: pp, color: P.ok, width: 2.4 }],
       points: [{ x: N, y: dcs(N, us), color: P.bad, r: 5 }, { x: N, y: dp2p(N, us, u), color: P.ok, r: 5 }] });
     NB.text(ctx, "클라이언트-서버", 70, 26, { size: 12, bold: true, color: P.bad });
