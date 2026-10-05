@@ -33,7 +33,7 @@
     { slug: "ops",        num: "23", part: "보안과 운영",    title: "측정과 문제 해결",               desc: "ping과 traceroute, 지연의 네 가지 원인, 대역폭-지연 곱, 큐와 버퍼블로트, QoS, 장애 추적.", tags: ["운영", "sim"] },
     { slug: "journey",    num: "24", part: "종합",           title: "영상 통화 한 번의 여행",         desc: "휴대폰 → Wi-Fi → 광케이블 → 데이터센터 → 기지국 → 친구의 휴대폰. 모든 계층을 한 번에 따라간다.", tags: ["종합", "sim"] },
     { slug: "history",    num: "25", part: "종합",           title: "통신의 역사와 미래",             desc: "봉화와 전신에서 아파넷, 웹, 스마트폰, 6G와 양자 통신까지. 대역폭 성장 곡선을 따라간다.", tags: ["역사", "sim"] },
-    { slug: "glossary",   num: "26", part: "종합",           title: "용어집 & 종합 퀴즈",             desc: "네트워크·통신·반도체 핵심 용어를 검색하고, 종합 퀴즈로 배운 내용을 점검하자.", tags: ["정리"] },
+    { slug: "glossary",   num: "26", part: "종합",           title: "용어집 & 종합 퀴즈",             desc: "네트워크·통신·반도체 핵심 용어 459개를 검색하고, 75문항 종합 퀴즈로 배운 내용을 점검하자.", tags: ["정리"] },
   ];
 
   const NB = (window.NB = {});

@@ -6,6 +6,18 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <title>네트워크 칩: 스위치와 NIC · NetworkBook</title>
 <meta name="description" content="51.2 Tbps 스위치 ASIC의 내부를 3D로 뜯어보고, 초당 수십억 패킷을 처리하는 파이프라인, TCAM의 병렬 검색, 마이크로버스트를 견디는 버퍼, NIC·SmartNIC·DPU의 오프로드를 시뮬레이터로 익힌다.">
+<link rel="canonical" href="https://networkbook.euiyun.com/chapters/netchips.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="NetworkBook">
+<meta property="og:title" content="네트워크 칩: 스위치와 NIC · NetworkBook">
+<meta property="og:description" content="51.2 Tbps 스위치 ASIC의 내부를 3D로 뜯어보고, 초당 수십억 패킷을 처리하는 파이프라인, TCAM의 병렬 검색, 마이크로버스트를 견디는 버퍼, NIC·SmartNIC·DPU의 오프로드를 시뮬레이터로 익힌다.">
+<meta property="og:url" content="https://networkbook.euiyun.com/chapters/netchips.html">
+<meta property="og:image" content="https://networkbook.euiyun.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"네트워크 칩: 스위치와 NIC","name":"네트워크 칩: 스위치와 NIC · NetworkBook","url":"https://networkbook.euiyun.com/chapters/netchips.html","mainEntityOfPage":"https://networkbook.euiyun.com/chapters/netchips.html","inLanguage":"ko","isAccessibleForFree":true,"learningResourceType":"interactive textbook chapter","position":17,"image":"https://networkbook.euiyun.com/og.png","dateModified":"2026-10-05","isPartOf":{"@type":"Book","@id":"https://networkbook.euiyun.com/#book","name":"NetworkBook — 인터랙티브 네트워크 교과서","url":"https://networkbook.euiyun.com/"},"publisher":{"@type":"Organization","name":"NetworkBook","url":"https://networkbook.euiyun.com/"},"description":"51.2 Tbps 스위치 ASIC의 내부를 3D로 뜯어보고, 초당 수십억 패킷을 처리하는 파이프라인, TCAM의 병렬 검색, 마이크로버스트를 견디는 버퍼, NIC·SmartNIC·DPU의 오프로드를 시뮬레이터로 익힌다."},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"NetworkBook","item":"https://networkbook.euiyun.com/"},{"@type":"ListItem","position":2,"name":"17 네트워크 칩: 스위치와 NIC","item":"https://networkbook.euiyun.com/chapters/netchips.html"}]}]}</script>
 <link rel="stylesheet" href="../css/style.css">
 <script src="../js/common.js"></script>
 <style>
@@ -36,7 +48,7 @@
   <header class="chapter-hero">
     <div class="eyebrow">Chapter 17</div>
     <h1>네트워크 칩: 스위치와 NIC</h1>
-    <p class="lead">데이터센터 랙 맨 위에 꽂힌 납작한 상자 하나가 1초에 50테라비트, 100테라비트를 주고받는다. 넷플릭스 4K 영상 1,000만 편을 동시에 흘려보낼 수 있는 양이다. 그 일을 하는 것은 상자 한가운데 커다란 방열판 아래 숨은 칩 하나다. 이 장에서는 그 <strong>스위치 칩</strong>과, 서버 쪽 출입구인 <strong>NIC</strong>의 속을 들여다본다.</p>
+    <p class="lead">데이터센터 랙 맨 위에 꽂힌 납작한 상자 하나가 1초에 50테라비트, 100테라비트를 주고받는다. 4K 영상(편당 약 15 Mbps) 수백만 편을 동시에 흘려보낼 수 있는 양이다. 그 일을 하는 것은 상자 한가운데 커다란 방열판 아래 숨은 칩 하나다. 이 장에서는 그 <strong>스위치 칩</strong>과, 서버 쪽 출입구인 <strong>NIC</strong>의 속을 들여다본다.</p>
     <ul class="objectives">
       <li>스위치·라우터 상자 안의 칩 구성(스위치 ASIC, CPU, 광 모듈, 리타이머, NIC/DPU)을 그린다.</li>
       <li>스위치 칩 용량이 약 2년마다 두 배가 된 역사와 “용량 = SerDes 수 × 레인 속도” 관계를 계산한다.</li>
@@ -487,7 +499,8 @@
     const cw = narrow ? w : w * 0.62, chh = narrow ? h * 0.6 : h;
     const ch = NB.chart(ctx, { x: 52, y: 14, w: cw - 52 - 14, h: chh - 14 - 44 }, { x: [2009, 2026.5], y: [0.3, 300], logY: true, xLabel: "연도 (대략)", yLabel: "칩 용량 (Tbps)", xTicks: [2010, 2014, 2018, 2022, 2026], yFmt: (v) => (v >= 1 ? String(v) : String(v)),
       series: [{ data: GENS.map((g) => [g[0], g[1]]), color: P.accent, width: 2.2 }, { data: [[2010, 0.64], [2026, 0.64 * Math.pow(2, 8)]], color: P.faint, width: 1, dash: [4, 4] }],
-      points: GENS.map((g) => ({ x: g[0], y: g[1], color: P.accent, r: 3.5 })).concat([{ x: 2026, y: cap, color: P.bad, r: 6, label: narrow ? "" : "계산값" }]) });
+      points: GENS.map((g) => ({ x: g[0], y: g[1], color: P.accent, r: 3.5 })).concat([{ x: 2026, y: cap, color: P.bad, r: 6 }]) });
+    if (!narrow) NB.text(ctx, "계산값", ch.X(2026) - 10, ch.Y(cap) + 14, { size: 11, align: "right", bold: true, color: P.bad });
     ctx.font = "10.5px " + NB.color("mono");
     GENS.forEach((g, i) => { if (narrow && i % 2) return; NB.text(ctx, g[1] >= 1 ? g[1] + "T" : g[1] * 1000 + "G", ch.X(g[0]) - 4, ch.Y(g[1]) - 12, { size: 10.5, align: "right", mono: true, color: P.dim }); });
     NB.text(ctx, "2년마다 ×2 (점선)", ch.X(2014), ch.Y(30), { size: 11, color: P.faint });
