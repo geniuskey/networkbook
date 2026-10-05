@@ -18,6 +18,8 @@
 - 모바일(폭 360px)에서 페이지 가로 스크롤이 생기면 안 된다. 넓은 그림은 `overflow-x:auto` 래퍼 안에 넣는다. SVG는 `viewBox`만 주고 width/height 속성 생략.
 
 ## head 템플릿
+
+모든 HTML 페이지에는 아래 Cloudflare Web Analytics 코드를 `<head>`에 한 번 포함한다. SEO 자동 생성 블록 밖에 두며, 공통 Site Token을 유지한다.
 ```html
 <!doctype html>
 <html lang="ko">
@@ -29,6 +31,9 @@
 <meta name="description" content="한 문장 설명">
 <link rel="stylesheet" href="../css/style.css">
 <script src="../js/common.js"></script>
+<!-- Cloudflare Web Analytics -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"3d6151a0abc94ede89285d462527fa80"}'></script>
+<!-- End Cloudflare Web Analytics -->
 </head>
 <body data-chapter="routing">
 <main class="chapter">
