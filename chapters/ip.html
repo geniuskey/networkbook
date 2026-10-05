@@ -1,0 +1,999 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>IP 주소와 서브넷 · NetworkBook</title>
+<meta name="description" content="인터넷의 주소 체계. IPv4 헤더와 32비트 주소, 서브넷 마스크와 CIDR 계산, 사설 주소, DHCP와 ARP, 공유기의 NAT, 그리고 128비트 IPv6로의 이사를 시뮬레이터로 익힌다.">
+<link rel="canonical" href="https://networkbook.euiyun.com/chapters/ip.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="NetworkBook">
+<meta property="og:title" content="IP 주소와 서브넷 · NetworkBook">
+<meta property="og:description" content="인터넷의 주소 체계. IPv4 헤더와 32비트 주소, 서브넷 마스크와 CIDR 계산, 사설 주소, DHCP와 ARP, 공유기의 NAT, 그리고 128비트 IPv6로의 이사를 시뮬레이터로 익힌다.">
+<meta property="og:url" content="https://networkbook.euiyun.com/chapters/ip.html">
+<meta property="og:image" content="https://networkbook.euiyun.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"IP 주소와 서브넷","name":"IP 주소와 서브넷 · NetworkBook","url":"https://networkbook.euiyun.com/chapters/ip.html","mainEntityOfPage":"https://networkbook.euiyun.com/chapters/ip.html","inLanguage":"ko","isAccessibleForFree":true,"learningResourceType":"interactive textbook chapter","position":7,"image":"https://networkbook.euiyun.com/og.png","dateModified":"2026-10-05","isPartOf":{"@type":"Book","@id":"https://networkbook.euiyun.com/#book","name":"NetworkBook — 인터랙티브 네트워크 교과서","url":"https://networkbook.euiyun.com/"},"publisher":{"@type":"Organization","name":"NetworkBook","url":"https://networkbook.euiyun.com/"},"description":"인터넷의 주소 체계. IPv4 헤더와 32비트 주소, 서브넷 마스크와 CIDR 계산, 사설 주소, DHCP와 ARP, 공유기의 NAT, 그리고 128비트 IPv6로의 이사를 시뮬레이터로 익힌다."},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"NetworkBook","item":"https://networkbook.euiyun.com/"},{"@type":"ListItem","position":2,"name":"07 IP 주소와 서브넷","item":"https://networkbook.euiyun.com/chapters/ip.html"}]}]}</script>
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .bv { padding: 14px 18px 6px; display: grid; gap: 10px; }
+  .bv-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; align-items: center; }
+  .bv-lab { font-size: 13px; color: var(--text-dim); display: flex; flex-direction: column; gap: 1px; }
+  .bv-lab b { font-family: var(--mono); color: var(--text); font-size: 14px; }
+  .bv-bits { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .oct { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 1px; }
+  .oct span { font-family: var(--mono); font-size: 12px; text-align: center; padding: 3px 0; border-radius: 3px; background: var(--surface); color: var(--text-dim); user-select: none; }
+  .oct span.n { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+  .oct span.b { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--text); }
+  .bv-row.ip .oct span { cursor: pointer; }
+  .bv-row.ip .oct span:hover { outline: 1px solid var(--accent); }
+  @media (max-width: 640px) {
+    .bv-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .bv-lab { flex-direction: row; justify-content: space-between; }
+    .bv-bits { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  .stepdesc { padding: 12px 18px; border-top: 1px solid var(--border); font-size: 15px; min-height: 66px; }
+  .pkt-tbl { margin: 0; }
+  .pkt-tbl td, .pkt-tbl th { font-size: 12.5px; padding: 6px 10px; }
+  .pkt-tbl td { font-family: var(--mono); }
+  .pkt-tbl td:first-child { font-family: var(--font); color: var(--text-dim); white-space: nowrap; }
+  .pkt-wrap { padding: 0 18px 14px; }
+  .pkt-wrap .table-wrap { margin: 0; }
+  .sp-list { padding: 10px 18px; border-top: 1px solid var(--border); font-size: 13.5px; display: grid; gap: 3px; }
+  .sp-list .mono { font-family: var(--mono); }
+  .sp-list .bad { color: var(--bad); font-weight: 700; }
+  .nat-hdr { font-family: var(--mono); font-size: 12.5px; padding: 10px 18px; border-top: 1px solid var(--border); display: grid; gap: 3px; word-break: break-all; min-height: 56px; }
+  .nat-hdr .k { font-family: var(--font); color: var(--text-dim); margin-right: 6px; }
+  .nat-hdr .chg { color: var(--accent); font-weight: 700; }
+  tr.fresh td { background: var(--accent-soft); }
+  .v6 { padding: 14px 18px; display: grid; gap: 10px; }
+  .v6-full { display: flex; flex-wrap: wrap; gap: 6px 2px; align-items: center; font-family: var(--mono); font-size: 14px; }
+  .g6 { padding: 3px 6px; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); }
+  .g6 i { font-style: normal; color: var(--text-faint); text-decoration: line-through; }
+  .g6.z { background: color-mix(in srgb, var(--warn) 16%, transparent); border-color: var(--warn); }
+  .v6-step { font-size: 13.5px; word-break: break-all; }
+  .v6-step code { font-size: 13.5px; }
+  .v6-step b { color: var(--accent); }
+  .v6-err { color: var(--bad); font-size: 14px; }
+  .quiz-q code, .whatif code { word-break: break-all; }
+</style>
+</head>
+<body data-chapter="ip">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 07</div>
+    <h1>IP 주소와 서브넷</h1>
+    <p class="lead">카페에서 노트북을 열면 몇 초 만에 인터넷이 된다. 그 사이 노트북은 “나는 몇 번지인가?”를 물어 주소를 빌리고, 옆자리 공유기의 하드웨어 주소를 알아내고, 공유기는 노트북의 주소를 바깥용 주소로 바꿔 적는다. 전 세계 수백억 대의 기기가 서로를 찾는 비결은 32비트(또는 128비트)짜리 숫자 하나, IP 주소다. 이 장에서는 그 숫자를 직접 쪼개고 계산해 본다.</p>
+    <ul class="objectives">
+      <li>IP가 “최선형·비연결” 배달을 하는 이유와 IPv4 헤더의 주요 필드를 설명한다.</li>
+      <li>IPv4 주소를 이진수로 읽고, 네트워크 부분과 호스트 부분을 나눈다.</li>
+      <li>프리픽스 길이로 서브넷 마스크·네트워크 주소·브로드캐스트·호스트 수를 계산한다.</li>
+      <li>하나의 네트워크를 여러 서브넷으로 나누고 VLSM으로 낭비를 줄인다.</li>
+      <li>DHCP가 주소를 빌려주는 과정과 ARP가 MAC 주소를 알아내는 과정을 따라간다.</li>
+      <li>NAT가 공인 IP 하나를 여러 기기가 나눠 쓰게 하는 원리와 부작용을 이해한다.</li>
+      <li>IPv4 고갈의 역사와 IPv6의 표기법·자동 설정·보급 현황을 안다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="role">
+    <h2>IP의 일: 최선을 다해, 한 상자씩</h2>
+    <p>3장에서 본 계층 구조에서 <b>IP</b><span class="en">(Internet Protocol)</span>는 네트워크 계층을 맡는다. 할 일은 하나뿐이다. 목적지 주소가 적힌 상자(패킷)를 지구 어디든 그 주소의 기기까지 가져다 놓는 것. 이더넷(6장)이 같은 건물 안의 우편실이라면, IP는 도시와 나라를 넘나드는 택배 회사다.</p>
+    <p>IP의 배달 방식에는 두 가지 큰 특징이 있다.</p>
+    <ul>
+      <li><span class="term">최선형 전달</span><span class="en">(best-effort delivery)</span>: 최선을 다하지만 아무것도 약속하지 않는다. 상자가 사라질 수도, 순서가 바뀔 수도, 드물게는 두 번 도착할 수도 있다. 혼잡한 라우터는 넘치는 패킷을 그냥 버린다. 분실을 챙기는 일은 위층의 TCP(9장)에게 맡긴다.</li>
+      <li><b>비연결형</b><span class="en">(connectionless)</span>: 보내기 전에 상대와 약속(연결 설정)을 하지 않는다. 패킷마다 완전한 주소가 적혀 있고, 라우터는 각 패킷을 서로 모르는 남처럼 따로 처리한다. 같은 대화의 패킷도 다른 길로 갈 수 있다.</li>
+    </ul>
+    <p>약속을 적게 한 덕분에 IP는 단순하고, 단순한 덕분에 구리선·광섬유·전파·위성 어떤 링크 위에서도 돌아간다. “인터넷의 허리”라 불리는 이유다. 아래는 IPv4 패킷 맨 앞에 붙는 20바이트 헤더, 즉 택배 상자의 송장이다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto">
+      <svg viewBox="0 0 760 312" style="min-width:600px" role="img" aria-label="IPv4 헤더의 필드 배치">
+        <g class="t-mono" style="font-size:11px">
+          <text x="60" y="30" class="t-dim">0</text><text x="220" y="30" class="t-dim">8</text><text x="380" y="30" class="t-dim">16</text><text x="540" y="30" class="t-dim">24</text><text x="692" y="30" class="t-dim">31</text>
+          <text x="50" y="75" text-anchor="end" class="t-dim">0</text><text x="50" y="115" text-anchor="end" class="t-dim">4</text><text x="50" y="155" text-anchor="end" class="t-dim">8</text><text x="50" y="195" text-anchor="end" class="t-dim">12</text><text x="50" y="235" text-anchor="end" class="t-dim">16</text><text x="50" y="275" text-anchor="end" class="t-dim">20</text>
+        </g>
+        <text x="20" y="30" class="t-dim" style="font-size:11px">바이트</text>
+        <g stroke="var(--border)" stroke-width="1.2">
+          <rect x="60" y="50" width="80" height="40" class="f-acc-soft"/><rect x="140" y="50" width="80" height="40" class="f-surface"/><rect x="220" y="50" width="160" height="40" class="f-surface"/><rect x="380" y="50" width="320" height="40" class="f-surface"/>
+          <rect x="60" y="90" width="320" height="40" class="f-surface"/><rect x="380" y="90" width="60" height="40" class="f-surface"/><rect x="440" y="90" width="260" height="40" class="f-surface"/>
+          <rect x="60" y="130" width="160" height="40" class="f-acc-soft"/><rect x="220" y="130" width="160" height="40" class="f-acc-soft"/><rect x="380" y="130" width="320" height="40" class="f-acc-soft"/>
+          <rect x="60" y="170" width="640" height="40" class="f-acc2-soft"/>
+          <rect x="60" y="210" width="640" height="40" class="f-acc2-soft"/>
+          <rect x="60" y="250" width="640" height="34" class="f-surface" stroke-dasharray="5 4"/>
+        </g>
+        <g class="t" style="font-size:13px" text-anchor="middle">
+          <text x="100" y="67">버전</text><text x="180" y="67">헤더 길이</text><text x="300" y="67">서비스 종류</text><text x="540" y="67">전체 길이</text>
+          <text x="220" y="107">식별자</text><text x="410" y="107">플래그</text><text x="570" y="107">조각 오프셋</text>
+          <text x="140" y="147" style="font-weight:700">TTL</text><text x="300" y="147" style="font-weight:700">프로토콜</text><text x="540" y="147" style="font-weight:700">헤더 체크섬</text>
+          <text x="380" y="187" style="font-weight:700">출발지 IP 주소 (32비트)</text>
+          <text x="380" y="227" style="font-weight:700">목적지 IP 주소 (32비트)</text>
+          <text x="380" y="272" class="t-dim">옵션 (가변 길이, 거의 쓰지 않음)</text>
+        </g>
+        <g class="t-mono t-dim" style="font-size:10.5px" text-anchor="middle">
+          <text x="100" y="83">4</text><text x="180" y="83">5 (×4B)</text><text x="300" y="83">DSCP·ECN</text><text x="540" y="83">헤더+데이터 바이트 수</text>
+          <text x="220" y="123">조각 맞추기용 번호</text><text x="410" y="123">DF·MF</text><text x="570" y="123">8바이트 단위 위치</text>
+          <text x="140" y="163">64 → 홉마다 −1</text><text x="300" y="163">6=TCP, 17=UDP</text><text x="540" y="163">헤더 손상 검사</text>
+          <text x="380" y="203">예: 192.168.0.23</text>
+          <text x="380" y="243">예: 142.250.196.110</text>
+        </g>
+        <text x="380" y="304" text-anchor="middle" class="t-dim" style="font-size:12px">한 줄 = 32비트(4바이트). 옵션이 없으면 헤더는 정확히 20바이트다.</text>
+      </svg>
+      </div>
+      <figcaption><b>그림 7-1.</b> IPv4 헤더. 라우터는 패킷마다 목적지 주소를 보고 길을 정하고, TTL을 1 줄이고, 그 때문에 바뀐 헤더의 체크섬을 다시 계산한다. 프로토콜 번호는 안에 든 상자가 TCP인지 UDP인지 알려 준다. 데이터 내용은 들여다보지 않는다.</figcaption>
+    </figure>
+    <div class="callout analogy"><strong>송장만 보는 분류 센터</strong><p>물류 허브의 직원은 상자를 열어 보지 않는다. 송장의 받는 주소만 보고 어느 트럭에 실을지 정한다. 상자가 너무 많아 창고가 넘치면 일부를 그냥 버린다(최선형). 같은 사람이 보낸 상자 열 개도 각각 다른 트럭을 탈 수 있다(비연결형). 대신 송장에는 “유효 기한(TTL)” 도장이 있어 허브를 지날 때마다 하나씩 줄고, 0이 되면 폐기한다. 주소가 잘못돼 영원히 도는 상자를 막는 장치다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="address">
+    <h2>32비트 주소: 네트워크 부분과 호스트 부분</h2>
+    <p>IPv4 주소는 32개의 비트, 즉 0과 1이 32개 늘어선 숫자다. 사람이 읽기 쉽게 8비트(1바이트)씩 끊어 각각 0~255의 십진수로 쓰고 점으로 잇는다. 이를 <b>점 표기</b>(dotted decimal)라 한다. <code>192.168.10.37</code>은 사실 <code>11000000 10101000 00001010 00100101</code>이다. 가능한 주소는 2<sup>32</sup> ≈ 43억 개다.</p>
+    <p>주소의 앞쪽은 <b>어느 네트워크인가</b>, 뒤쪽은 <b>그 네트워크 안의 어느 기기인가</b>를 뜻한다. 도로명 주소의 “테헤란로 123”이 동네와 건물을 가리키고, 뒤의 호수가 집을 가리키는 것과 같다. 라우터는 앞부분(네트워크)만 보고 길을 정하므로, 전 세계 기기 수십억 개를 일일이 외울 필요 없이 네트워크 수십만~백만 개 정도만 알면 된다(8장).</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto">
+      <svg viewBox="0 0 760 236" style="min-width:560px" role="img" aria-label="192.168.10.37/24의 네트워크 부분과 호스트 부분">
+        <text x="380" y="30" text-anchor="middle" class="t-mono" style="font-size:22px;font-weight:700">192.168.10.37 /24</text>
+        <g stroke="var(--border)">
+          <rect x="40" y="50" width="160" height="44" rx="8" class="f-acc-soft"/><rect x="215" y="50" width="160" height="44" rx="8" class="f-acc-soft"/><rect x="390" y="50" width="160" height="44" rx="8" class="f-acc-soft"/><rect x="565" y="50" width="160" height="44" rx="8" class="f-acc2-soft"/>
+        </g>
+        <g class="t-mono" text-anchor="middle" style="font-size:20px">
+          <text x="120" y="79" class="t-acc">192</text><text x="295" y="79" class="t-acc">168</text><text x="470" y="79" class="t-acc">10</text><text x="645" y="79" style="fill:var(--accent-2)">37</text>
+        </g>
+        <g class="t-mono t-dim" text-anchor="middle" style="font-size:14px">
+          <text x="120" y="118">11000000</text><text x="295" y="118">10101000</text><text x="470" y="118">00001010</text><text x="645" y="118">00100101</text>
+        </g>
+        <path d="M40 132 v10 H550 v-10" fill="none" stroke="var(--accent)" stroke-width="2"/>
+        <path d="M565 132 v10 H725 v-10" fill="none" stroke="var(--accent-2)" stroke-width="2"/>
+        <text x="295" y="166" text-anchor="middle" class="t" style="font-weight:700;fill:var(--accent)">네트워크 부분 24비트 = 도로명·건물</text>
+        <text x="645" y="166" text-anchor="middle" class="t" style="font-weight:700;fill:var(--accent-2)">호스트 8비트 = 호수</text>
+        <text x="380" y="198" text-anchor="middle" class="t-dim">“/24” = 앞에서부터 24비트가 네트워크. 서브넷 마스크로 쓰면 255.255.255.0.</text>
+        <text x="380" y="220" text-anchor="middle" class="t-dim">네트워크 부분이 같은 기기끼리는 라우터 없이 같은 LAN(6장) 안에서 바로 주고받는다.</text>
+      </svg>
+      </div>
+      <figcaption><b>그림 7-2.</b> IPv4 주소의 두 부분. 경계선의 위치는 주소 자체에 적혀 있지 않고, 프리픽스 길이(또는 서브넷 마스크)라는 별도 정보로 정한다.</figcaption>
+    </figure>
+    <h3>클래스에서 CIDR로</h3>
+    <p>1981년 처음 정한 규칙은 경계선을 8비트 단위로 고정한 <b>클래스</b> 방식이었다. 첫 숫자만 보면 클래스가 정해졌다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>클래스</th><th>첫 바이트</th><th>네트워크/호스트</th><th class="num">네트워크 수</th><th class="num">네트워크당 호스트</th></tr></thead>
+      <tbody>
+        <tr><td>A</td><td>0~127</td><td>8 / 24비트</td><td class="num">128</td><td class="num">약 1,677만</td></tr>
+        <tr><td>B</td><td>128~191</td><td>16 / 16비트</td><td class="num">16,384</td><td class="num">65,534</td></tr>
+        <tr><td>C</td><td>192~223</td><td>24 / 8비트</td><td class="num">약 209만</td><td class="num">254</td></tr>
+        <tr><td>D</td><td>224~239</td><td colspan="3">멀티캐스트(여러 수신자에게 한꺼번에)</td></tr>
+        <tr><td>E</td><td>240~255</td><td colspan="3">실험·예약용</td></tr>
+      </tbody>
+    </table></div>
+    <p>문제는 크기가 세 가지뿐이라는 것이었다. 직원 2,000명 회사는 C(254대)로는 모자라 B(65,534대)를 받아야 했고, 6만 개 넘는 주소가 놀았다. 1990년대 초 B 클래스가 빠르게 바닥나자 1993년 <span class="term">CIDR</span><span class="en">(Classless Inter-Domain Routing)</span>이 도입됐다. 경계선을 아무 비트에나 둘 수 있게 하고, 주소 뒤에 <code>/22</code>처럼 네트워크 비트 수를 붙인다. 이 숫자를 <span class="term">프리픽스 길이</span><span class="en">(prefix length)</span>라 한다. 2,000명 회사는 이제 <code>/21</code>(2,046대)을 받으면 된다. 오늘날 클래스라는 말은 역사 용어로만 남았다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="subnet">
+    <h2>서브넷 계산기</h2>
+    <p>프리픽스 길이를 비트 모양으로 쓴 것이 <span class="term">서브넷 마스크</span><span class="en">(subnet mask)</span>다. 네트워크 비트 자리는 1, 호스트 비트 자리는 0. <code>/24</code>는 1이 24개, 0이 8개이므로 <code>255.255.255.0</code>이다. 기기는 주소와 마스크를 비트별 AND(둘 다 1일 때만 1) 하여 자기 네트워크 주소를 얻고, 상대 주소도 같은 방식으로 계산해 “같은 동네인가?”를 판단한다. 같으면 직접(ARP로 MAC을 찾아) 보내고, 다르면 기본 게이트웨이(공유기)에게 맡긴다.</p>
+    <p>한 <span class="term">서브넷</span><span class="en">(subnet)</span>에서 두 주소는 기기에게 줄 수 없다. 호스트 비트가 전부 0인 주소는 네트워크 자체의 이름(<b>네트워크 주소</b>)이고, 전부 1인 주소는 “이 네트워크의 모두에게”라는 뜻의 <span class="term">브로드캐스트 주소</span><span class="en">(broadcast address)</span>다. 그래서 호스트 비트가 h개면 쓸 수 있는 주소는 2<sup>h</sup> − 2개다.</p>
+    <div class="formula">사용 가능 호스트 = 2<sup>(32 − 프리픽스)</sup> − 2 &nbsp;&nbsp;·&nbsp;&nbsp; 네트워크 주소 = IP AND 마스크 &nbsp;&nbsp;·&nbsp;&nbsp; 브로드캐스트 = 네트워크 주소 OR (NOT 마스크)</div>
+    <div class="sim" id="sim-calc">
+      <div class="sim-head"><span class="sim-tag">CALCULATOR</span><h3>서브넷 계산기: 프리픽스 길이를 움직여 보세요</h3></div>
+      <div class="sim-controls" style="border-top:0">
+        <label class="ctrl"><span>IP 주소 (a.b.c.d 또는 a.b.c.d/n)</span><input type="text" id="sc-ip" value="192.168.10.37" spellcheck="false" autocomplete="off"></label>
+        <label class="ctrl"><span>프리픽스 길이 <output id="sc-p-out"></output></span><input type="range" id="sc-p" min="0" max="32" value="24"></label>
+        <div class="ctrl"><span>예시</span><div class="seg" id="sc-ex"><button data-value="192.168.10.37/24" class="on">집</button><button data-value="10.20.30.40/8">10/8</button><button data-value="172.16.5.200/20">/20</button><button data-value="203.0.113.77/27">/27</button><button data-value="198.51.100.6/31">/31</button></div></div>
+      </div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>네트워크 비트</span><span><i style="background:var(--text-faint)"></i>호스트 비트</span><span><i style="background:var(--warn)"></i>브로드캐스트의 호스트 비트(모두 1)</span></div>
+      <div class="bv" id="sc-bits"></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">서브넷 마스크</span><span class="v" id="sc-mask" style="font-size:15px">—</span></div>
+        <div class="stat"><span class="k">네트워크 주소</span><span class="v" id="sc-net" style="font-size:15px">—</span></div>
+        <div class="stat"><span class="k">브로드캐스트 주소</span><span class="v" id="sc-bc" style="font-size:15px">—</span></div>
+        <div class="stat"><span class="k">기기에 줄 수 있는 범위</span><span class="v" id="sc-range" style="font-size:14px">—</span></div>
+        <div class="stat"><span class="k">사용 가능 호스트 수</span><span class="v" id="sc-hosts">—</span></div>
+        <div class="stat"><span class="k">주소 종류 (옛 클래스)</span><span class="v" id="sc-kind" style="font-size:14px">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 프리픽스를 24 → 25 → 26으로 늘려 보자. 네트워크 비트(파란색)가 하나 늘 때마다 호스트 수가 절반이 된다. 맨 위 줄(IP 주소)의 비트를 눌러 직접 뒤집을 수도 있다. 호스트 비트를 바꾸면 네트워크 주소는 그대로, 네트워크 비트를 바꾸면 다른 동네가 된다. /31은 두 라우터를 잇는 점대점 링크 전용(RFC 3021)이라 네트워크·브로드캐스트 주소를 따로 두지 않고, /32는 기기 하나만 가리킨다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">/24 네트워크(사용 가능 254대)의 프리픽스를 /25로 1만 늘리면, 서브넷 하나에서 쓸 수 있는 호스트 수는?</p><p class="wi-hint">서브넷 계산기의 슬라이더를 24에서 25로 옮겨 확인하자.</p><div class="opts">
+      <button class="opt">253대 (한 대 줄어든다)</button><button class="opt">508대 (두 배)</button><button class="opt" data-correct>126대 (절반보다 조금 적다)</button><button class="opt">변하지 않는다</button>
+    </div><div class="quiz-exp">호스트 비트가 8개에서 7개가 되면 주소는 256 → 128개로 절반이 되고, 네트워크·브로드캐스트 두 개를 빼면 126대다. 대신 같은 /24 안에 이런 서브넷이 두 개 생긴다.</div></div>
+
+    <h3>서브넷 나누기와 VLSM</h3>
+    <p>회사가 <code>192.168.10.0/24</code> 하나를 받았다고 하자. 영업팀, 개발팀, 손님 Wi-Fi를 한 네트워크에 몰아 두면 브로드캐스트가 모두에게 퍼지고, 보안 정책도 나누기 어렵다. 그래서 프리픽스를 늘려 작은 서브넷 여러 개로 쪼갠다. 비트 하나를 네트워크 쪽으로 빌릴 때마다 서브넷 수는 두 배, 크기는 절반이 된다.</p>
+    <p>그런데 팀마다 필요한 크기가 다르다. 모든 서브넷을 같은 크기로 자르면 라우터 두 대를 잇는 링크(주소 2개 필요)에도 62개짜리 블록을 줘야 한다. <span class="term">VLSM</span><span class="en">(Variable Length Subnet Mask)</span>은 서브넷마다 프리픽스 길이를 다르게 해서 필요한 만큼만 떼어 준다. 큰 블록부터 차례로 배치하면 블록 경계가 저절로 맞는다.</p>
+    <div class="sim" id="sim-split">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>/24 하나를 서브넷으로 나누기</h3></div>
+      <div class="sim-view"><canvas id="cv-split"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>방식</span><div class="seg" id="sp-mode"><button data-value="eq" class="on">같은 크기로</button><button data-value="vl">필요한 만큼 (VLSM)</button></div></div>
+        <label class="ctrl sp-eq"><span>서브넷 개수 <output id="sp-k-out"></output></span><input type="range" id="sp-k" min="0" max="6" value="2"></label>
+        <label class="ctrl sp-vl" style="display:none"><span>영업팀 기기 수 <output id="sp-a-out"></output></span><input type="range" id="sp-a" min="0" max="250" value="100"></label>
+        <label class="ctrl sp-vl" style="display:none"><span>개발팀 기기 수 <output id="sp-b-out"></output></span><input type="range" id="sp-b" min="0" max="250" value="50"></label>
+        <label class="ctrl sp-vl" style="display:none"><span>손님 Wi-Fi 기기 수 <output id="sp-c-out"></output></span><input type="range" id="sp-c" min="0" max="250" value="25"></label>
+        <label class="ctrl sp-vl" style="display:none"><span>라우터 간 링크 <output id="sp-d-out"></output></span><input type="range" id="sp-d" min="0" max="250" value="2"></label>
+      </div>
+      <div class="sp-list" id="sp-list"></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k" id="sp-k1">서브넷 수</span><span class="v" id="sp-o1">—</span></div>
+        <div class="stat"><span class="k" id="sp-k2">서브넷당 크기</span><span class="v" id="sp-o2">—</span></div>
+        <div class="stat"><span class="k" id="sp-k3">전체 사용 가능 호스트</span><span class="v" id="sp-o3">—</span></div>
+      </div>
+      <div class="sim-note">막대 하나가 주소 256개(<code>192.168.10.0</code>~<code>.255</code>)다. 블록 양 끝의 빨간 선은 기기에게 줄 수 없는 네트워크·브로드캐스트 주소. 같은 크기로 잘게 나눌수록 이 “세금”이 늘어 전체 사용 가능 호스트가 줄어든다(1개 → 254대, 64개 → 128대). VLSM 모드에서는 필요 기기 수 + 2를 담는 가장 작은 2의 거듭제곱 크기를 큰 것부터 배치한다. 영업팀을 200대로 늘려 공간이 모자라는 순간을 확인해 보자.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="special">
+    <h2>특별한 주소들</h2>
+    <p>43억 개의 주소가 모두 인터넷에서 쓰이는 것은 아니다. 몇 덩어리는 특별한 용도로 예약되어 있다. 가장 중요한 것은 <span class="term">사설 IP 주소</span><span class="en">(private address)</span>다. 회사나 집 안에서 누구나 마음대로 쓸 수 있지만 인터넷으로는 나갈 수 없는 주소로, 1996년 RFC 1918이 정했다. 전 세계 수억 가정이 똑같이 <code>192.168.0.1</code>을 공유기 주소로 쓰는데도 충돌이 없는 이유다. 바깥으로 나갈 때는 NAT(아래)가 공인 주소로 바꿔 준다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>범위</th><th>이름</th><th>쓰임</th></tr></thead>
+      <tbody>
+        <tr><td><code>10.0.0.0/8</code></td><td>사설 (큰 것)</td><td>대기업·데이터센터·클라우드 내부망. 약 1,677만 개</td></tr>
+        <tr><td><code>172.16.0.0/12</code></td><td>사설 (중간)</td><td>172.16.0.0~172.31.255.255. 약 105만 개. 172.32는 공인이니 주의</td></tr>
+        <tr><td><code>192.168.0.0/16</code></td><td>사설 (작은 것)</td><td>집 공유기의 기본값(192.168.0.x, 192.168.1.x 등)</td></tr>
+        <tr><td><code>127.0.0.0/8</code></td><td><span class="term">루프백</span><span class="en">(loopback)</span></td><td>“나 자신”. <code>127.0.0.1</code>로 보낸 패킷은 밖으로 나가지 않고 같은 컴퓨터로 돌아온다(localhost)</td></tr>
+        <tr><td><code>169.254.0.0/16</code></td><td><b>링크 로컬 주소</b><span class="en">(link-local)</span></td><td>DHCP 서버를 못 찾았을 때 기기가 스스로 붙이는 주소. 이 주소가 보이면 “주소 배정 실패” 신호</td></tr>
+        <tr><td><code>100.64.0.0/10</code></td><td>공유 주소 (CGNAT)</td><td>통신사가 가입자에게 주는 “두 번째 사설 주소”(RFC 6598)</td></tr>
+        <tr><td><code>224.0.0.0/4</code></td><td>멀티캐스트</td><td>한 번 보내 여러 수신자가 받는 그룹 주소(IPTV, 라우팅 프로토콜 등)</td></tr>
+        <tr><td><code>255.255.255.255</code></td><td>제한 브로드캐스트</td><td>“지금 이 LAN의 모두에게”. 라우터를 넘지 않는다. DHCP가 쓴다</td></tr>
+        <tr><td><code>0.0.0.0</code></td><td>지정 안 됨</td><td>아직 주소가 없는 기기의 출발지 주소. 라우팅 표에서는 “모든 곳”(기본 경로, 8장)</td></tr>
+        <tr><td><code>192.0.2.0/24</code> 등</td><td>문서용</td><td>책과 예제에만 쓰는 주소(198.51.100.0/24, 203.0.113.0/24도). 이 장의 예시들도 이것을 쓴다</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="dhcp-arp">
+    <h2>주소 빌리기(DHCP)와 이웃 찾기(ARP)</h2>
+    <p>노트북을 처음 보는 Wi-Fi에 연결하면 주소, 마스크, 공유기 주소, DNS 서버 주소를 손으로 넣은 적이 없는데도 인터넷이 된다. <span class="term">DHCP</span><span class="en">(Dynamic Host Configuration Protocol)</span> 덕분이다. 공유기 안의 DHCP 서버가 주소 묶음(예: 192.168.0.2~254)을 관리하며, 새로 온 기기에게 하나를 일정 기간 <b>임대</b>해 준다. 주고받는 메시지 네 개의 머리글자를 따서 <b>DORA</b>라 부른다.</p>
+    <div class="sim" id="sim-dhcp">
+      <div class="sim-head"><span class="sim-tag">STEP</span><h3>DHCP DORA: 주소를 빌리는 네 번의 대화</h3></div>
+      <div class="sim-view"><canvas id="cv-dhcp"></canvas></div>
+      <div class="stepdesc" id="dh-desc"></div>
+      <div class="pkt-wrap"><div class="table-wrap"><table class="pkt-tbl" id="dh-tbl"></table></div></div>
+      <div class="sim-controls"><div class="btn-row"><button class="btn" id="dh-prev">← 이전</button><button class="btn primary" id="dh-next">다음 →</button><button class="btn" id="dh-auto">처음부터 자동 재생</button></div></div>
+      <div class="sim-note">Discover와 Request는 브로드캐스트라 같은 LAN의 모든 기기(휴대폰, TV)가 받지만 DHCP 서버가 아니므로 무시한다. 단순화: Offer와 ACK는 노트북에게만 가는 것으로 그렸다(실제로는 클라이언트 설정에 따라 브로드캐스트로 보내기도 한다). 임대 시간은 공유기마다 다르며 하루 정도가 흔하다.</div>
+    </div>
+    <p>주소를 얻은 노트북이 같은 LAN의 프린터 <code>192.168.0.40</code>에게 패킷을 보내려 한다. 그런데 이더넷과 Wi-Fi(6장, 13장)는 IP 주소가 아니라 <b>MAC 주소</b>로 프레임을 배달한다. 프린터의 MAC 주소는 어떻게 알까? <span class="term">ARP</span><span class="en">(Address Resolution Protocol)</span>가 답이다. LAN 전체에 “192.168.0.40 쓰는 분, MAC 주소 알려 주세요” 하고 브로드캐스트로 외치면, 해당 기기만 자기 MAC을 적어 답한다. 답은 <b>ARP 캐시</b>에 잠시 저장해 두고 다음부터는 묻지 않는다.</p>
+    <p>목적지가 LAN 바깥(예: <code>8.8.8.8</code>)이면? 노트북은 서브넷 마스크로 계산해 “다른 동네”임을 알고, 8.8.8.8이 아니라 <b>기본 게이트웨이(공유기)의 MAC</b>을 묻는다. IP 헤더의 목적지는 8.8.8.8 그대로 두고, 이더넷 프레임의 목적지만 공유기 MAC으로 적어 넘긴다. 택배 송장의 최종 주소는 그대로인데, 일단 동네 집하장 트럭에 싣는 것이다.</p>
+    <div class="sim" id="sim-arp">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>ARP: “이 IP 쓰는 분 누구세요?”</h3></div>
+      <div class="sim-view"><canvas id="cv-arp"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>노트북(A)이 보낼 곳</span><div class="seg" id="arp-dst"><button data-value="B" class="on">휴대폰 .31</button><button data-value="C">프린터 .40</button><button data-value="X">인터넷 8.8.8.8</button></div></div>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn primary" id="arp-send">패킷 보내기</button><button class="btn" id="arp-clear">ARP 캐시 비우기</button></div></div>
+      </div>
+      <div class="pkt-wrap" style="padding-top:12px"><div class="table-wrap"><table class="pkt-tbl"><thead><tr><th>노트북의 ARP 캐시: IP 주소</th><th>MAC 주소</th><th>남은 시간</th></tr></thead><tbody id="arp-cache"></tbody></table></div></div>
+      <div class="log" id="arp-log"></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">보낸 ARP 요청 (브로드캐스트)</span><span class="v" id="arp-o1">0</span></div>
+        <div class="stat"><span class="k">캐시 적중 (묻지 않고 바로)</span><span class="v" id="arp-o2">0</span></div>
+        <div class="stat"><span class="k">괜히 방해받은 기기 수 누적</span><span class="v" id="arp-o3">0</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 같은 곳으로 두 번 보내 보자. 두 번째는 캐시에 있어 묻지 않고 바로 간다. 그다음 ‘인터넷 8.8.8.8’을 고르면 노트북이 묻는 대상이 8.8.8.8이 아니라 공유기(.1)임을 확인하자. 캐시 항목은 이 시뮬레이터에서 45초 뒤 지워진다(실제 OS는 수십 초~수 분). 브로드캐스트는 모든 기기를 깨우므로 기기가 수천 대인 LAN에서는 ARP만으로도 부담이 된다. 이것이 큰 망을 서브넷으로 나누는 이유 중 하나다.</div>
+    </div>
+    <div class="callout warn"><strong>ARP는 거짓말을 믿는다</strong><p>ARP에는 인증이 없다. 누군가 묻지도 않았는데 “공유기 IP는 내 MAC이야”라는 응답을 계속 뿌리면 이웃들의 캐시가 오염되어 모든 트래픽이 그 사람을 거쳐 가게 된다(ARP 스푸핑). 공용 Wi-Fi에서 HTTPS 같은 암호화(22장)가 중요한 이유다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="nat">
+    <h2>NAT: 대표 번호 하나로 온 가족이</h2>
+    <p>집에는 휴대폰, 노트북, TV, 스피커까지 기기가 열 대 넘게 있지만, 통신사가 집에 주는 공인 IPv4 주소는 보통 하나다. 공유기의 <span class="term">NAT</span><span class="en">(Network Address Translation)</span>가 이 문제를 푼다. 집 안 기기가 밖으로 패킷을 보내면, 공유기가 출발지 주소를 자기 공인 주소로 바꿔 적는다. 기기 여러 대가 동시에 나가도 구분할 수 있도록 출발지 <b>포트 번호</b>까지 바꾸고, 그 대응을 변환표에 적어 둔다. 포트까지 바꾸는 이 방식을 정확히는 <span class="term">PAT</span><span class="en">(Port Address Translation)</span> 또는 NAPT라 하며, 집 공유기의 NAT는 사실상 모두 이것이다.</p>
+    <div class="callout analogy"><strong>회사 대표 전화와 내선 번호</strong><p>직원 100명이 바깥에 전화를 걸면 상대방 화면에는 모두 회사 대표 번호가 뜬다. 교환대는 “지금 거래처 A와 통화 중인 선은 내선 37번”이라고 적어 두었다가 상대가 말하면 37번으로 돌려준다. 그런데 바깥 사람이 대표 번호로 먼저 전화해 “아무나 바꿔 주세요” 하면? 교환대는 누구에게 연결할지 모른다. 미리 “고객 상담 문의는 내선 200번”이라고 정해 두지 않았다면.</p></div>
+    <div class="sim" id="sim-nat">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>공유기의 NAT 변환표 채우기</h3></div>
+      <div class="sim-view"><canvas id="cv-nat"></canvas></div>
+      <div class="nat-hdr" id="nat-hdr"><div><span class="k">패킷 헤더</span>기기를 고르고 ‘요청 보내기’를 누르세요.</div></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>보내는 기기</span><div class="seg" id="nat-dev"><button data-value="P" class="on">휴대폰</button><button data-value="L">노트북</button><button data-value="T">TV</button></div></div>
+        <div class="ctrl"><span>목적지</span><div class="seg" id="nat-srv"><button data-value="W" class="on">웹 서버 :443</button><button data-value="G">게임 서버 :3074</button></div></div>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn primary" id="nat-send">요청 보내기</button><button class="btn" id="nat-in">바깥에서 먼저 접속</button></div></div>
+        <label class="check"><input type="checkbox" id="nat-fwd"> 포트 포워딩: 공인 8080 → TV(192.168.0.20:8080)</label>
+      </div>
+      <div class="pkt-wrap" style="padding-top:12px"><div class="table-wrap"><table class="pkt-tbl"><thead><tr><th>집 안 주소:포트</th><th>공인 주소:포트</th><th>상대방</th><th>남은 시간</th></tr></thead><tbody id="nat-tbl"></tbody></table></div></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">공인 IP 개수</span><span class="v">1개</span></div>
+        <div class="stat"><span class="k">변환표 항목</span><span class="v" id="nat-o1">0</span></div>
+        <div class="stat"><span class="k">버린 패킷 (표에 없음)</span><span class="v" id="nat-o2">0</span></div>
+      </div>
+      <div class="sim-note">해볼 것: 휴대폰과 노트북에서 한 번씩 요청을 보내 보자. 둘 다 출발지 포트로 50000을 골랐지만(각자 따로 고르니 겹칠 수 있다) 공유기는 바깥 포트를 40001, 40002로 다르게 줘서 답장을 정확히 되돌린다. 그다음 ‘바깥에서 먼저 접속’을 눌러 보자. 변환표에 없는 패킷이라 버려진다. 포트 포워딩을 켜면 TV로 들어간다. 단순화: 실제 공유기는 바깥 포트를 무작위로 고르고, 항목은 TCP 연결이 끝나거나 일정 시간(수십 초~수 분) 조용하면 지운다. 여기서는 60초.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">포트 포워딩을 끈 상태에서, 바깥의 친구가 우리 집 공인 IP의 8080번 포트로 먼저 접속하면 어떻게 될까?</p><p class="wi-hint">NAT 시뮬레이터에서 포트 포워딩을 끄고 ‘바깥에서 먼저 접속’을 눌러 보자.</p><div class="opts">
+      <button class="opt">공유기가 기기 전체에 복사해서 보낸다</button><button class="opt" data-correct>변환표에 해당 항목이 없어 공유기가 버린다</button><button class="opt">가장 최근에 인터넷을 쓴 기기에게 간다</button><button class="opt">TV가 8080을 쓰므로 자동으로 TV에게 간다</button>
+    </div><div class="quiz-exp">NAT 변환표는 안에서 밖으로 나간 패킷이 있을 때만 생긴다. 바깥에서 먼저 온 패킷은 누구에게 줄지 알 수 없어 버린다. 그래서 집에서 게임 서버나 NAS를 열려면 포트 포워딩 규칙을 직접 넣어야 한다. 부수적으로 이것은 간단한 방화벽 역할도 한다.</div></div>
+    <h3>NAT의 부작용</h3>
+    <ul>
+      <li><b>서버를 열기 어렵다.</b> 바깥에서 먼저 들어오는 연결은 막히므로 집 NAS, 게임 호스팅, CCTV를 바깥에서 보려면 <span class="term">포트 포워딩</span><span class="en">(port forwarding)</span> 규칙을 손으로 넣거나, 공유기가 지원하면 앱이 UPnP로 자동 요청한다.</li>
+      <li><b>P2P가 복잡해진다.</b> 둘 다 NAT 뒤에 있는 두 사람이 영상 통화를 하려면 “구멍 뚫기”(STUN) 기법을 쓰거나, 실패하면 중계 서버(TURN)를 거쳐야 한다(24장).</li>
+      <li><b>종단 간 원칙이 깨진다.</b> IP 주소가 기기를 끝까지 가리키지 못하고 중간 장비가 헤더를 고친다. 패킷 안에 IP 주소를 적는 오래된 프로토콜(FTP 등)은 공유기가 내용까지 고쳐야 한다.</li>
+      <li><b>이중 NAT, CGNAT.</b> 주소가 더 모자라자 통신사는 가입자 공유기에게조차 <code>100.64.x.x</code> 같은 공유 주소를 주고, 통신사 장비에서 한 번 더 NAT를 한다. 이를 <span class="term">CGNAT</span><span class="en">(Carrier-Grade NAT)</span>라 한다. 공인 IP 하나를 수십~수백 가입자가 나눠 쓰므로 포트 포워딩이 아예 불가능하고, 한 사람의 잘못으로 같은 IP 전체가 차단당하기도 한다. 휴대폰의 LTE·5G 데이터는 대부분 CGNAT 뒤에 있다.</li>
+    </ul>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="ipv6">
+    <h2>IPv4 고갈과 IPv6</h2>
+    <p>43억 개는 1981년에는 무한해 보였다. 하지만 PC, 휴대폰, 사물인터넷이 쏟아지며 바닥이 드러났다. 전 세계 주소를 총괄하는 IANA는 2011년 2월 마지막 /8 블록 다섯 개를 다섯 지역 인터넷 레지스트리(RIR)에 하나씩 나눠 주고 창고를 비웠다. 아시아·태평양의 APNIC은 두 달 뒤 사실상 소진됐고, 유럽(RIPE NCC), 남미(LACNIC), 북미(ARIN)가 뒤따랐다. 지금 IPv4 주소는 회사끼리 사고파는 “중고 자산”이 되어 주소 하나에 수십 달러 수준에 거래된다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto">
+      <svg viewBox="0 0 760 250" style="min-width:600px" role="img" aria-label="IPv4 고갈과 IPv6 연표">
+        <line x1="40" y1="120" x2="730" y2="120" class="s-axis" stroke-width="2"/>
+        <g class="t-mono t-dim" style="font-size:11px" text-anchor="middle">
+          <text x="40" y="137">1980</text><text x="191" y="137">1990</text><text x="342" y="137">2000</text><text x="493" y="137">2010</text><text x="644" y="137">2020</text>
+        </g>
+        <g stroke="var(--border)" stroke-width="1.5">
+          <line x1="55" y1="120" x2="55" y2="62"/><line x1="236" y1="120" x2="236" y2="42"/><line x1="251" y1="120" x2="251" y2="160"/><line x1="281" y1="120" x2="281" y2="82"/><line x1="312" y1="120" x2="312" y2="190"/>
+          <line x1="614" y1="120" x2="614" y2="82"/>
+        </g>
+        <g stroke="var(--bad)" stroke-width="1.5"><line x1="509" y1="120" x2="509" y2="42"/><line x1="511" y1="120" x2="511" y2="218"/><line x1="530" y1="120" x2="530" y2="196"/><line x1="563" y1="120" x2="563" y2="174"/><line x1="586" y1="120" x2="586" y2="152"/></g>
+        <g class="t" style="font-size:12px">
+          <text x="60" y="66">1981 IPv4 표준 (RFC 791)</text>
+          <text x="96" y="46">1993 CIDR 도입 →</text>
+          <text x="256" y="164">1994 NAT 제안</text>
+          <text x="286" y="86">1996 사설 주소 (RFC 1918)</text>
+          <text x="317" y="194">1998 IPv6 규격 (RFC 2460)</text>
+          <text x="504" y="46" text-anchor="end" style="fill:var(--bad);font-weight:700">2011.2 IANA 마지막 블록 배분 →</text>
+          <text x="618" y="86">2017 IPv6 정식 표준</text>
+        </g>
+        <g class="t" style="font-size:11.5px;fill:var(--bad)">
+          <text x="516" y="222">2011 APNIC(아시아·태평양)</text>
+          <text x="535" y="200">2012 RIPE NCC(유럽)</text>
+          <text x="568" y="178">2014 LACNIC(남미)</text>
+          <text x="591" y="156">2015 ARIN(북미)</text>
+        </g>
+        <text x="40" y="244" class="t-dim" style="font-size:11.5px">빨간색: 지역 레지스트리별 IPv4 사실상 소진 시점(아프리카 AFRINIC은 2017년 이후 단계적 소진)</text>
+      </svg>
+      </div>
+      <figcaption><b>그림 7-3.</b> IPv4 고갈 연표. CIDR(1993)과 NAT·사설 주소(1994~1996)는 원래 IPv6가 준비될 때까지 시간을 버는 임시방편이었지만, 너무 잘 통해서 30년을 버텼다.</figcaption>
+    </figure>
+    <p>근본 해결책은 주소를 늘리는 것이다. <span class="term">IPv6</span>는 주소를 128비트로 키웠다. 2<sup>128</sup> ≈ 3.4×10<sup>38</sup>개, 지구 표면 1제곱미터마다 약 6.7×10<sup>23</sup>개를 줄 수 있는 양이다. 집 하나의 LAN에 기본으로 주는 <code>/64</code> 서브넷 하나만 해도 1.8×10<sup>19</sup>개, IPv4 인터넷 전체의 40억 배가 넘는다. 주소가 넉넉하니 NAT가 필요 없고 모든 기기가 전 세계에서 유일한 주소를 가질 수 있다. 헤더도 고정 40바이트로 단순해졌고, 라우터가 패킷을 쪼개는 단편화(아래)와 헤더 체크섬을 없앴다.</p>
+    <h3>IPv6 표기와 축약</h3>
+    <p>128비트를 점과 십진수로 쓰면 16칸이나 되므로, IPv6는 16비트씩 8묶음으로 끊어 16진수로 쓰고 콜론으로 잇는다. 그래도 길어서 두 가지 축약 규칙이 있다. ① 각 묶음 앞의 0은 생략할 수 있다(<code>0db8</code> → <code>db8</code>, <code>0000</code> → <code>0</code>). ② 0으로만 된 묶음이 연달아 있으면 <b>한 번만</b> <code>::</code>로 줄일 수 있다(두 번 쓰면 각각 몇 묶음인지 알 수 없다). 표준 권장 표기(RFC 5952)는 소문자, 가장 긴 0 묶음 덩어리를 줄이고, 길이가 같으면 앞쪽을 줄이며, 0 묶음 하나만은 <code>::</code>로 줄이지 않는다.</p>
+    <div class="sim" id="sim-v6">
+      <div class="sim-head"><span class="sim-tag">CONVERTER</span><h3>IPv6 전체 주소 ↔ 축약형 변환기</h3></div>
+      <div class="sim-controls" style="border-top:0">
+        <label class="ctrl" style="grid-column:1/-1"><span>IPv6 주소 (전체형이든 축약형이든)</span><input type="text" id="v6-in" value="2001:0db8:0000:0000:0000:ff00:0042:8329" spellcheck="false" autocomplete="off"></label>
+        <div class="ctrl" style="grid-column:1/-1"><span>예시</span><div class="seg" id="v6-ex"><button data-value="2001:0db8:0000:0000:0000:ff00:0042:8329" class="on">문서용</button><button data-value="fe80::0211:22ff:fe33:4455">링크 로컬</button><button data-value="2001:db8:0:0:1:0:0:1">0 덩어리 둘</button><button data-value="::1">루프백</button><button data-value="ff02::1">멀티캐스트</button></div></div>
+      </div>
+      <div class="v6" id="v6-out"></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">주소 종류</span><span class="v" id="v6-kind" style="font-size:14px">—</span></div>
+        <div class="stat"><span class="k">네트워크 프리픽스 (앞 64비트)</span><span class="v" id="v6-pfx" style="font-size:14px">—</span></div>
+        <div class="stat"><span class="k">인터페이스 ID (뒤 64비트)</span><span class="v" id="v6-iid" style="font-size:14px">—</span></div>
+        <div class="stat"><span class="k">글자 수</span><span class="v" id="v6-len">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: ‘0 덩어리 둘’ 예시에서 0이 두 묶음씩 두 군데 있다. 길이가 같으므로 앞쪽만 <code>::</code>가 된다. 축약형(<code>2001:db8::1</code>)을 입력하면 거꾸로 전체형을 복원한다. 인터페이스 ID 가운데에 <code>ff:fe</code>가 끼어 있으면 MAC 주소로 만든 EUI-64 방식이다. 이 변환기는 점 표기 IPv4를 끼운 형식(<code>::ffff:1.2.3.4</code>)은 다루지 않는다.</div>
+    </div>
+    <h3>주소를 스스로 만드는 SLAAC</h3>
+    <p>IPv6 기기는 DHCP 서버 없이도 주소를 만든다. 이를 <span class="term">SLAAC</span><span class="en">(Stateless Address Autoconfiguration)</span>이라 한다. 라우터가 주기적으로(또는 요청받으면) “이 링크의 프리픽스는 <code>2001:db8:1:2::/64</code>”라는 라우터 광고(RA)를 보내면, 기기는 뒤 64비트 인터페이스 ID를 스스로 정해 붙인다. 예전에는 MAC 주소로 만들었지만(EUI-64) 어디서 접속하든 같은 꼬리가 남아 추적에 악용될 수 있어, 요즘 OS는 무작위 값을 쓰고 주기적으로 바꾼다. 같은 주소를 이미 누가 쓰는지는 NDP(IPv6판 ARP)로 물어 확인한다. ARP와 브로드캐스트는 IPv6에서 사라지고 멀티캐스트 기반 NDP가 그 역할을 맡는다.</p>
+    <h3>이사는 아직 진행 중</h3>
+    <p>IPv6는 IPv4와 호환되지 않는다. 그래서 지금은 기기와 망이 두 주소를 함께 쓰는 <span class="term">듀얼 스택</span><span class="en">(dual stack)</span>으로 과도기를 보낸다. 웹사이트가 두 주소를 다 가지면 브라우저는 IPv6를 먼저 시도하고, 느리면 재빨리 IPv4로 바꾼다(Happy Eyeballs). 구글이 집계하는 자사 서비스 접속 중 IPv6 비율은 2025년 무렵 <b>약 45~50%</b> 수준이다. 나라와 통신사마다 차이가 커서 인도·프랑스·독일 등은 절반을 크게 넘고, IPv4 주소를 일찍 넉넉히 받은 곳은 상대적으로 낮다. 휴대폰 망은 IPv6 전용으로 운영하고 IPv4 사이트만 변환 장비(NAT64)로 연결하는 통신사도 많다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="frag">
+    <h2>단편화, MTU, 그리고 TTL</h2>
+    <p>링크마다 한 번에 실을 수 있는 최대 크기, <b>MTU</b>가 다르다(이더넷은 보통 1,500바이트, 데이터센터의 점보 프레임은 9,000바이트, 6장). 큰 MTU 구간에서 온 4,000바이트 패킷이 1,500바이트 구간을 만나면? IPv4 라우터는 패킷을 여러 조각으로 자른다. 이를 <span class="term">단편화</span><span class="en">(fragmentation)</span>라 한다. 조각마다 IP 헤더를 새로 붙이고, 같은 식별자와 “원래 패킷의 몇 번째 바이트부터인가(조각 오프셋)”, “뒤에 조각이 더 있다(MF 플래그)”를 적는다. 다시 맞추는 일은 최종 목적지만 한다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto">
+      <svg viewBox="0 0 760 236" style="min-width:600px" role="img" aria-label="4000바이트 패킷이 1500 MTU 링크에서 세 조각으로 나뉘는 모습">
+        <defs><marker id="ip-fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <text x="20" y="40" class="t" style="font-weight:700">원래 패킷 (4,000바이트)</text>
+        <rect x="20" y="52" width="24" height="40" class="f-acc"/><rect x="44" y="52" width="196" height="40" class="f-acc-soft" stroke="var(--border)"/>
+        <text x="32" y="77" text-anchor="middle" class="t-mono" style="font-size:10px;fill:#fff">H</text><text x="142" y="77" text-anchor="middle" class="t-mono" style="font-size:12px">데이터 3,980B</text>
+        <text x="20" y="114" class="t-dim" style="font-size:12px">식별자 = 7001, MF = 0, 오프셋 = 0</text>
+        <path d="M248 72 H300" class="s-acc" marker-end="url(#ip-fa)"/>
+        <rect x="304" y="44" width="120" height="58" rx="10" class="f-elev" stroke="var(--border)"/><text x="364" y="68" text-anchor="middle" class="t" style="font-weight:700">라우터</text><text x="364" y="88" text-anchor="middle" class="t-mono t-dim" style="font-size:11px">다음 MTU 1,500</text>
+        <path d="M428 72 C 460 72, 460 46, 486 46" class="s-acc" marker-end="url(#ip-fa)"/><path d="M428 72 H486" class="s-acc" marker-end="url(#ip-fa)"/><path d="M428 72 C 460 72, 460 128, 486 128" class="s-acc" marker-end="url(#ip-fa)"/>
+        <g class="t-mono" style="font-size:11px">
+          <rect x="490" y="30" width="20" height="30" class="f-acc"/><rect x="510" y="30" width="148" height="30" class="f-acc-soft" stroke="var(--border)"/><text x="584" y="50" text-anchor="middle">1,480B</text><text x="664" y="50">MF=1 · 0</text>
+          <rect x="490" y="57" width="20" height="30" class="f-acc" transform="translate(0,4)"/><rect x="510" y="61" width="148" height="30" class="f-acc-soft" stroke="var(--border)"/><text x="584" y="81" text-anchor="middle">1,480B</text><text x="664" y="81">MF=1 · 185</text>
+          <rect x="490" y="113" width="20" height="30" class="f-acc"/><rect x="510" y="113" width="102" height="30" class="f-acc-soft" stroke="var(--border)"/><text x="561" y="133" text-anchor="middle">1,020B</text><text x="664" y="133">MF=0 · 370</text>
+        </g>
+        <text x="490" y="166" class="t-dim" style="font-size:11.5px">오프셋은 8바이트 단위: 1,480 ÷ 8 = 185</text>
+        <text x="20" y="176" class="t" style="font-size:13px">세 조각은 서로 다른 길로 가도 되고, 목적지가 식별자·오프셋을 보고 재조립한다.</text>
+        <text x="20" y="200" class="t-dim" style="font-size:12.5px">조각 하나만 잃어도 4,000바이트 전체가 쓸모없어진다. 그래서 요즘은 경로 MTU를 미리 알아내</text>
+        <text x="20" y="220" class="t-dim" style="font-size:12.5px">처음부터 작게 보내고(DF 플래그), IPv6는 라우터의 단편화를 아예 없앴다.</text>
+      </svg>
+      </div>
+      <figcaption><b>그림 7-4.</b> IPv4 단편화. 각 조각은 헤더 20바이트 + 데이터 1,480바이트 이하. 조각 오프셋 필드(13비트)가 8바이트 단위인 것은 헤더 비트를 아끼려는 설계다.</figcaption>
+    </figure>
+    <p>단편화는 성능과 보안에 모두 골칫거리라 지금은 피하는 것이 원칙이다. 보내는 쪽이 “쪼개지 마시오(DF)” 표시를 하고 보내면, 너무 큰 패킷을 만난 라우터는 버리면서 ICMP 오류로 “이 구간 MTU는 1,500”이라고 알려 준다. 보내는 쪽은 크기를 줄여 다시 보낸다. 이를 경로 MTU 탐색(PMTUD)이라 한다. 방화벽이 이 ICMP를 막으면 작은 웹 페이지는 열리는데 큰 페이지만 멈추는 기묘한 장애가 생긴다(23장).</p>
+    <p>헤더의 <span class="term">TTL</span><span class="en">(Time To Live)</span>은 라우터를 하나 지날 때마다 1씩 줄고, 0이 되면 그 라우터가 패킷을 버리고 출발지에 ICMP “시간 초과”를 알린다. 이름은 “생존 시간”이지만 실제로는 남은 <b>홉 수</b>다. 라우팅 설정 실수로 라우터 두 대가 서로에게 패킷을 넘기는 고리가 생겨도, 패킷이 영원히 돌며 링크를 가득 채우는 일을 막는다. 보통 64나 128로 시작한다. 8장의 traceroute는 이 TTL을 일부러 1, 2, 3…으로 보내 경로를 알아내는 영리한 도구다.</p>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li><b>IP</b>는 최선형·비연결형 배달을 한다. 패킷마다 출발지·목적지 주소, TTL, 프로토콜 번호가 적힌 20바이트 헤더를 단다.</li>
+      <li>IPv4 주소는 <b>32비트</b>(약 43억 개). 앞쪽은 네트워크, 뒤쪽은 호스트이며 경계는 <b>프리픽스 길이(/n)</b> 또는 서브넷 마스크로 정한다(CIDR).</li>
+      <li>네트워크 주소 = IP AND 마스크, 브로드캐스트 = 호스트 비트 모두 1. 사용 가능 호스트 = 2<sup>32−n</sup> − 2.</li>
+      <li>서브넷을 나누면 비트 하나마다 개수는 두 배, 크기는 절반. <b>VLSM</b>은 필요한 크기만큼 다른 길이로 떼어 낭비를 줄인다.</li>
+      <li><b>사설 주소</b>(10/8, 172.16/12, 192.168/16)는 안에서만 쓰고, <b>NAT(PAT)</b>가 공인 IP 하나와 포트로 바꿔 내보낸다. 바깥에서 먼저 오는 연결은 막혀 포트 포워딩이 필요하다.</li>
+      <li><b>DHCP</b>는 Discover·Offer·Request·ACK로 주소를 임대하고, <b>ARP</b>는 브로드캐스트로 IP에 해당하는 MAC을 묻는다. LAN 바깥 목적지는 게이트웨이의 MAC을 묻는다.</li>
+      <li>IPv4는 2011년 IANA에서 바닥났다. <b>IPv6</b>는 128비트(3.4×10<sup>38</sup>), 콜론 16진 표기와 <code>::</code> 축약, SLAAC 자동 설정을 쓰며 듀얼 스택으로 보급 중이다(구글 기준 약 절반).</li>
+      <li>MTU보다 큰 IPv4 패킷은 <b>단편화</b>된다. <b>TTL</b>은 홉마다 1씩 줄어 라우팅 고리에서 패킷이 영원히 도는 것을 막는다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p><code>192.168.1.130/26</code>이 속한 네트워크의 네트워크 주소는?</p><div class="opts">
+        <button class="opt">192.168.1.0</button>
+        <button class="opt">192.168.1.64</button>
+        <button class="opt" data-correct>192.168.1.128</button>
+        <button class="opt">192.168.1.192</button>
+      </div><div class="quiz-exp">/26의 마지막 바이트 마스크는 11000000(192)이다. 130 = 10000010이고 AND 하면 10000000 = 128. 이 서브넷은 .128~.191이며 브로드캐스트는 .191이다.</div></div>
+      <div class="quiz-q"><p>다음 중 사설 IP 주소가 <b>아닌</b> 것은?</p><div class="opts">
+        <button class="opt">10.200.1.5</button>
+        <button class="opt">172.20.0.9</button>
+        <button class="opt">192.168.0.254</button>
+        <button class="opt" data-correct>172.32.0.1</button>
+      </div><div class="quiz-exp">172.16.0.0/12는 172.16.0.0~172.31.255.255까지다. 172.32.x.x는 인터넷의 공인 주소다.</div></div>
+      <div class="quiz-q"><p>DHCP Discover 메시지를 브로드캐스트(255.255.255.255)로 보내는 이유는?</p><div class="opts">
+        <button class="opt" data-correct>기기에 아직 IP 주소가 없고 DHCP 서버의 주소도 모르기 때문</button>
+        <button class="opt">모든 기기에게 새 주소를 알려 충돌을 막으려고</button>
+        <button class="opt">브로드캐스트가 유니캐스트보다 빠르기 때문</button>
+        <button class="opt">인터넷의 다른 DHCP 서버에도 물어보려고</button>
+      </div><div class="quiz-exp">출발지는 0.0.0.0, 목적지는 “이 LAN의 모두”로 보낼 수밖에 없다. 서버만 응답하고 나머지는 무시한다. 제한 브로드캐스트는 라우터를 넘지 않는다.</div></div>
+      <div class="quiz-q"><p>192.168.0.23/24인 노트북이 8.8.8.8로 패킷을 보낼 때, ARP로 MAC 주소를 묻는 대상은?</p><div class="opts">
+        <button class="opt">8.8.8.8</button>
+        <button class="opt">DNS 서버</button>
+        <button class="opt" data-correct>기본 게이트웨이(공유기)</button>
+        <button class="opt">묻지 않고 브로드캐스트 MAC으로 보낸다</button>
+      </div><div class="quiz-exp">8.8.8.8은 다른 네트워크이므로 프레임은 일단 게이트웨이에게 간다. IP 헤더의 목적지는 8.8.8.8 그대로, 이더넷 목적지만 게이트웨이 MAC이다.</div></div>
+      <div class="quiz-q"><p>집 공유기(PAT)가 기기 세 대의 연결을 공인 IP 하나로 구분하는 방법은?</p><div class="opts">
+        <button class="opt">기기마다 다른 MAC 주소를 바깥에 보여 준다</button>
+        <button class="opt" data-correct>바깥으로 나갈 때 출발지 포트를 서로 다르게 바꾸고 변환표에 적어 둔다</button>
+        <button class="opt">시간을 나눠 한 번에 한 기기만 인터넷을 쓰게 한다</button>
+        <button class="opt">서버가 기기 이름을 보고 구분한다</button>
+      </div><div class="quiz-exp">“공인IP:바깥포트 ↔ 내부IP:내부포트” 대응을 적어 두고, 답장의 목적지 포트로 표를 찾아 원래 기기로 되돌린다.</div></div>
+      <div class="quiz-q"><p><code>2001:0db8:0000:0000:0000:0000:0000:0001</code>의 올바른 축약 표기는?</p><div class="opts">
+        <button class="opt">21:db8::1</button>
+        <button class="opt">2001:db8:::1</button>
+        <button class="opt">2001:db8::0:1</button>
+        <button class="opt" data-correct>2001:db8::1</button>
+      </div><div class="quiz-exp">앞의 0만 생략할 수 있으므로 2001은 그대로, 0db8은 db8. 연속된 0 묶음 여섯 개를 ::로 한 번에 줄인다. ::: 같은 표기는 없다. 2001:db8::0:1도 해석은 되지만 가장 긴 덩어리를 다 줄이지 않아 권장 표기가 아니다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------------- 공통: IPv4 도우미 ---------------- */
+  const dot = (n) => [n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join(".");
+  const parseIP = (s) => {
+    const m = /^\s*(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\s*$/.exec(s);
+    if (!m) return null;
+    const o = m.slice(1).map(Number);
+    if (o.some((v) => v > 255)) return null;
+    return ((o[0] << 24) | (o[1] << 16) | (o[2] << 8) | o[3]) >>> 0;
+  };
+  const maskOf = (p) => (p === 0 ? 0 : (0xffffffff << (32 - p)) >>> 0);
+  function kindOf(n) {
+    const a = n >>> 24, b = (n >>> 16) & 255, c = (n >>> 8) & 255;
+    if (n === 0xffffffff) return "제한 브로드캐스트";
+    if (a === 0) return "이 네트워크 (0/8)";
+    if (a === 10) return "사설 (10/8)";
+    if (a === 172 && b >= 16 && b <= 31) return "사설 (172.16/12)";
+    if (a === 192 && b === 168) return "사설 (192.168/16)";
+    if (a === 127) return "루프백 (127/8)";
+    if (a === 169 && b === 254) return "링크 로컬 (169.254/16)";
+    if (a === 100 && b >= 64 && b <= 127) return "CGNAT 공유 (100.64/10)";
+    if ((a === 192 && b === 0 && c === 2) || (a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113)) return "문서용 예시 주소";
+    if (a >= 224 && a <= 239) return "멀티캐스트 (224/4)";
+    if (a >= 240) return "예약 (240/4)";
+    return "공인 (전 세계 유일)";
+  }
+  const classOf = (n) => { const a = n >>> 24; return a < 128 ? "A" : a < 192 ? "B" : a < 224 ? "C" : a < 240 ? "D" : "E"; };
+  const fmtN = (x) => Math.round(x).toLocaleString("ko-KR");
+
+  /* 캔버스 패킷 비행 엔진: 노드 키 목록을 따라 상자가 날아간다 */
+  function makeFlights() {
+    return {
+      t: 0, list: [], ev: [],
+      go(keys, delay, dur, label, color) { this.list.push({ keys, start: this.t + delay, dur, label, color }); },
+      at(delay, fn) { this.ev.push({ t: this.t + delay, fn, done: false }); },
+      busy() { return this.list.some((f) => this.t < f.start + f.dur) || this.ev.some((e) => !e.done); },
+      step(dt) {
+        this.t += dt;
+        this.ev.forEach((e) => { if (!e.done && e.t <= this.t) { e.done = true; e.fn(); } });
+        this.list = this.list.filter((f) => this.t < f.start + f.dur + 0.05);
+        this.ev = this.ev.filter((e) => !e.done);
+      },
+      draw(ctx, pos, P, small) {
+        this.list.forEach((f) => {
+          const u = (this.t - f.start) / f.dur;
+          if (u < 0 || u >= 1) return;
+          const pts = f.keys.map(pos);
+          const L = []; let tot = 0;
+          for (let i = 0; i < pts.length - 1; i++) { const d = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); L.push(d); tot += d; }
+          let s = u * tot, i = 0;
+          while (i < L.length - 1 && s > L[i]) { s -= L[i]; i++; }
+          const g = L[i] ? Math.min(1, s / L[i]) : 1;
+          const x = NB.lerp(pts[i][0], pts[i + 1][0], g), y = NB.lerp(pts[i][1], pts[i + 1][1], g);
+          const fs = small ? 9.5 : 10.5;
+          ctx.font = "700 " + fs + "px " + NB.font();
+          const bw = ctx.measureText(f.label).width + 12;
+          NB.box(ctx, x - bw / 2, y - 10, bw, 20, { fill: f.color || P.accent, stroke: false, text: f.label, color: "#fff", size: fs, bold: true, r: 5 });
+        });
+      },
+    };
+  }
+  /* 노드 상자 그리기 */
+  function node(ctx, x, y, w, h, lines, o) {
+    const P = NB.palette();
+    NB.rrect(ctx, x - w / 2, y - h / 2, w, h, 8);
+    ctx.fillStyle = o.fill || P.surface; ctx.fill();
+    ctx.strokeStyle = o.stroke || P.border; ctx.lineWidth = o.lw || 1.2; ctx.stroke();
+    const n = lines.length, lh = o.lh || 13;
+    lines.forEach((ln, i) => NB.text(ctx, ln, x, y + (i - (n - 1) / 2) * lh, { align: "center", size: i === 0 ? (o.size || 12) : (o.size2 || 10.5), bold: i === 0, mono: i > 0, color: i === 0 ? (o.color || P.text) : P.dim }));
+  }
+  function bubble(ctx, text, x, y, color, size) {
+    const P = NB.palette();
+    ctx.font = "700 " + (size || 11) + "px " + NB.font();
+    const w = ctx.measureText(text).width + 14;
+    const cw = ctx.canvas.width / (ctx.getTransform().a || 1);
+    x = NB.clamp(x, w / 2 + 2, cw - w / 2 - 2);
+    NB.box(ctx, x - w / 2, y - 11, w, 22, { fill: P.bg, stroke: color || P.accent, lw: 1.5, text, color: color || P.accent, size: size || 11, bold: true, r: 11 });
+  }
+
+  /* ---------------- 1. 서브넷 계산기 ---------------- */
+  let scIP = parseIP("192.168.10.37");
+  const scP = NB.range("sc-p", (v) => "/" + v, () => scUpdate());
+  function scParse() {
+    let v = $("sc-ip").value.trim();
+    const k = v.indexOf("/");
+    if (k >= 0) {
+      const p = Number(v.slice(k + 1));
+      if (Number.isInteger(p) && p >= 0 && p <= 32 && v.slice(k + 1) !== "" && scP() !== p) scP.set(p);
+      v = v.slice(0, k);
+    }
+    const n = parseIP(v);
+    $("sc-ip").style.borderColor = n == null ? "var(--bad)" : "";
+    if (n != null) scIP = n;
+    scUpdate();
+  }
+  $("sc-ip").addEventListener("input", scParse);
+  NB.seg("sc-ex", (v) => { $("sc-ip").value = v.split("/")[0]; scP.set(Number(v.split("/")[1])); scParse(); });
+  function scUpdate() {
+    const p = scP(), m = maskOf(p), net = (scIP & m) >>> 0, bc = (net | (~m >>> 0)) >>> 0;
+    const rows = [["IP 주소 (비트 클릭)", scIP, "ip"], ["서브넷 마스크", m, "mask"], ["네트워크 주소", net, "net"], ["브로드캐스트", bc, "bc"]];
+    $("sc-bits").innerHTML = rows.map(([lab, val, kind]) => {
+      let octs = "";
+      for (let o = 0; o < 4; o++) {
+        let s = "";
+        for (let b = 0; b < 8; b++) {
+          const i = o * 8 + b, bit = (val >>> (31 - i)) & 1, isN = i < p;
+          s += `<span class="${isN ? "n" : "h"}${kind === "bc" && !isN ? " b" : ""}" data-i="${i}">${bit}</span>`;
+        }
+        octs += `<div class="oct">${s}</div>`;
+      }
+      return `<div class="bv-row ${kind}"><div class="bv-lab">${lab}<b>${dot(val)}</b></div><div class="bv-bits">${octs}</div></div>`;
+    }).join("");
+    const total = Math.pow(2, 32 - p);
+    NB.stat("sc-mask", dot(m) + ` <small>/${p}</small>`);
+    NB.stat("sc-net", dot(net));
+    NB.stat("sc-bc", p >= 31 ? `<small>없음 (/${p})</small>` : dot(bc));
+    if (p === 32) { NB.stat("sc-range", dot(net) + " 하나"); NB.stat("sc-hosts", "1 <small>단일 호스트</small>"); }
+    else if (p === 31) { NB.stat("sc-range", dot(net) + " – " + dot(bc)); NB.stat("sc-hosts", "2 <small>점대점 링크</small>"); }
+    else { NB.stat("sc-range", dot(net + 1) + " – " + dot(bc - 1)); NB.stat("sc-hosts", fmtN(total - 2) + ` <small>/ 주소 ${fmtN(total)}개</small>`); }
+    NB.stat("sc-kind", kindOf(scIP) + ` <small>(${classOf(scIP)})</small>`);
+  }
+  $("sc-bits").addEventListener("click", (e) => {
+    const sp = e.target.closest(".bv-row.ip span[data-i]");
+    if (!sp) return;
+    const i = Number(sp.dataset.i);
+    scIP = (scIP ^ (1 << (31 - i))) >>> 0;
+    $("sc-ip").value = dot(scIP); $("sc-ip").style.borderColor = "";
+    scUpdate();
+  });
+  scUpdate();
+
+  /* ---------------- 2. 서브넷 나누기 ---------------- */
+  const spK = NB.range("sp-k", (v) => Math.pow(2, v) + "개 (/" + (24 + v) + ")", () => spUpdate());
+  const spReq = ["sp-a", "sp-b", "sp-c", "sp-d"].map((id) => NB.range(id, (v) => v + "대", () => spUpdate()));
+  const spNames = ["영업팀", "개발팀", "손님 Wi-Fi", "라우터 간 링크"];
+  const spMode = NB.seg("sp-mode", () => {
+    const vl = spMode() === "vl";
+    document.querySelectorAll("#sim-split .sp-eq").forEach((el) => (el.style.display = vl ? "none" : ""));
+    document.querySelectorAll("#sim-split .sp-vl").forEach((el) => (el.style.display = vl ? "" : "none"));
+    spUpdate();
+  });
+  let spBlocks = [];
+  function spUpdate() {
+    spBlocks = [];
+    if (spMode() === "eq") {
+      const k = spK(), n = Math.pow(2, k), size = 256 / n;
+      for (let i = 0; i < n; i++) spBlocks.push({ start: i * size, size, pfx: 24 + k, ci: i % 2 });
+      $("sp-k1").textContent = "서브넷 수"; $("sp-k2").textContent = "서브넷당 주소 / 사용 가능"; $("sp-k3").textContent = "전체 사용 가능 호스트";
+      NB.stat("sp-o1", n + "개");
+      NB.stat("sp-o2", size + " / " + (size - 2) + "대");
+      NB.stat("sp-o3", n * (size - 2) + "대 <small>(네트워크·브로드캐스트로 " + 2 * n + "개 소모)</small>");
+      const show = spBlocks.slice(0, 8).map((b) => `<span class="mono">192.168.10.${b.start}/${b.pfx}</span>`).join(", ");
+      $("sp-list").innerHTML = `<div>${show}${n > 8 ? ` … (총 ${n}개)` : ""}</div>`;
+    } else {
+      const reqs = spReq.map((g, i) => ({ name: spNames[i], need: g(), ci: i })).filter((r) => r.need > 0);
+      reqs.forEach((r) => { r.size = Math.max(4, Math.pow(2, Math.ceil(Math.log2(r.need + 2)))); });
+      reqs.sort((a, b) => b.size - a.size);
+      let cur = 0, waste = 0, fail = 0;
+      const lines = [];
+      reqs.forEach((r) => {
+        const pfx = 32 - Math.log2(r.size);
+        if (cur + r.size <= 256) {
+          spBlocks.push({ start: cur, size: r.size, pfx, ci: r.ci, name: r.name });
+          lines.push(`<div>${r.name} ${r.need}대 → <span class="mono">192.168.10.${cur}/${pfx}</span> <span style="color:var(--text-dim)">(주소 ${r.size}개, 사용 가능 ${r.size - 2})</span></div>`);
+          waste += r.size - 2 - r.need; cur += r.size;
+        } else { fail++; lines.push(`<div class="bad">${r.name} ${r.need}대 → /${pfx}(주소 ${r.size}개)가 필요하지만 남은 공간이 부족하다</div>`); }
+      });
+      $("sp-list").innerHTML = lines.join("") || "<div>필요한 기기 수를 정하세요.</div>";
+      $("sp-k1").textContent = "할당한 서브넷"; $("sp-k2").textContent = "남은 주소"; $("sp-k3").textContent = "할당했지만 남는 자리";
+      NB.stat("sp-o1", spBlocks.length + "개" + (fail ? ` <small style="color:var(--bad)">${fail}개 실패</small>` : ""));
+      NB.stat("sp-o2", 256 - cur + "개");
+      NB.stat("sp-o3", waste + "개");
+    }
+    spCv.redraw();
+  }
+  const spCv = NB.canvas("#cv-split", (ctx, w, h) => {
+    const P = NB.palette(), m = 14, small = w < 520;
+    const X = (a) => m + (a / 256) * (w - 2 * m);
+    const y0 = 34, bh = h - 92;
+    NB.text(ctx, "192.168.10.0/24 — 주소 256개", m, 16, { size: 12.5, bold: true, color: P.text });
+    NB.rrect(ctx, X(0), y0, X(256) - X(0), bh, 4); ctx.fillStyle = P.surface; ctx.fill(); ctx.strokeStyle = P.border; ctx.lineWidth = 1; ctx.stroke();
+    const used = spBlocks.reduce((s, b) => Math.max(s, b.start + b.size), 0);
+    if (spMode() === "vl" && used < 256) NB.text(ctx, "빈 공간", (X(used) + X(256)) / 2, y0 + bh / 2, { align: "center", size: 11, color: P.faint });
+    spBlocks.forEach((b) => {
+      const x1 = X(b.start), x2 = X(b.start + b.size), col = spMode() === "eq" ? (b.ci ? P.accent2 : P.accent) : P.series[b.ci];
+      ctx.globalAlpha = 0.22; ctx.fillStyle = col; ctx.fillRect(x1, y0, x2 - x1, bh); ctx.globalAlpha = 1;
+      ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.strokeRect(x1 + 0.5, y0 + 0.5, x2 - x1 - 1, bh - 1);
+      const u = Math.max(1.5, (w - 2 * m) / 256);
+      ctx.fillStyle = P.bad; ctx.fillRect(x1, y0, u, bh); ctx.fillRect(x2 - u, y0, u, bh);
+      const bw = x2 - x1;
+      if (bw >= 44) {
+        const lines = [];
+        if (b.name && bw >= 70) lines.push(b.name);
+        lines.push("/" + b.pfx);
+        if (bw >= 56) lines.push("." + b.start + "–." + (b.start + b.size - 1));
+        lines.forEach((ln, i) => NB.text(ctx, ln, (x1 + x2) / 2, y0 + bh / 2 + (i - (lines.length - 1) / 2) * 14, { align: "center", size: i === 0 && b.name && bw >= 70 ? 11 : 10.5, bold: i === 0, mono: !(b.name && i === 0 && bw >= 70), color: P.text }));
+      }
+    });
+    const step = small ? 64 : 32;
+    for (let a = 0; a <= 256; a += step) {
+      const x = X(a);
+      ctx.strokeStyle = P.axis; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y0 + bh); ctx.lineTo(x, y0 + bh + 5); ctx.stroke();
+      NB.text(ctx, "." + a, x, y0 + bh + 15, { align: a === 0 ? "left" : a === 256 ? "right" : "center", size: 10, mono: true, color: P.dim });
+    }
+    NB.text(ctx, "빨간 선 = 네트워크·브로드캐스트 주소 (기기에 못 줌)", m, h - 14, { size: small ? 10 : 11, color: P.dim });
+  }, { aspect: 0.2, minHeight: 160, maxHeight: 180 });
+  spUpdate();
+
+  /* ---------------- 3. DHCP DORA ---------------- */
+  const DH = [
+    { name: null, desc: "<b>0. 연결</b> — 노트북이 Wi-Fi에 막 붙었다. 링크는 연결됐지만 IP 주소가 없다(0.0.0.0). 공유기 주소도, DNS 서버도 모른다. ‘다음’을 눌러 보자." },
+    { name: "DISCOVER", from: "C", bc: true, say: "DHCP 서버 계세요?", desc: "<b>1. Discover</b> — 서버 주소를 모르니 LAN 전체에 브로드캐스트로 외친다. 출발지는 0.0.0.0, 목적지는 255.255.255.255, UDP 68번 → 67번 포트. 내 MAC 주소를 적어 누가 묻는지 알린다.",
+      f: [["출발지 MAC", "aa:bb:cc:00:00:23 (노트북)"], ["목적지 MAC", "ff:ff:ff:ff:ff:ff (모두)"], ["출발지 IP:포트", "0.0.0.0:68"], ["목적지 IP:포트", "255.255.255.255:67"], ["내용", "주소 좀 주세요. 거래 번호 0x3903F326"]] },
+    { name: "OFFER", from: "S", bc: false, say: "192.168.0.23 어때요?", desc: "<b>2. Offer</b> — 공유기의 DHCP 서버가 비어 있는 주소 하나를 골라 제안한다. 서브넷 마스크, 기본 게이트웨이, DNS 서버, 임대 시간도 함께 담는다. 서버가 여럿이면 제안도 여럿 올 수 있다.",
+      f: [["출발지 MAC", "11:22:33:44:55:01 (공유기)"], ["목적지 MAC", "aa:bb:cc:00:00:23"], ["출발지 IP:포트", "192.168.0.1:67"], ["목적지 IP:포트", "192.168.0.23:68"], ["내용", "제안 192.168.0.23 /24, 게이트웨이 .1, DNS .1, 임대 86400초"]] },
+    { name: "REQUEST", from: "C", bc: true, say: "그 주소 쓸게요!", desc: "<b>3. Request</b> — 노트북이 “192.168.0.1 서버가 준 .23을 쓰겠다”고 다시 <b>브로드캐스트</b>한다. 제안을 보냈던 다른 서버들도 이 메시지를 듣고 자기 제안이 선택되지 않았음을 안다. 아직 주소 확정 전이므로 출발지는 여전히 0.0.0.0.",
+      f: [["출발지 MAC", "aa:bb:cc:00:00:23"], ["목적지 MAC", "ff:ff:ff:ff:ff:ff (모두)"], ["출발지 IP:포트", "0.0.0.0:68"], ["목적지 IP:포트", "255.255.255.255:67"], ["내용", "요청 192.168.0.23, 서버 식별자 192.168.0.1"]] },
+    { name: "ACK", from: "S", bc: false, say: "확정! 24시간 쓰세요", desc: "<b>4. ACK</b> — 서버가 임대를 확정하고 장부에 “aa:bb:cc:00:00:23 → .23, 내일 이 시각까지”라고 적는다. 노트북은 이제 주소를 설정한다. 많은 OS는 이 직후 ARP로 “.23 쓰는 다른 기기 있나?”를 한 번 확인한다.",
+      f: [["출발지 MAC", "11:22:33:44:55:01 (공유기)"], ["목적지 MAC", "aa:bb:cc:00:00:23"], ["출발지 IP:포트", "192.168.0.1:67"], ["목적지 IP:포트", "192.168.0.23:68"], ["내용", "확정 192.168.0.23, 임대 86400초"]] },
+    { name: null, desc: "<b>5. 사용과 갱신</b> — 노트북은 192.168.0.23/24, 게이트웨이 192.168.0.1로 인터넷을 쓴다. 임대 시간의 절반(12시간)이 지나면 서버에게 직접(유니캐스트) Request를 보내 연장한다. 기기를 끄고 오래 지나면 임대가 끝나고 주소는 묶음으로 돌아간다." },
+  ];
+  let dhStep = 0, dhA = 1, dhAuto = false, dhWait = 0;
+  const dhPos = (k, w, h) => {
+    const by = h * 0.36;
+    return { C: [w * 0.14, by], S: [w * 0.86, by], X1: [w * 0.38, h * 0.8], X2: [w * 0.62, h * 0.8], b1: [w * 0.38, by], b2: [w * 0.62, by] }[k];
+  };
+  function dhRender() {
+    const s = DH[dhStep];
+    $("dh-desc").innerHTML = `${dhStep}/${DH.length - 1} · ` + s.desc;
+    $("dh-tbl").innerHTML = s.f ? `<thead><tr><th>${s.name} 메시지</th><th>값</th></tr></thead><tbody>` + s.f.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("") + "</tbody>" : `<tbody><tr><td>노트북 설정</td><td>${dhStep === 0 ? "IP 없음 · 게이트웨이 없음 · DNS 없음" : "IP 192.168.0.23/24 · 게이트웨이 192.168.0.1 · DNS 192.168.0.1 · 임대 24시간"}</td></tr></tbody>`;
+    $("dh-prev").disabled = dhStep === 0; $("dh-next").disabled = dhStep === DH.length - 1;
+  }
+  $("dh-next").onclick = () => { if (dhStep < DH.length - 1) { dhStep++; dhA = 0; dhAuto = false; dhRender(); } };
+  $("dh-prev").onclick = () => { if (dhStep > 0) { dhStep--; dhA = 1; dhAuto = false; dhRender(); dhCv.redraw(); } };
+  $("dh-auto").onclick = () => { dhStep = 0; dhA = 1; dhAuto = true; dhWait = 0; dhRender(); };
+  const dhCv = NB.canvas("#cv-dhcp", (ctx, w, h) => {
+    const P = NB.palette(), small = w < 520;
+    const pos = (k) => dhPos(k, w, h);
+    const by = h * 0.36;
+    ctx.strokeStyle = P.border; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(pos("C")[0], by); ctx.lineTo(pos("S")[0], by); ctx.stroke();
+    ["X1", "X2"].forEach((k) => { ctx.beginPath(); ctx.moveTo(pos(k)[0], by); ctx.lineTo(pos(k)[0], pos(k)[1]); ctx.stroke(); });
+    NB.text(ctx, "같은 LAN (Wi-Fi / 이더넷)", w / 2, by - 12, { align: "center", size: 10.5, color: P.faint });
+    const s = DH[dhStep];
+    const hasIP = dhStep > 4 || (dhStep === 4 && dhA >= 1);
+    const bw = Math.min(150, w * 0.25), bh = 50;
+    node(ctx, pos("C")[0], by, bw, bh, ["노트북", hasIP ? (small ? "…0.23" : "192.168.0.23") : (small ? "0.0.0.0" : "0.0.0.0 (없음)")], { fill: hasIP ? P.surface : P.bg, stroke: P.accent, lw: 2, size: small ? 11 : 12, size2: small ? 9.5 : 10.5 });
+    node(ctx, pos("S")[0], by, bw, bh, [small ? "DHCP 서버" : "공유기 (DHCP 서버)", small ? "…0.1" : "192.168.0.1"], { stroke: P.accent2, lw: 2, size: small ? 10.5 : 12, size2: small ? 9.5 : 10.5 });
+    node(ctx, pos("X1")[0], pos("X1")[1], Math.min(110, w * 0.2), 40, ["휴대폰", ".31"], { size: small ? 10.5 : 12 });
+    node(ctx, pos("X2")[0], pos("X2")[1], Math.min(110, w * 0.2), 40, ["TV", ".20"], { size: small ? 10.5 : 12 });
+    if (!s.name) return;
+    const a = Math.min(1, dhA);
+    const col = s.from === "C" ? P.accent : P.accent2;
+    const routes = s.from === "C" ? (s.bc ? [["C", "S"], ["C", "b1", "X1"], ["C", "b2", "X2"]] : [["C", "S"]]) : [["S", "C"]];
+    const fs = small ? 9.5 : 10.5;
+    routes.forEach((r) => {
+      const pts = r.map(pos);
+      const L = []; let tot = 0;
+      for (let i = 0; i < pts.length - 1; i++) { const d = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); L.push(d); tot += d; }
+      let sd = a * tot, i = 0;
+      while (i < L.length - 1 && sd > L[i]) { sd -= L[i]; i++; }
+      const g = Math.min(1, sd / L[i]);
+      const x = NB.lerp(pts[i][0], pts[i + 1][0], g), y = NB.lerp(pts[i][1], pts[i + 1][1], g);
+      if (a < 1) { ctx.font = "700 " + fs + "px " + NB.font(); const tw = ctx.measureText(s.name).width + 12; NB.box(ctx, x - tw / 2, y - 10, tw, 20, { fill: col, stroke: false, text: s.name, color: "#fff", size: fs, bold: true, r: 5 }); }
+    });
+    const sp = pos(s.from);
+    bubble(ctx, s.say, sp[0], sp[1] - 46, col, small ? 10 : 11.5);
+    if (a >= 1 && s.bc) { bubble(ctx, "DHCP 서버 아님 → 무시", pos("X1")[0], pos("X1")[1] + 34, P.faint, small ? 9 : 10.5); if (!small) bubble(ctx, "무시", pos("X2")[0], pos("X2")[1] + 34, P.faint, 10.5); }
+  }, { aspect: 0.4, minHeight: 250, maxHeight: 320 });
+  NB.loop($("cv-dhcp"), (dt) => {
+    if (dhA < 1) { dhA += dt * 0.7; dhCv.redraw(); }
+    else if (dhAuto) {
+      dhWait += dt;
+      if (dhWait > (dhStep === 0 ? 0.6 : 1.6)) { dhWait = 0; if (dhStep < DH.length - 1) { dhStep++; dhA = 0; dhRender(); } else dhAuto = false; }
+    }
+  });
+  dhRender();
+
+  /* ---------------- 4. ARP ---------------- */
+  const AH = {
+    A: { name: "노트북 A", ip: "192.168.0.23", mac: "aa:bb:cc:00:00:23" },
+    B: { name: "휴대폰", ip: "192.168.0.31", mac: "3c:22:fb:7a:10:31" },
+    C: { name: "프린터", ip: "192.168.0.40", mac: "00:1e:0b:5c:22:40" },
+    G: { name: "공유기 (게이트웨이)", ip: "192.168.0.1", mac: "11:22:33:44:55:01" },
+  };
+  const arpF = makeFlights();
+  const arpCache = new Map(); // key → expiry time
+  const arpBub = {}; // key → {text, until, color}
+  let arpClock = 0, arpReq = 0, arpHit = 0, arpBc = 0, arpTick = 0;
+  const arpDst = NB.seg("arp-dst", null);
+  const arpPos = (k, w, h) => ({ A: [w * 0.13, h * 0.5], S: [w * 0.4, h * 0.5], B: [w * 0.66, h * 0.17], C: [w * 0.66, h * 0.5], G: [w * 0.66, h * 0.83], I: [w * 0.9, h * 0.83] }[k]);
+  function arpLog(html) { const d = document.createElement("div"); d.className = "new"; d.innerHTML = html; const L = $("arp-log"); [...L.children].forEach((c) => c.classList.remove("new")); L.prepend(d); while (L.children.length > 30) L.lastChild.remove(); }
+  function arpSay(k, text, sec, color) { arpBub[k] = { text, until: arpClock + sec, color }; }
+  function arpRender() {
+    const rows = [...arpCache.entries()].map(([k, exp]) => `<tr><td>${AH[k].ip}</td><td>${AH[k].mac}</td><td>${Math.max(0, Math.ceil(exp - arpClock))}초</td></tr>`);
+    $("arp-cache").innerHTML = rows.join("") || `<tr><td colspan="3" style="font-family:var(--font);color:var(--text-faint)">비어 있음</td></tr>`;
+    NB.stat("arp-o1", arpReq); NB.stat("arp-o2", arpHit); NB.stat("arp-o3", arpBc);
+  }
+  $("arp-send").onclick = () => {
+    if (arpF.busy()) return;
+    const t = arpDst(), hop = t === "X" ? "G" : t;
+    const P = NB.palette();
+    const dataPath = t === "X" ? ["A", "S", "G", "I"] : ["A", "S", hop];
+    const dataDur = t === "X" ? 1.5 : 1.0;
+    if (t === "X") arpLog("목적지 8.8.8.8은 192.168.0.0/24 밖 → 기본 게이트웨이 <b>192.168.0.1</b>에게 맡겨야 한다.");
+    if (arpCache.has(hop)) {
+      arpHit++;
+      arpLog(`캐시에 ${AH[hop].ip} → ${AH[hop].mac} 있음. 묻지 않고 바로 보낸다.`);
+      arpF.go(dataPath, 0, dataDur, "데이터", P.ok);
+      arpF.at(dataDur, () => arpSay(t === "X" ? "I" : hop, "도착!", 1.5, P.ok));
+    } else {
+      arpReq++; arpBc += 3;
+      arpLog(`ARP 요청(브로드캐스트): “<b>${AH[hop].ip}</b> 쓰는 분? ${AH.A.ip}(${AH.A.mac})가 묻습니다”`);
+      arpF.go(["A", "S"], 0, 0.5, "누구?", P.warn);
+      ["B", "C", "G"].forEach((k) => arpF.go(["S", k], 0.5, 0.5, "누구?", P.warn));
+      arpF.at(1.0, () => { ["B", "C", "G"].forEach((k) => arpSay(k, k === hop ? "나야!" : "나 아님", 1.4, k === hop ? P.accent2 : P.faint)); });
+      arpF.go([hop, "S", "A"], 1.2, 0.9, "ARP 응답", P.accent2);
+      arpF.at(2.1, () => { arpCache.set(hop, arpClock + 45); arpLog(`ARP 응답(유니캐스트): ${AH[hop].ip}의 MAC은 <b>${AH[hop].mac}</b>. 캐시에 저장.`); arpRender(); });
+      arpF.go(dataPath, 2.2, dataDur, "데이터", P.ok);
+      arpF.at(2.2 + dataDur, () => arpSay(t === "X" ? "I" : hop, "도착!", 1.5, P.ok));
+    }
+    arpRender();
+  };
+  $("arp-clear").onclick = () => { arpCache.clear(); arpLog("ARP 캐시를 비웠다."); arpRender(); };
+  const arpCv = NB.canvas("#cv-arp", (ctx, w, h) => {
+    const P = NB.palette(), small = w < 520;
+    const pos = (k) => arpPos(k, w, h);
+    ctx.strokeStyle = P.border; ctx.lineWidth = 2.5;
+    ["A", "B", "C", "G"].forEach((k) => { ctx.beginPath(); ctx.moveTo(...pos("S")); ctx.lineTo(...pos(k)); ctx.stroke(); });
+    ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(...pos("G")); ctx.lineTo(...pos("I")); ctx.stroke(); ctx.setLineDash([]);
+    const bw = Math.min(150, w * 0.27), bh = small ? 46 : 52;
+    const fsz = small ? 10 : 11.5, fsz2 = small ? 8.5 : 10;
+    ["A", "B", "C", "G"].forEach((k) => {
+      const [x, y] = pos(k), H = AH[k];
+      const lines = small ? [k === "G" ? "공유기" : H.name, H.ip.replace("192.168.0", "…"), H.mac.slice(-8)] : [H.name, H.ip, H.mac];
+      node(ctx, x, y, bw, bh, lines, { stroke: k === "A" ? P.accent : arpCache.has(k) ? P.ok : P.border, lw: k === "A" || arpCache.has(k) ? 2 : 1.2, size: fsz, size2: fsz2, lh: small ? 12 : 14 });
+    });
+    const [sx, sy] = pos("S");
+    node(ctx, sx, sy, small ? 50 : 64, 30, ["스위치"], { size: small ? 10 : 11.5 });
+    const [ix, iy] = pos("I");
+    ctx.beginPath(); ctx.ellipse(ix, iy, Math.min(48, w * 0.09), 22, 0, 0, 7); ctx.fillStyle = P.surface; ctx.fill(); ctx.strokeStyle = P.border; ctx.stroke();
+    NB.text(ctx, "인터넷", ix, iy - 6, { align: "center", size: small ? 9.5 : 11, bold: true }); NB.text(ctx, "8.8.8.8", ix, iy + 8, { align: "center", size: small ? 8.5 : 10, mono: true, color: P.dim });
+    arpF.draw(ctx, pos, P, small);
+    Object.keys(arpBub).forEach((k) => { const b = arpBub[k]; if (b.until > arpClock) { const [x, y] = pos(k); bubble(ctx, b.text, x, y - bh / 2 - 13, b.color, small ? 9.5 : 11); } });
+  }, { aspect: 0.5, minHeight: 300, maxHeight: 380 });
+  NB.loop($("cv-arp"), (dt) => {
+    arpClock += dt; arpF.step(dt);
+    let changed = false;
+    arpCache.forEach((exp, k) => { if (exp <= arpClock) { arpCache.delete(k); changed = true; arpLog(`${AH[k].ip} 캐시 항목이 시간이 지나 지워졌다.`); } });
+    arpTick += dt;
+    if (changed || arpTick > 1) { arpTick = 0; arpRender(); }
+    arpCv.redraw();
+  });
+  arpRender();
+  arpLog("‘패킷 보내기’를 눌러 시작하세요.");
+
+  /* ---------------- 5. NAT / PAT ---------------- */
+  const NDEV = { P: { name: "휴대폰", ip: "192.168.0.7", port: 50000 }, L: { name: "노트북", ip: "192.168.0.12", port: 50000 }, T: { name: "TV", ip: "192.168.0.20", port: 50000 } };
+  const NSRV = { W: { name: "웹 서버", ip: "198.51.100.10", port: 443 }, G: { name: "게임 서버", ip: "198.51.100.20", port: 3074 } };
+  const PUB = "203.0.113.42";
+  const natF = makeFlights();
+  const natTbl = []; // {dev, inPort, outPort, srv, exp, fresh}
+  const natBub = {};
+  let natClock = 0, natNext = 40001, natDrop = 0, natTick = 0;
+  const natDev = NB.seg("nat-dev", null), natSrv = NB.seg("nat-srv", null);
+  const natPos = (k, w, h) => ({ P: [w * 0.11, h * 0.2], L: [w * 0.11, h * 0.52], T: [w * 0.11, h * 0.84], R: [w * 0.45, h * 0.52], W: [w * 0.88, h * 0.2], G: [w * 0.88, h * 0.52], X: [w * 0.88, h * 0.84] }[k]);
+  function natSay(k, text, sec, color) { natBub[k] = { text, until: natClock + sec, color }; }
+  function natHdr(lines) { $("nat-hdr").innerHTML = lines.map((l) => `<div>${l}</div>`).join(""); }
+  function natRender() {
+    $("nat-tbl").innerHTML = natTbl.map((e) => `<tr class="${e.fresh > natClock ? "fresh" : ""}"><td>${NDEV[e.dev].ip}:${e.inPort}</td><td>${PUB}:${e.outPort}</td><td>${NSRV[e.srv].ip}:${NSRV[e.srv].port}</td><td>${Math.max(0, Math.ceil(e.exp - natClock))}초</td></tr>`).join("") +
+      (natFwd() ? `<tr><td>192.168.0.20:8080</td><td>${PUB}:8080</td><td>(고정 규칙: 포트 포워딩)</td><td>항상</td></tr>` : "") ||
+      `<tr><td colspan="4" style="font-family:var(--font);color:var(--text-faint)">비어 있음</td></tr>`;
+    NB.stat("nat-o1", natTbl.length + (natFwd() ? " + 고정 1" : ""));
+    NB.stat("nat-o2", natDrop);
+  }
+  const natFwd = () => $("nat-fwd").checked;
+  $("nat-fwd").addEventListener("change", natRender);
+  $("nat-send").onclick = () => {
+    const P = NB.palette();
+    const dk = natDev(), sk = natSrv(), d = NDEV[dk], s = NSRV[sk];
+    const inPort = d.port; d.port += 1;
+    const e = { dev: dk, inPort, outPort: 0, srv: sk, exp: 0, fresh: 0 };
+    natHdr([`<span class="k">① 집 안</span>출발 ${d.ip}:${inPort} → 도착 ${s.ip}:${s.port}`]);
+    natF.go([dk, "R"], 0, 0.8, "요청", P.accent);
+    natF.at(0.8, () => {
+      e.outPort = natNext++; e.exp = natClock + 60; e.fresh = natClock + 2; natTbl.push(e);
+      natSay("R", "변환표에 기록", 1.2, P.accent);
+      natHdr([`<span class="k">① 집 안</span>출발 ${d.ip}:${inPort} → 도착 ${s.ip}:${s.port}`, `<span class="k">② 바깥</span>출발 <span class="chg">${PUB}:${e.outPort}</span> → 도착 ${s.ip}:${s.port}`]);
+      natRender();
+    });
+    natF.go(["R", sk], 0.8, 0.8, "요청", P.accent);
+    natF.at(1.6, () => natSay(sk, "받았다, 응답!", 1.2, P.accent2));
+    natF.go([sk, "R"], 1.8, 0.8, "응답", P.accent2);
+    natF.at(2.6, () => {
+      natSay("R", `${e.outPort} → ${d.name}`, 1.4, P.accent2);
+      natHdr([`<span class="k">③ 응답 도착</span>출발 ${s.ip}:${s.port} → 도착 ${PUB}:${e.outPort}`, `<span class="k">④ 표에서 찾아 바꿈</span>출발 ${s.ip}:${s.port} → 도착 <span class="chg">${d.ip}:${inPort}</span>`]);
+      e.exp = natClock + 60;
+    });
+    natF.go(["R", dk], 2.6, 0.8, "응답", P.accent2);
+    natF.at(3.4, () => natSay(dk, "응답 받음", 1.2, P.ok));
+  };
+  $("nat-in").onclick = () => {
+    const P = NB.palette();
+    natHdr([`<span class="k">바깥에서 먼저</span>출발 192.0.2.99:61234 → 도착 ${PUB}:8080`]);
+    natF.go(["X", "R"], 0, 0.9, "접속?", P.warn);
+    natF.at(0.9, () => {
+      if (natFwd()) {
+        natSay("R", "포워딩 규칙 → TV", 1.4, P.ok);
+        natHdr([`<span class="k">바깥에서 먼저</span>출발 192.0.2.99:61234 → 도착 ${PUB}:8080`, `<span class="k">포트 포워딩</span>도착 주소를 <span class="chg">192.168.0.20:8080</span>으로 바꿔 TV에게`]);
+        natF.go(["R", "T"], 0, 0.8, "접속", P.ok);
+        natF.at(0.8, () => natSay("T", "8080 접속 받음", 1.4, P.ok));
+      } else {
+        natDrop++; natSay("R", "✕ 표에 없음 → 버림", 1.8, P.bad);
+        natHdr([`<span class="k">바깥에서 먼저</span>출발 192.0.2.99:61234 → 도착 ${PUB}:8080`, `<span class="k">결과</span><span style="color:var(--bad)">8080에 해당하는 변환표 항목이 없어 버렸다</span>`]);
+        natRender();
+      }
+    });
+  };
+  const natCv = NB.canvas("#cv-nat", (ctx, w, h) => {
+    const P = NB.palette(), small = w < 520;
+    const pos = (k) => natPos(k, w, h);
+    const rx = pos("R")[0];
+    ctx.fillStyle = P.surface; ctx.globalAlpha = 0.5; ctx.fillRect(0, 0, rx, h); ctx.globalAlpha = 1;
+    NB.text(ctx, "집 안 (사설 192.168.0.0/24)", 8, 12, { size: small ? 9.5 : 11, color: P.dim });
+    NB.text(ctx, "인터넷 (공인)", w - 8, 12, { align: "right", size: small ? 9.5 : 11, color: P.dim });
+    ctx.strokeStyle = P.border; ctx.lineWidth = 2.5;
+    ["P", "L", "T", "W", "G", "X"].forEach((k) => { ctx.beginPath(); ctx.moveTo(...pos("R")); ctx.lineTo(...pos(k)); ctx.stroke(); });
+    const bw = Math.min(124, w * 0.2), fs = small ? 10 : 11.5, fs2 = small ? 8.5 : 10;
+    ["P", "L", "T"].forEach((k) => { const [x, y] = pos(k); node(ctx, x, y, bw, 40, [NDEV[k].name, small ? "…" + NDEV[k].ip.slice(8) : NDEV[k].ip], { size: fs, size2: fs2 }); });
+    ["W", "G"].forEach((k) => { const [x, y] = pos(k); node(ctx, x, y, bw, 40, [NSRV[k].name, small ? "…" + NSRV[k].ip.slice(7) : NSRV[k].ip], { size: fs, size2: fs2, stroke: P.accent2 }); });
+    { const [x, y] = pos("X"); node(ctx, x, y, bw, 40, ["낯선 사용자", small ? "…2.99" : "192.0.2.99"], { size: fs, size2: fs2, stroke: P.warn }); }
+    { const [x, y] = pos("R"); node(ctx, x, y, Math.min(150, w * 0.26), 56, ["공유기 (NAT)", "안 192.168.0.1", "밖 " + PUB], { size: fs, size2: fs2, stroke: P.accent, lw: 2, fill: P.bg }); }
+    natF.draw(ctx, pos, P, small);
+    Object.keys(natBub).forEach((k) => { const b = natBub[k]; if (b.until > natClock) { const [x, y] = pos(k); bubble(ctx, b.text, x, y - (k === "R" ? 42 : 34), b.color, small ? 9.5 : 11); } });
+  }, { aspect: 0.48, minHeight: 300, maxHeight: 380 });
+  NB.loop($("cv-nat"), (dt) => {
+    natClock += dt; natF.step(dt);
+    let changed = false;
+    for (let i = natTbl.length - 1; i >= 0; i--) if (natTbl[i].exp && natTbl[i].exp <= natClock) { natTbl.splice(i, 1); changed = true; }
+    natTick += dt;
+    if (changed || natTick > 1) { natTick = 0; natRender(); }
+    natCv.redraw();
+  });
+  natRender();
+
+  /* ---------------- 6. IPv6 변환기 ---------------- */
+  function parse6(s) {
+    s = s.trim().toLowerCase();
+    if (!s) return { err: "주소를 입력하세요." };
+    if (!/^[0-9a-f:]+$/.test(s)) return { err: "IPv6 주소에는 0~9, a~f, 콜론(:)만 쓸 수 있다." };
+    const dc = s.split("::").length - 1;
+    if (dc > 1) return { err: "::는 한 번만 쓸 수 있다. 두 번 쓰면 각각 몇 묶음을 줄였는지 알 수 없다." };
+    let groups;
+    if (dc === 1) {
+      const [l, r] = s.split("::");
+      const L = l ? l.split(":") : [], R = r ? r.split(":") : [];
+      if (L.length + R.length > 7) return { err: "::가 대신할 묶음이 남지 않는다(묶음이 너무 많다)." };
+      groups = [...L, ...Array(8 - L.length - R.length).fill("0"), ...R];
+    } else {
+      groups = s.split(":");
+      if (groups.length !== 8) return { err: `묶음이 ${groups.length}개다. ::가 없으면 정확히 8묶음이어야 한다.` };
+    }
+    if (groups.some((g) => g.length < 1 || g.length > 4)) return { err: "각 묶음은 16진수 1~4자리여야 한다." };
+    return { v: groups.map((g) => parseInt(g, 16)) };
+  }
+  function zeroRun(v) {
+    let best = -1, bl = 0;
+    for (let i = 0; i < 8;) {
+      if (v[i] !== 0) { i++; continue; }
+      let j = i; while (j < 8 && v[j] === 0) j++;
+      if (j - i > bl) { bl = j - i; best = i; }
+      i = j;
+    }
+    return bl >= 2 ? [best, bl] : [-1, 0];
+  }
+  function compress(v) {
+    const hx = v.map((x) => x.toString(16));
+    const [i, n] = zeroRun(v);
+    if (i < 0) return hx.join(":");
+    return hx.slice(0, i).join(":") + "::" + hx.slice(i + n).join(":");
+  }
+  function kind6(v) {
+    const z = v.every((x) => x === 0);
+    if (z) return "지정 안 됨 (::)";
+    if (v.slice(0, 7).every((x) => x === 0) && v[7] === 1) return "루프백 (::1)";
+    if ((v[0] & 0xffc0) === 0xfe80) return "링크 로컬 (fe80::/10)";
+    if ((v[0] & 0xff00) === 0xff00) return "멀티캐스트 (ff00::/8)";
+    if ((v[0] & 0xfe00) === 0xfc00) return "고유 로컬 (fc00::/7, 사설)";
+    if (v[0] === 0x2001 && v[1] === 0x0db8) return "문서용 (2001:db8::/32)";
+    if ((v[0] & 0xe000) === 0x2000) return "글로벌 유니캐스트 (2000::/3)";
+    return "기타/예약";
+  }
+  function v6Update() {
+    const raw = $("v6-in").value, r = parse6(raw);
+    $("v6-in").style.borderColor = r.err ? "var(--bad)" : "";
+    if (r.err) {
+      $("v6-out").innerHTML = `<div class="v6-err">${r.err}</div>`;
+      ["v6-kind", "v6-pfx", "v6-iid", "v6-len"].forEach((id) => NB.stat(id, "—"));
+      return;
+    }
+    const v = r.v, [zi, zn] = zeroRun(v);
+    const chips = v.map((x, i) => {
+      const full = x.toString(16).padStart(4, "0"), core = x.toString(16), lead = full.slice(0, 4 - core.length);
+      return `<span class="g6${i >= zi && i < zi + zn ? " z" : ""}"><i>${lead}</i>${core}</span>`;
+    }).join(":");
+    const fullStr = v.map((x) => x.toString(16).padStart(4, "0")).join(":");
+    const step1 = v.map((x) => x.toString(16)).join(":");
+    const comp = compress(v);
+    let eui = "";
+    if ((v[5] & 0xff) === 0xff && (v[6] >> 8) === 0xfe) {
+      const b = [((v[4] >> 8) ^ 0x02), v[4] & 255, v[5] >> 8, v[6] & 255, v[7] >> 8, v[7] & 255];
+      eui = `<div class="v6-step">인터페이스 ID 가운데 <b>ff:fe</b> → MAC 주소 <code>${b.map((x) => x.toString(16).padStart(2, "0")).join(":")}</code>로 만든 EUI-64(7번째 비트를 뒤집고 가운데에 fffe를 끼운 것)</div>`;
+    }
+    $("v6-out").innerHTML =
+      `<div class="v6-step">전체형 (16비트 × 8묶음, 회색 줄 = 생략할 앞자리 0, 주황 = :: 로 줄일 덩어리)</div><div class="v6-full">${chips}</div>` +
+      `<div class="v6-step">① 앞자리 0 지우기: <code>${step1}</code></div>` +
+      `<div class="v6-step">② ${zi >= 0 ? `가장 긴 0 묶음 덩어리(${zn}개)를 <b>::</b>로` : "2묶음 이상 연속된 0이 없어 :: 생략 없음"}: <code><b>${comp}</b></code></div>` +
+      `<div class="v6-step" style="color:var(--text-dim)">전체형: <code>${fullStr}</code></div>` + eui;
+    NB.stat("v6-kind", kind6(v));
+    NB.stat("v6-pfx", compress([...v.slice(0, 4), 0, 0, 0, 0]).replace(/::$/, "") + "::/64");
+    NB.stat("v6-iid", v.slice(4).map((x) => x.toString(16)).join(":"));
+    NB.stat("v6-len", `${fullStr.length} → ${comp.length}자`);
+  }
+  $("v6-in").addEventListener("input", v6Update);
+  NB.seg("v6-ex", (val) => { $("v6-in").value = val; v6Update(); });
+  v6Update();
+})();
+</script>
+</body>
+</html>

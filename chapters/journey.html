@@ -1,0 +1,1068 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>영상 통화 한 번의 여행 · NetworkBook</title>
+<meta name="description" content="서울 카페의 Wi-Fi 휴대폰에서 부산의 5G 휴대폰까지, 영상 통화 패킷 하나를 따라가며 카메라·코덱·RTP·NAT·광통신·라우팅·데이터센터·기지국·RF 칩이 0.1초 안에 함께 일하는 모습을 보고, 지연 예산과 지터 버퍼, 비트레이트 적응을 직접 실험하는 종합 장.">
+<link rel="canonical" href="https://networkbook.euiyun.com/chapters/journey.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="NetworkBook">
+<meta property="og:title" content="영상 통화 한 번의 여행 · NetworkBook">
+<meta property="og:description" content="서울 카페의 Wi-Fi 휴대폰에서 부산의 5G 휴대폰까지, 영상 통화 패킷 하나를 따라가며 카메라·코덱·RTP·NAT·광통신·라우팅·데이터센터·기지국·RF 칩이 0.1초 안에 함께 일하는 모습을 보고, 지연 예산과 지터 버퍼, 비트레이트 적응을 직접 실험하는 종합 장.">
+<meta property="og:url" content="https://networkbook.euiyun.com/chapters/journey.html">
+<meta property="og:image" content="https://networkbook.euiyun.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"영상 통화 한 번의 여행","name":"영상 통화 한 번의 여행 · NetworkBook","url":"https://networkbook.euiyun.com/chapters/journey.html","mainEntityOfPage":"https://networkbook.euiyun.com/chapters/journey.html","inLanguage":"ko","isAccessibleForFree":true,"learningResourceType":"interactive textbook chapter","position":24,"image":"https://networkbook.euiyun.com/og.png","dateModified":"2026-10-05","isPartOf":{"@type":"Book","@id":"https://networkbook.euiyun.com/#book","name":"NetworkBook — 인터랙티브 네트워크 교과서","url":"https://networkbook.euiyun.com/"},"publisher":{"@type":"Organization","name":"NetworkBook","url":"https://networkbook.euiyun.com/"},"description":"서울 카페의 Wi-Fi 휴대폰에서 부산의 5G 휴대폰까지, 영상 통화 패킷 하나를 따라가며 카메라·코덱·RTP·NAT·광통신·라우팅·데이터센터·기지국·RF 칩이 0.1초 안에 함께 일하는 모습을 보고, 지연 예산과 지터 버퍼, 비트레이트 적응을 직접 실험하는 종합 장."},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"NetworkBook","item":"https://networkbook.euiyun.com/"},{"@type":"ListItem","position":2,"name":"24 영상 통화 한 번의 여행","item":"https://networkbook.euiyun.com/chapters/journey.html"}]}]}</script>
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .jdesc { padding: 14px 18px; border-top: 1px solid var(--border); min-height: 138px; }
+  .jdesc h4 { margin: 0 0 4px; font-size: 17px; }
+  .jdesc p { margin: 0; font-size: 15px; }
+  .jdesc .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .jdesc .meta a.pill { text-decoration: none; }
+  .jdesc .chg { margin-top: 6px; font-size: 13.5px; color: var(--text-dim); }
+  .jdesc .chg b.add { color: var(--ok); }
+  .jdesc .chg b.rm { color: var(--bad); }
+  .verdict { font-weight: 700; }
+  .sim-controls .ctrl > .seg { justify-self: start; align-self: start; }
+  .recap td:first-child { white-space: nowrap; }
+  svg a text { text-decoration: underline; text-decoration-thickness: 1px; }
+  svg a:hover text { fill: var(--accent-2); }
+</style>
+</head>
+<body data-chapter="journey">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 24</div>
+    <h1>영상 통화 한 번의 여행</h1>
+    <p class="lead">서울의 한 카페. 카페 Wi-Fi에 연결된 휴대폰으로 부산에 있는 친구에게 영상 통화를 건다. 친구는 길을 걷는 중이라 5G에 연결되어 있다. 화면 속 친구가 웃는 모습이 거의 동시에 보이고, 내 목소리도 거의 바로 들린다. 그 “거의 동시”는 약 0.1초다. 이 장에서는 그 0.1초를 슬로 모션으로 펼친다. 놀랍게도 이 책의 거의 모든 장이 그 안에 들어 있다.</p>
+    <ul class="objectives">
+      <li>카메라에서 상대 화면까지, 영상 패킷 하나가 지나는 모든 구간과 담당 장을 하나의 지도로 연결한다.</li>
+      <li>구간마다 어떤 헤더가 붙고 벗겨지는지, 신호가 전기·빛·전파 중 무엇으로 바뀌는지 따라간다.</li>
+      <li>통화를 맺는 과정(DNS, TLS, 시그널링, STUN·TURN·ICE)이 왜 필요한지 이해한다.</li>
+      <li>입-귀 지연 150 ms 예산을 구간별로 나눠 보고, 어디가 병목인지 찾는다.</li>
+      <li>지터 버퍼, FEC, 손실 은닉, 비트레이트 적응이 나쁜 네트워크를 견디는 방법을 실험한다.</li>
+      <li>영상 통화 1시간의 데이터 양, 비행기 Wi-Fi와 AI 챗봇의 여행을 같은 눈으로 본다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="map">
+    <h2>전체 지도: 카메라에서 친구 화면까지</h2>
+    <p>영상 통화는 한 번 보내고 끝나는 택배가 아니다. 1초에 30장의 장면과 50개의 음성 조각이 끊임없이 출발하는 <b>배달 행렬</b>이다. 그 행렬이 지나는 길을 먼저 한 장의 지도로 보자. 각 상자의 장 번호를 누르면 그 구간을 자세히 다룬 장으로 간다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg style="min-width:720px" viewBox="0 0 960 370" role="img" aria-label="영상 통화 패킷이 지나는 전체 경로 지도">
+        <defs>
+          <marker id="jm-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-dim)"/></marker>
+          <marker id="jm-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"/></marker>
+        </defs>
+        <text x="478" y="26" text-anchor="middle" class="t-dim">서울 ◀──────────  직선 약 330 km, 광섬유 경로 약 400 km  ──────────▶ 부산</text>
+        <!-- my phone -->
+        <rect x="10" y="40" width="150" height="284" rx="14" class="f-surface"/>
+        <text x="85" y="62" text-anchor="middle" class="t" style="font-weight:700">내 휴대폰 · 서울</text>
+        <g>
+          <rect x="20" y="74" width="130" height="40" rx="8" class="f-elev"/><text x="30" y="91" class="t" style="font-size:12px">카메라 (빛→숫자)</text><a href="signal.html"><text x="30" y="107" class="t-acc" style="font-size:11px">2장</text></a>
+          <rect x="20" y="124" width="130" height="40" rx="8" class="f-elev"/><text x="30" y="141" class="t" style="font-size:12px">인코더 (코덱)</text><a href="apps.html"><text x="30" y="157" class="t-acc" style="font-size:11px">10장</text></a>
+          <rect x="20" y="174" width="130" height="40" rx="8" class="f-elev"/><text x="30" y="191" class="t" style="font-size:12px">앱: RTP + SRTP</text><a href="tcp.html"><text x="30" y="207" class="t-acc" style="font-size:11px">9장</text></a><a href="security.html"><text x="62" y="207" class="t-acc" style="font-size:11px">22장</text></a>
+          <rect x="20" y="224" width="130" height="40" rx="8" class="f-elev"/><text x="30" y="241" class="t" style="font-size:12px">OS: UDP · IP</text><a href="tcp.html"><text x="30" y="257" class="t-acc" style="font-size:11px">9장</text></a><a href="ip.html"><text x="62" y="257" class="t-acc" style="font-size:11px">7장</text></a>
+          <rect x="20" y="274" width="130" height="40" rx="8" class="f-acc-soft"/><text x="30" y="291" class="t" style="font-size:12px">Wi-Fi 칩</text><a href="wifi.html"><text x="30" y="307" class="t-acc" style="font-size:11px">13장</text></a><a href="rfchips.html"><text x="66" y="307" class="t-acc" style="font-size:11px">18장</text></a>
+          <path d="M85 114 V122 M85 164 V172 M85 214 V222 M85 264 V272" class="s-line" marker-end="url(#jm-a)"/>
+        </g>
+        <!-- network boxes -->
+        <g>
+          <rect x="196" y="270" width="76" height="52" rx="9" class="f-elev"/><text x="234" y="291" text-anchor="middle" class="t" style="font-size:12px">공유기·NAT</text><a href="ip.html"><text x="234" y="311" text-anchor="middle" class="t-acc" style="font-size:11px">7장</text></a>
+          <rect x="292" y="270" width="76" height="52" rx="9" class="f-elev"/><text x="330" y="291" text-anchor="middle" class="t" style="font-size:12px">FTTH·PON</text><a href="optical.html"><text x="330" y="311" text-anchor="middle" class="t-acc" style="font-size:11px">5장</text></a>
+          <rect x="388" y="270" width="76" height="52" rx="9" class="f-elev"/><text x="426" y="291" text-anchor="middle" class="t" style="font-size:12px">ISP 라우터</text><a href="routing.html"><text x="426" y="311" text-anchor="middle" class="t-acc" style="font-size:11px">8장</text></a>
+          <rect x="484" y="270" width="76" height="52" rx="9" class="f-elev"/><text x="522" y="291" text-anchor="middle" class="t" style="font-size:12px">백본 광섬유</text><a href="optical.html"><text x="522" y="311" text-anchor="middle" class="t-acc" style="font-size:11px">5장</text></a>
+          <rect x="580" y="270" width="76" height="52" rx="9" class="f-elev"/><text x="618" y="291" text-anchor="middle" class="t" style="font-size:12px">5G 코어</text><a href="cellular.html"><text x="618" y="311" text-anchor="middle" class="t-acc" style="font-size:11px">14장</text></a>
+          <rect x="676" y="270" width="76" height="52" rx="9" class="f-elev"/><text x="714" y="291" text-anchor="middle" class="t" style="font-size:12px">5G 기지국</text><a href="cellular.html"><text x="714" y="311" text-anchor="middle" class="t-acc" style="font-size:11px">14장</text></a>
+        </g>
+        <!-- links: radio / wire / light -->
+        <path d="M150 294 q4 -7 8 0 t8 0 t8 0 t8 0 t8 0" class="s-acc" style="stroke-width:1.6"/>
+        <path d="M272 296 H290" class="s-line" style="stroke-width:2.4" marker-end="url(#jm-a)"/>
+        <g stroke="var(--accent-2)" stroke-width="3.5" fill="none"><path d="M368 296 H386 M464 296 H482 M560 296 H578 M656 296 H674"/></g>
+        <path d="M752 294 q4 -7 8 0 t8 0 t8 0 t8 0 t8 0" class="s-acc" style="stroke-width:1.6"/>
+        <!-- data center -->
+        <rect x="408" y="78" width="228" height="128" rx="14" class="f-acc2-soft"/>
+        <text x="522" y="100" text-anchor="middle" class="t" style="font-weight:700">데이터센터</text>
+        <a href="datacenter.html"><text x="578" y="100" class="t-acc" style="font-size:11px">20장</text></a><a href="cloud.html"><text x="606" y="100" class="t-acc" style="font-size:11px">21장</text></a>
+        <rect x="422" y="112" width="200" height="34" rx="8" class="f-elev"/><text x="522" y="134" text-anchor="middle" class="t" style="font-size:12px">로그인·시그널링 서버</text>
+        <rect x="422" y="154" width="200" height="40" rx="8" class="f-elev"/><text x="522" y="172" text-anchor="middle" class="t" style="font-size:12px">STUN · TURN 릴레이</text><text x="522" y="188" text-anchor="middle" class="t-mono" style="font-size:10px">직접 연결이 안 될 때만 경유</text>
+        <path d="M508 268 V210" stroke="var(--accent-2)" stroke-width="2.5" fill="none" marker-end="url(#jm-b)"/>
+        <path d="M536 210 V266" stroke="var(--accent-2)" stroke-width="2.5" fill="none" stroke-dasharray="5 4" marker-end="url(#jm-b)"/>
+        <!-- signaling -->
+        <path d="M160 128 H404" class="s-line" stroke-dasharray="4 4" marker-end="url(#jm-a)"/>
+        <path d="M640 128 H794" class="s-line" stroke-dasharray="4 4" marker-end="url(#jm-a)"/>
+        <text x="282" y="120" text-anchor="middle" class="t-dim" style="font-size:11px">시그널링: DNS → TLS 연결</text>
+        <a href="apps.html"><text x="232" y="146" class="t-acc" style="font-size:11px">10장</text></a><a href="security.html"><text x="270" y="146" class="t-acc" style="font-size:11px">22장</text></a>
+        <text x="716" y="120" text-anchor="middle" class="t-dim" style="font-size:11px">통화 요청 · 푸시 알림</text>
+        <!-- friend phone -->
+        <rect x="796" y="40" width="154" height="284" rx="14" class="f-surface"/>
+        <text x="873" y="62" text-anchor="middle" class="t" style="font-weight:700">친구 휴대폰 · 부산</text>
+        <g>
+          <rect x="806" y="74" width="134" height="40" rx="8" class="f-elev"/><text x="816" y="91" class="t" style="font-size:12px">화면 (숫자→빛)</text><a href="signal.html"><text x="816" y="107" class="t-acc" style="font-size:11px">2장</text></a>
+          <rect x="806" y="124" width="134" height="40" rx="8" class="f-elev"/><text x="816" y="141" class="t" style="font-size:12px">디코더</text><a href="apps.html"><text x="816" y="157" class="t-acc" style="font-size:11px">10장</text></a>
+          <rect x="806" y="174" width="134" height="40" rx="8" class="f-elev"/><text x="816" y="191" class="t" style="font-size:12px">앱: 지터 버퍼</text><a href="tcp.html"><text x="816" y="207" class="t-acc" style="font-size:11px">9장</text></a>
+          <rect x="806" y="224" width="134" height="40" rx="8" class="f-elev"/><text x="816" y="241" class="t" style="font-size:12px">OS: 봉투 벗기기</text><a href="layers.html"><text x="816" y="257" class="t-acc" style="font-size:11px">3장</text></a>
+          <rect x="806" y="274" width="134" height="40" rx="8" class="f-acc-soft"/><text x="816" y="291" class="t" style="font-size:12px">RF 칩 · 모뎀</text><a href="rfchips.html"><text x="816" y="307" class="t-acc" style="font-size:11px">18장</text></a><a href="modulation.html"><text x="852" y="307" class="t-acc" style="font-size:11px">12장</text></a>
+          <path d="M873 272 V266 M873 222 V216 M873 172 V166 M873 122 V116" class="s-line" marker-end="url(#jm-a)"/>
+        </g>
+        <!-- legend -->
+        <g transform="translate(196,346)">
+          <path d="M0 0 q4 -7 8 0 t8 0 t8 0" class="s-acc" style="stroke-width:1.6"/><text x="30" y="4" class="t-dim" style="font-size:11.5px">전파</text>
+          <path d="M80 0 H106" class="s-line" style="stroke-width:2.4"/><text x="112" y="4" class="t-dim" style="font-size:11.5px">전기(랜선)</text>
+          <path d="M190 0 H216" stroke="var(--accent-2)" stroke-width="3.5"/><text x="222" y="4" class="t-dim" style="font-size:11.5px">빛(광섬유)</text>
+          <path d="M300 0 H326" class="s-line" stroke-dasharray="4 4"/><text x="332" y="4" class="t-dim" style="font-size:11.5px">시그널링(통화 맺기)</text>
+          <text x="456" y="4" class="t-dim" style="font-size:11.5px">· 밑줄 친 장 번호는 링크</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 24-1.</b> 영상 통화의 전체 경로. 왼쪽 휴대폰 안에서 아래로 내려가며 봉투가 씌워지고(캡슐화), 전파 → 전기 → 빛 → 전기 → 전파로 모습을 바꿔 부산에 닿은 뒤, 오른쪽 휴대폰 안에서 위로 올라가며 봉투가 벗겨진다. 데이터센터는 통화를 맺어 주고(시그널링), 직접 연결이 막힐 때만 영상을 중계한다.</figcaption>
+    </figure>
+    <div class="callout analogy"><strong>신선 식품 배달 행렬</strong><p>보통 택배(파일 다운로드)는 늦더라도 하나도 빠짐없이 와야 한다. 영상 통화는 <b>신선 식품</b> 배달에 가깝다. 매초 수십 개의 상자가 출발하고, 정해진 시각(재생 시각)을 넘긴 상자는 도착해도 버린다. 그래서 등기 우편(TCP)이 아닌 일반 우편(UDP)을 쓰고, 상자에는 순서 번호와 “언제 찍은 장면인지” 적힌 번호표(RTP)를 붙이며, 받는 쪽은 약간의 대기실(지터 버퍼)을 두어 들쭉날쭉한 도착을 고른 박자로 바꾼다.</p></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>구간</th><th>신호의 모습</th><th class="num">대표 지연(한쪽)</th><th>장</th></tr></thead>
+      <tbody>
+        <tr><td>카메라 캡처 + 인코딩</td><td>빛 → 전하 → 숫자</td><td class="num">20~40 ms</td><td>2, 10</td></tr>
+        <tr><td>휴대폰 → 공유기 (Wi-Fi)</td><td>전파 (2.4/5/6 GHz, OFDM)</td><td class="num">1~10 ms (붐비면 수십 ms)</td><td>11, 12, 13</td></tr>
+        <tr><td>공유기 → 통신사 국사 (FTTH)</td><td>전기 → 빛 (PON)</td><td class="num">1~2 ms</td><td>5, 7</td></tr>
+        <tr><td>통신사 라우터 · 백본 (서울→부산)</td><td>빛 (DWDM), 라우터 안에서는 전기</td><td class="num">3~6 ms</td><td>5, 8, 17</td></tr>
+        <tr><td>데이터센터 TURN 경유 (필요할 때만)</td><td>빛 → 전기 → 빛</td><td class="num">+0.5~3 ms (가까울 때)</td><td>20, 21</td></tr>
+        <tr><td>5G 코어 → 기지국 → 친구 폰</td><td>빛 → 전파 (3.5 GHz)</td><td class="num">5~15 ms</td><td>14, 18</td></tr>
+        <tr><td>지터 버퍼 + 디코딩 + 화면 표시</td><td>숫자 → 빛</td><td class="num">40~80 ms</td><td>9, 10</td></tr>
+      </tbody>
+    </table></div>
+    <p>표를 다시 보자. 서울에서 부산까지 400 km를 건너는 네트워크 구간을 모두 합쳐도 20 ms 안팎이다. 오히려 <b>양 끝의 휴대폰 안</b>(캡처, 인코딩, 기다림, 디코딩, 표시)이 더 오래 걸린다. 이 사실은 뒤에서 지연 예산을 짤 때 다시 확인한다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="setup">
+    <h2>통화를 맺기까지: 시그널링과 NAT 통과</h2>
+    <p>영상이 흐르기 전에 먼저 할 일이 있다. 내 휴대폰은 친구 휴대폰의 IP 주소를 모른다. 안다고 해도 친구는 이동통신사의 <b>통신사 NAT(CGNAT)</b> 뒤에, 나는 카페 공유기의 NAT 뒤에 숨어 있어서(7장) 바깥에서 먼저 말을 걸 수 없다. 그래서 둘 다 이미 알고 있는 제3자, 즉 통화 서비스의 서버가 중매를 선다. 이렇게 “누가 누구에게, 어떤 조건으로 통화하자”는 약속을 주고받는 일을 <span class="term">시그널링</span><span class="en">(signaling)</span>이라 한다. 영상 자체가 흐르는 길(미디어 경로)과는 별개의 길이다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg style="min-width:620px" viewBox="0 0 800 470" role="img" aria-label="통화 연결 과정 순서도">
+        <defs><marker id="js-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+        <marker id="js-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"/></marker>
+        <marker id="js-c" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ok)"/></marker></defs>
+        <g class="t" style="font-weight:700;font-size:12.5px" text-anchor="middle">
+          <rect x="30" y="12" width="110" height="34" rx="8" class="f-acc-soft"/><text x="85" y="34">내 휴대폰</text>
+          <rect x="190" y="12" width="110" height="34" rx="8" class="f-elev"/><text x="245" y="34">DNS 리졸버</text>
+          <rect x="350" y="12" width="130" height="34" rx="8" class="f-elev"/><text x="415" y="34">시그널링 서버</text>
+          <rect x="530" y="12" width="110" height="34" rx="8" class="f-elev"/><text x="585" y="34">STUN·TURN</text>
+          <rect x="680" y="12" width="110" height="34" rx="8" class="f-acc-soft"/><text x="735" y="34">친구 휴대폰</text>
+        </g>
+        <g class="s-axis" stroke-dasharray="3 4"><path d="M85 46 V456 M245 46 V456 M415 46 V456 M585 46 V456 M735 46 V456"/></g>
+        <g class="t-mono" style="font-size:11.5px">
+          <path d="M85 74 H241" class="s-acc" marker-end="url(#js-a)"/><path d="M245 90 H89" class="s-acc" stroke-dasharray="5 3" marker-end="url(#js-a)"/>
+          <text x="92" y="68">① call.example.com의 IP는?</text><text x="250" y="94">→ 203.0.113.20  (10장)</text>
+          <path d="M85 122 H411" class="s-acc" marker-end="url(#js-a)"/><path d="M415 138 H89" class="s-acc" stroke-dasharray="5 3" marker-end="url(#js-a)"/>
+          <text x="92" y="116">② TCP + TLS 1.3 연결, 로그인 토큰 (22장)</text><text x="200" y="152">앱을 켤 때 이미 열어 둔 연결을 재사용</text>
+          <path d="M85 180 H411" class="s-acc" marker-end="url(#js-a)"/><path d="M415 196 H731" class="s-acc" marker-end="url(#js-a)"/>
+          <text x="92" y="174">③ 통화 요청: 제안(offer) SDP</text><text x="424" y="190">푸시 알림으로 친구 폰을 깨움</text>
+          <text x="92" y="212" class="t-dim" style="font-size:11px">코덱 목록 · 해상도 · 암호 열쇠 지문 · 주소 후보</text>
+          <path d="M735 236 H419" class="s-acc" marker-end="url(#js-a)"/><path d="M415 252 H89" class="s-acc" marker-end="url(#js-a)"/>
+          <text x="440" y="230">④ 친구가 “받기”: 응답(answer) SDP</text>
+          <path d="M85 286 H581" stroke="var(--accent-2)" stroke-width="2" marker-end="url(#js-b)"/><path d="M581 302 H89" stroke="var(--accent-2)" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#js-b)"/>
+          <path d="M735 286 H589" stroke="var(--accent-2)" stroke-width="2" marker-end="url(#js-b)"/>
+          <text x="92" y="280">⑤ STUN: “바깥에서 본 내 주소는?” → 198.51.100.24:61002</text>
+          <text x="92" y="318" class="t-dim" style="font-size:11px">필요하면 TURN 서버에 중계 주소도 빌려 둔다 (후보 수집)</text>
+          <path d="M85 350 H731" stroke="var(--accent-2)" stroke-width="2" stroke-dasharray="2 4" marker-end="url(#js-b)" marker-start="url(#js-b)"/>
+          <text x="92" y="344">⑥ ICE 연결 검사: 후보 쌍마다 서로 찔러 보고, 통하는 길 중 가장 좋은 길을 고른다</text>
+          <path d="M85 392 H731" class="s-acc" marker-end="url(#js-a)" marker-start="url(#js-a)"/>
+          <text x="92" y="386">⑦ DTLS 핸드셰이크 → SRTP 열쇠 확정 (22장)</text>
+          <path d="M89 430 H731" stroke="var(--ok)" stroke-width="5" marker-end="url(#js-c)" marker-start="url(#js-c)"/>
+          <text x="300" y="424" style="fill:var(--ok);font-weight:700">⑧ 영상·음성 흐름 시작 (SRTP over UDP)</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 24-2.</b> 통화를 맺는 순서. ①~④는 서버를 통한 약속(시그널링), ⑤~⑥은 NAT를 뚫을 길 찾기, ⑦은 종단 간 암호 열쇠 나누기다. 사람이 “받기”를 누르는 시간을 빼면 네트워크 작업은 대개 0.5~2초 안에 끝난다. 주소는 문서용 예시 주소다.</figcaption>
+    </figure>
+    <p>단계별로 쓰이는 이름을 정리하자.</p>
+    <ul>
+      <li><b>DNS와 TLS</b>: 앱은 서버 이름을 DNS로 IP 주소로 바꾸고(10장), TLS로 암호화된 연결을 연다(22장). 로그인 토큰도 이 안에서 오간다. 메신저 앱은 보통 켜질 때 이 연결을 만들어 두고 계속 유지한다.</li>
+      <li><b>SDP</b>: 통화 조건을 적은 문서다. <span class="term">SDP</span><span class="en">(Session Description Protocol)</span>에는 “나는 Opus 음성과 H.264·VP8·AV1 영상을 쓸 수 있다”, “내 암호 인증서 지문은 이것이다” 같은 내용이 들어 있다. 제안(offer)과 응답(answer)을 맞춰 보면 둘 다 쓸 수 있는 코덱이 정해진다. 웹 브라우저와 앱에 내장된 실시간 통신 표준 묶음인 <span class="term">WebRTC</span>가 이 방식을 쓰고, 전화망 쪽의 SIP(VoLTE 등)도 같은 SDP를 주고받는다.</li>
+      <li><b>STUN</b>: NAT 바깥에 있는 서버에 작은 UDP 패킷을 보내면 서버가 “네 패킷은 198.51.100.24:61002에서 왔다”고 알려 준다. 이것이 <span class="term">STUN</span>이다. 공유기 변환표에 적힌 내 바깥 주소를 알아내는 거울이다.</li>
+      <li><b>TURN</b>: 직접 연결이 끝내 안 되면 데이터센터의 <span class="term">TURN</span> 서버가 중계 주소를 빌려 주고, 영상 패킷을 받아 상대에게 그대로 넘겨 준다. 내용은 SRTP로 암호화되어 있어서 중계 서버도 볼 수 없다.</li>
+      <li><b>ICE</b>: 위에서 모은 주소 후보(휴대폰 자신의 주소, STUN으로 알아낸 바깥 주소, TURN 중계 주소)를 서로 교환한 뒤, 가능한 짝을 모두 시험해 가장 좋은 길을 고르는 절차가 <span class="term">ICE</span><span class="en">(Interactive Connectivity Establishment)</span>다.</li>
+    </ul>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg style="min-width:560px" viewBox="0 0 800 280" role="img" aria-label="직접 연결과 TURN 중계 비교">
+        <defs><marker id="jn-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ok)"/></marker>
+        <marker id="jn-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"/></marker></defs>
+        <text x="200" y="22" text-anchor="middle" class="t" style="font-weight:700">A. 구멍 뚫기 성공: 직접 연결(P2P)</text>
+        <text x="600" y="22" text-anchor="middle" class="t" style="font-weight:700">B. 막혔을 때: TURN 중계</text>
+        <g transform="translate(0,0)">
+          <rect x="20" y="110" width="70" height="46" rx="9" class="f-acc-soft"/><text x="55" y="138" text-anchor="middle" class="t" style="font-size:12px">내 폰</text>
+          <rect x="110" y="104" width="60" height="58" rx="9" class="f-elev"/><text x="140" y="130" text-anchor="middle" class="t" style="font-size:12px">NAT</text><text x="140" y="146" text-anchor="middle" class="t-mono" style="font-size:10px">공유기</text>
+          <rect x="230" y="104" width="60" height="58" rx="9" class="f-elev"/><text x="260" y="130" text-anchor="middle" class="t" style="font-size:12px">NAT</text><text x="260" y="146" text-anchor="middle" class="t-mono" style="font-size:10px">CGNAT</text>
+          <rect x="310" y="110" width="70" height="46" rx="9" class="f-acc-soft"/><text x="345" y="138" text-anchor="middle" class="t" style="font-size:12px">친구 폰</text>
+          <circle cx="200" cy="58" r="20" class="f-surface"/><text x="200" y="62" text-anchor="middle" class="t-mono" style="font-size:10px">STUN</text>
+          <path d="M140 104 L184 70 M260 104 L216 70" class="s-line" stroke-dasharray="3 3"/>
+          <path d="M90 126 H230" stroke="var(--ok)" stroke-width="3" marker-end="url(#jn-a)"/>
+          <path d="M310 142 H170" stroke="var(--ok)" stroke-width="3" marker-end="url(#jn-a)"/>
+          <text x="200" y="190" text-anchor="middle" class="t-dim">양쪽이 거의 동시에 상대의 바깥 주소로 쏘면,</text>
+          <text x="200" y="208" text-anchor="middle" class="t-dim">각 NAT는 “내가 먼저 보낸 상대의 답장”으로 여겨 통과시킨다.</text>
+          <text x="200" y="236" text-anchor="middle" class="t-acc">가장 짧은 길 · 서버 비용 없음</text>
+        </g>
+        <path d="M400 40 V260" class="s-axis" stroke-dasharray="4 4"/>
+        <g transform="translate(400,0)">
+          <rect x="20" y="150" width="70" height="46" rx="9" class="f-acc-soft"/><text x="55" y="178" text-anchor="middle" class="t" style="font-size:12px">내 폰</text>
+          <rect x="110" y="144" width="60" height="58" rx="9" class="f-elev"/><text x="140" y="170" text-anchor="middle" class="t" style="font-size:12px">NAT</text><text x="140" y="186" text-anchor="middle" class="t-mono" style="font-size:10px">대칭형</text>
+          <rect x="230" y="144" width="60" height="58" rx="9" class="f-elev"/><text x="260" y="170" text-anchor="middle" class="t" style="font-size:12px">방화벽</text><text x="260" y="186" text-anchor="middle" class="t-mono" style="font-size:10px">UDP 차단</text>
+          <rect x="310" y="150" width="70" height="46" rx="9" class="f-acc-soft"/><text x="345" y="178" text-anchor="middle" class="t" style="font-size:12px">친구 폰</text>
+          <rect x="150" y="40" width="100" height="46" rx="9" class="f-acc2-soft"/><text x="200" y="60" text-anchor="middle" class="t" style="font-size:12px">TURN 서버</text><text x="200" y="76" text-anchor="middle" class="t-mono" style="font-size:10px">데이터센터</text>
+          <path d="M150 144 L172 90" stroke="var(--accent-2)" stroke-width="3" marker-end="url(#jn-b)"/>
+          <path d="M228 90 L250 144" stroke="var(--accent-2)" stroke-width="3" marker-end="url(#jn-b)"/>
+          <path d="M170 173 H226" stroke="var(--bad)" stroke-width="2.5" stroke-dasharray="4 3"/><text x="198" y="166" text-anchor="middle" style="fill:var(--bad);font-size:13px;font-weight:700">✕</text>
+          <text x="200" y="230" text-anchor="middle" class="t-dim">상대마다 다른 바깥 포트를 쓰는 NAT, UDP를 막는 방화벽이면</text>
+          <text x="200" y="248" text-anchor="middle" class="t-dim">양쪽 모두 TURN에 “나가는” 연결만 만들고 서버가 이어 준다.</text>
+          <text x="200" y="272" text-anchor="middle" class="t-acc">항상 되지만 길이 늘고 서버 대역폭 비용이 든다</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 24-3.</b> NAT 통과. 대부분의 통화는 STUN으로 알아낸 바깥 주소끼리 직접 연결된다(A). NAT가 상대마다 다른 포트를 배정하거나(대칭형 NAT) 회사 방화벽이 UDP를 막으면 TURN 중계로 넘어간다(B). 극단적인 경우엔 TCP 443번 위의 TLS로 감싸 HTTPS처럼 위장해 지나간다.</figcaption>
+    </figure>
+    <div class="callout deep"><strong>그룹 통화는 SFU를 거친다</strong><p>1:1은 직접 연결이 가장 좋지만, 10명이 통화할 때 모두가 9명에게 각자 영상을 보내면 내 업로드가 9배가 된다. 그래서 그룹 통화는 데이터센터의 <span class="term">SFU</span><span class="en">(Selective Forwarding Unit)</span>에 영상을 한 번만 올리고, 서버가 받는 사람 화면 크기에 맞는 해상도를 골라 나눠 준다. 보내는 쪽은 큰 화질·작은 화질을 동시에 올리는(simulcast) 경우가 많다. 서버는 패킷을 고르기만 하고 다시 인코딩하지 않으므로 지연이 거의 늘지 않는다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="trip">
+    <h2>패킷 하나의 여행: 한 구간씩</h2>
+    <p>이제 통화가 연결되었다. 내 얼굴이 담긴 한 장면 가운데 <b>패킷 하나</b>를 골라 부산까지 따라가 보자. “다음 →”을 누를 때마다 패킷이 한 구간을 건너고, 아래 그림에 지금 패킷에 붙은 헤더(바깥 → 안쪽), 신호의 모습(전기·빛·전파), 출발·도착 주소가 나타난다. 맨 아래 막대에는 시간이 쌓인다. 경로를 “직접 연결”로 바꾸면 데이터센터를 거치지 않는 길도 볼 수 있다.</p>
+    <div class="sim" id="sim-trip">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>영상 패킷 하나가 지나가는 길</h3></div>
+      <div class="sim-controls" style="border-top:0;border-bottom:1px solid var(--border)">
+        <div class="ctrl"><span>경로</span><div class="seg" id="jmode"><button data-value="relay" class="on">TURN 릴레이 경유</button><button data-value="p2p">직접 연결 (P2P)</button></div></div>
+      </div>
+      <div class="sim-view" style="overflow-x:auto"><div style="min-width:720px"><canvas id="cv-trip"></canvas></div></div>
+      <div class="jdesc" id="jdesc"></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>진행 <output id="jstep">0</output></span><div class="btn-row"><button class="btn" id="jprev">← 이전</button><button class="btn primary" id="jnext">다음 →</button><button class="btn" id="jauto">자동 재생</button><button class="btn" id="jall">끝까지</button><button class="btn" id="jreset">처음으로</button></div></div>
+      </div>
+      <div class="sim-view" style="border-top:1px solid var(--border)"><canvas id="cv-tbar"></canvas></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">누적 지연</span><span class="v" id="o-tsum">0 ms</span></div>
+        <div class="stat"><span class="k">그중 네트워크 구간</span><span class="v" id="o-tnet">0 ms</span></div>
+        <div class="stat"><span class="k">그중 양 끝 휴대폰 안</span><span class="v" id="o-tdev">0 ms</span></div>
+      </div>
+      <div class="sim-note">수치는 서울-부산 통화의 대표적인 크기를 단순화한 것이다(30 fps, 720p, 약 2 Mbps). 실제로는 구간마다 매 패킷 다르게 출렁인다. 주소는 문서용 예시 주소(RFC 5737)이고, 이동통신사가 IPv6를 쓰면 주소 모양과 NAT 단계가 달라진다. 해볼 것: “직접 연결”로 바꾸면 무엇이 빠지는지, 그리고 맨 아래 막대에서 가장 긴 조각이 네트워크가 아니라 어디인지 보자.</div>
+    </div>
+    <div class="callout tip"><strong>왜 RTP 위에 또 UDP일까?</strong><p><span class="term">RTP</span><span class="en">(Real-time Transport Protocol)</span>는 배달 규칙이라기보다 상자에 붙이는 <b>번호표</b>다. 순서 번호로 빠진 상자와 뒤바뀐 순서를 알아내고, 타임스탬프로 “이 조각은 몇 번째 순간의 장면인지”를 알아 음성과 영상을 맞춰(립싱크) 재생한다. 실제 배달은 UDP와 IP가 맡는다. 암호화한 버전이 <span class="term">SRTP</span>다. 함께 다니는 RTCP는 “손실 몇 %, 지터 몇 ms”를 상대에게 알려 주는 운송장 피드백이다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="budget">
+    <h2>지연 예산: 150 ms 안에 들어오려면</h2>
+    <p>대화가 자연스러우려면 내가 말한 소리가 상대 귀에 닿기까지, 즉 <span class="term">입-귀 지연</span><span class="en">(mouth-to-ear delay)</span>이 짧아야 한다. 국제전기통신연합의 권고(ITU-T G.114)는 한쪽 방향 150 ms 이하면 대부분의 대화에서 지연을 거의 느끼지 못한다고 본다. 300 ms를 넘어가면 “내가 말을 끝냈나?” 하는 머뭇거림 때문에 서로 말이 겹치기 시작하고, 400 ms를 넘으면 일반적인 대화로는 받아들이기 어렵다.</p>
+    <p>150 ms라는 <b>예산</b>을 구간마다 나눠 쓴다고 생각해 보자. 아래에서 구간별 조건을 바꿔 가며 어디서 예산이 새는지 찾아보자.</p>
+    <div class="sim" id="sim-budget">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>입-귀 지연 예산 계산기</h3></div>
+      <div class="sim-view"><canvas id="cv-budget"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>캡처·인코딩 <output id="b-cap-out"></output></span><input type="range" id="b-cap" min="10" max="80" step="1" value="25"></div>
+        <div class="ctrl"><span>내 쪽 Wi-Fi</span><div class="seg" id="b-wifi"><button data-value="3" class="on">한산함</button><button data-value="15">붐비는 카페</button><button data-value="40">약한 신호</button></div></div>
+        <div class="ctrl"><span>접속망</span><div class="seg" id="b-acc"><button data-value="2" class="on">FTTH</button><button data-value="7">케이블(HFC)</button><button data-value="25">혼잡한 공용 회선</button></div></div>
+        <div class="ctrl"><span>상대 위치(거리)</span><div class="seg" id="b-dist"><button data-value="busan" class="on">부산</button><button data-value="tokyo">도쿄</button><button data-value="ny">뉴욕</button></div></div>
+        <div class="ctrl"><span>서버 경유</span><div class="seg" id="b-relay"><button data-value="p2p" class="on">직접(P2P)</button><button data-value="near">가까운 릴레이</button><button data-value="far">먼 릴레이(미국 서부)</button></div></div>
+        <div class="ctrl"><span>상대 이동통신</span><div class="seg" id="b-mob"><button data-value="8" class="on">5G</button><button data-value="18">LTE</button><button data-value="35">혼잡한 셀</button></div></div>
+        <div class="ctrl"><span>지터 버퍼 <output id="b-jb-out"></output></span><input type="range" id="b-jb" min="0" max="200" step="5" value="40"></div>
+        <div class="ctrl"><span>디코딩·표시 <output id="b-dec-out"></output></span><input type="range" id="b-dec" min="10" max="60" step="1" value="20"></div>
+        <div class="ctrl"><span>예시 조합</span><div class="btn-row"><button class="btn" id="b-best">최선</button><button class="btn" id="b-def">기본</button><button class="btn" id="b-worst">최악</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">입-귀 지연(한쪽)</span><span class="v" id="o-bsum">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v verdict" id="o-bver" style="font-size:15px">—</span></div>
+        <div class="stat"><span class="k">네트워크 구간 비중</span><span class="v" id="o-bnet">—</span></div>
+        <div class="stat"><span class="k">가장 큰 구간</span><span class="v" id="o-bmax" style="font-size:14px">—</span></div>
+      </div>
+      <div class="sim-note">한쪽 방향 지연의 단순 모델이다. 거리 구간은 광섬유 속 빛(1 km에 약 5 µs)과 라우터 경유를 합친 대표값(부산 4 ms, 도쿄 16 ms, 뉴욕 95 ms)이다. “먼 릴레이”는 서울 → 미국 서부 → 상대로 돌아가는 길이다. 판정 기준은 ITU-T G.114를 단순화해 150 ms / 300 ms로 나눴다. 해볼 것: ① 부산 친구인데 릴레이가 미국 서부로 잡히면? ② 뉴욕 친구일 때 무엇을 줄여야 150 ms 안에 들어오나?</div>
+    </div>
+    <div class="callout analogy"><strong>예산은 고정, 거리는 협상 불가</strong><p>지연 예산은 한 달 생활비와 같다. 월세(빛이 거리를 건너는 시간)는 깎을 수 없다. 서울-뉴욕의 바닷길은 아무리 좋은 장비를 써도 수십 ms다. 그러니 줄일 수 있는 것은 식비와 용돈, 즉 휴대폰 안의 처리와 버퍼다. 먼 나라와의 통화 앱이 인코더를 가볍게 돌리고 지터 버퍼를 아슬아슬하게 잡는 이유다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="jitter">
+    <h2>손실과 지터에 맞서기</h2>
+    <p>패킷은 일정한 박자로 출발하지만 도착은 들쭉날쭉하다. Wi-Fi에서 순서를 기다리고, 라우터 큐에 잠깐 머물고, 기지국 스케줄러가 차례를 정하기 때문이다. 이 도착 간격의 흔들림이 <b>지터</b>(jitter)다. 그리고 일부는 아예 사라진다(손실). 영상 통화 앱은 네 가지 무기로 맞선다.</p>
+    <ol>
+      <li><span class="term">지터 버퍼</span><span class="en">(jitter buffer)</span>: 도착한 패킷을 바로 재생하지 않고 잠깐 모았다가 고른 박자로 꺼낸다. 버퍼가 깊을수록 늦은 패킷을 더 기다려 주지만, 그만큼 모든 소리가 늦게 들린다.</li>
+      <li><b>FEC</b>(순방향 오류 정정): 여분의 정보를 미리 함께 보내 잃어버린 조각을 받는 쪽이 스스로 복원한다(12장의 오류 정정 부호와 같은 생각). Opus 음성 코덱은 다음 패킷에 이전 조각의 저화질 사본을 넣어 보낼 수 있다. 영상은 패킷 몇 개를 XOR한 복구 패킷을 덧붙인다.</li>
+      <li><span class="term">패킷 손실 은닉</span><span class="en">(PLC)</span>: 끝내 못 받은 조각은 앞뒤 소리로 그럴듯하게 메우거나, 영상은 이전 장면을 잠시 유지한다. 몇 % 손실까지는 사람이 잘 눈치채지 못한다. 영상의 기준 장면이 깨지면 상대에게 “새 기준 장면(키프레임)을 보내 줘”라고 요청하고, 빠진 패킷만 골라 재전송을 부탁하기도 한다(NACK). 지연 예산이 남을 때만 쓰는 방법이다.</li>
+      <li><b>비트레이트 적응</b>: 손실과 지연이 늘면 그 자체가 “길이 막힌다”는 신호다. 보내는 양을 줄여 큐가 비게 한다(9장의 혼잡 제어). 다음 절에서 실험한다.</li>
+    </ol>
+    <div class="sim" id="sim-jit">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>지터 버퍼: 지연과 끊김의 줄다리기</h3></div>
+      <div class="sim-view"><canvas id="cv-jit"></canvas></div>
+      <div class="legend"><span><i style="background:var(--ok)"></i>제때 도착</span><span><i style="background:var(--warn)"></i>늦어서 버림</span><span><i style="background:var(--bad)"></i>네트워크에서 손실</span><span><i style="background:var(--accent-2)"></i>FEC로 복원</span></div>
+      <div class="sim-view" style="border-top:1px solid var(--border);margin-top:10px"><canvas id="cv-jit2"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>지터 (평균 추가 지연) <output id="j-jit-out"></output></span><input type="range" id="j-jit" min="1" max="60" step="1" value="10"></div>
+        <div class="ctrl"><span>네트워크 손실률 <output id="j-loss-out"></output></span><input type="range" id="j-loss" min="0" max="15" step="0.5" value="2"></div>
+        <div class="ctrl"><span>지터 버퍼 깊이 <output id="j-buf-out"></output></span><input type="range" id="j-buf" min="0" max="200" step="5" value="40"></div>
+        <div class="ctrl"><span>복원 수단</span><label class="check"><input type="checkbox" id="j-fec"> 음성 FEC 켜기 (다음 패킷에 사본, 대역폭 +25% 수준)</label><div class="btn-row"><button class="btn" id="j-new">새 표본</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">버퍼가 더하는 지연</span><span class="v" id="o-jbuf">—</span></div>
+        <div class="stat"><span class="k">늦어서 버린 비율</span><span class="v" id="o-jlate">—</span></div>
+        <div class="stat"><span class="k">최종 끊김 비율</span><span class="v" id="o-jres">—</span></div>
+        <div class="stat"><span class="k">체감</span><span class="v verdict" id="o-jver" style="font-size:15px">—</span></div>
+      </div>
+      <div class="sim-note">위: 20 ms마다 보낸 음성 패킷 150개(3초)의 추가 지연. 점선 위로 올라간 패킷은 재생 시각을 놓쳐 버려진다. 아래: 버퍼 깊이에 따른 끊김 비율(세로는 로그 눈금). 추가 지연을 평균이 “지터” 값인 지수 분포로 둔 단순 모델이고, FEC는 “바로 다음 패킷이 버퍼 깊이 − 20 ms 안에 오면 복원”으로 계산했다. 해볼 것: 지터를 30 ms로 올리고 끊김을 1% 아래로 만들려면 버퍼가 얼마나 깊어야 하는지 보자. 실제 앱(예: WebRTC의 NetEQ)은 이 줄다리기를 측정값으로 계속 다시 맞추는 <b>적응형</b> 지터 버퍼를 쓴다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="adapt">
+    <h2>길이 막히면 덜 보낸다: 비트레이트 적응</h2>
+    <p>카페 Wi-Fi가 갑자기 붐비거나 친구가 엘리베이터에 타면, 쓸 수 있는 대역폭이 몇 초 사이에 10분의 1로 떨어진다. 이때 하던 대로 2.5 Mbps를 계속 밀어 넣으면 어떻게 될까? 남는 패킷이 병목 라우터나 기지국의 큐에 쌓이고, 큐가 길어질수록 모든 패킷이 그만큼 늦게 도착한다. 큐가 넘치면 버려진다. 파일 다운로드라면 TCP가 알아서 속도를 줄이지만(9장), UDP 위의 영상 통화는 앱이 직접 해야 한다.</p>
+    <p>WebRTC가 쓰는 대표적인 방식(구글 혼잡 제어, GCC)은 <b>지연이 늘기 시작하는 것</b>을 손실보다 먼저 알아챈다. 패킷 사이 도착 간격이 보낸 간격보다 점점 벌어지면 “큐가 차고 있다”는 뜻이므로, 큐가 넘치기 전에 인코더의 목표 비트레이트를 낮춘다. 해상도와 프레임률이 잠시 떨어지지만 대화는 끊기지 않는다.</p>
+    <div class="sim" id="sim-adapt">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>대역폭이 출렁일 때: 적응 vs 고집</h3></div>
+      <div class="sim-view"><canvas id="cv-adapt"></canvas></div>
+      <div class="legend"><span><i style="background:var(--text-dim)"></i>쓸 수 있는 대역폭</span><span><i style="background:var(--accent)"></i>보내는 비트레이트</span><span><i style="background:var(--warn)"></i>큐 대기 지연</span></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>상황</span><div class="seg" id="a-sc"><button data-value="elev" class="on">엘리베이터 탑승</button><button data-value="cafe">붐비는 카페 Wi-Fi</button><button data-value="stable">안정적인 5 Mbps</button></div></div>
+        <div class="ctrl"><span>보내는 쪽</span><label class="check"><input type="checkbox" id="a-on" checked> 비트레이트 적응 켜기</label><div class="btn-row"><button class="btn" id="a-reset">처음부터</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">보내는 비트레이트</span><span class="v" id="o-arate">—</span></div>
+        <div class="stat"><span class="k">큐 대기 지연</span><span class="v" id="o-adelay">—</span></div>
+        <div class="stat"><span class="k">버려지는 패킷</span><span class="v" id="o-aloss">—</span></div>
+        <div class="stat"><span class="k">상대가 보는 화질</span><span class="v" id="o-aq" style="font-size:15px">—</span></div>
+      </div>
+      <div class="sim-note">병목 링크 하나와 큐(2.5 Mbps 기준 약 0.5초 분량)만 있는 단순 모델이다. 적응 모드는 큐 지연이 60 ms를 넘으면 비트레이트를 0.85배로 줄이고, 20 ms 아래면 조금씩 올린다(GCC를 크게 단순화). 해볼 것: 엘리베이터 상황에서 적응을 끄면 대역폭이 돌아온 뒤에도 지연이 한동안 남는 이유(쌓인 큐)를 보자.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="data">
+    <h2>데이터 양 감각: 영상 통화 1시간은 몇 GB?</h2>
+    <p>720p 영상 통화는 보통 한 방향에 <b>1.5~2.5 Mbps</b> 수준이다. 1초에 2 Mbit이면 1시간(3,600초)에 7,200 Mbit = 900 MB. 영상 통화는 보내기와 받기가 동시에 일어나므로 휴대폰 요금제에서 빠지는 양은 그 두 배, 1시간에 약 1.8 GB가 된다. 코덱이 좋아지면 같은 화질을 더 적은 비트로 보낸다. 음성은 Opus 기준 수십 kbps라 영상에 비하면 거의 공짜지만, 20 ms마다 보내는 작은 패킷이라 헤더(IP·UDP·RTP·SRTP 약 50바이트) 비율이 의외로 크다.</p>
+    <div class="sim" id="sim-data">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>영상 통화 데이터 계산기</h3></div>
+      <div class="sim-view"><canvas id="cv-data"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>화질</span><div class="seg" id="d-res"><button data-value="0.6">360p</button><button data-value="2.0" class="on">720p</button><button data-value="3.5">1080p</button></div></div>
+        <div class="ctrl"><span>영상 코덱</span><div class="seg" id="d-codec"><button data-value="1" class="on">H.264</button><button data-value="0.7">VP9</button><button data-value="0.6">AV1</button></div></div>
+        <div class="ctrl"><span>통화 시간 <output id="d-min-out"></output></span><input type="range" id="d-min" min="1" max="180" step="1" value="60"></div>
+        <div class="ctrl"><span>월 데이터 요금제 <output id="d-plan-out"></output></span><input type="range" id="d-plan" min="1" max="100" step="1" value="10"></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">한 방향 (영상+음성+헤더)</span><span class="v" id="o-drate">—</span></div>
+        <div class="stat"><span class="k">이 통화의 데이터 (양방향)</span><span class="v" id="o-dtot">—</span></div>
+        <div class="stat"><span class="k">음성 패킷 중 헤더 몫</span><span class="v" id="o-dhdr">—</span></div>
+        <div class="stat"><span class="k">요금제로 통화 가능 시간</span><span class="v" id="o-dhours">—</span></div>
+      </div>
+      <div class="sim-note">H.264 기준 대표 비트레이트(360p 0.6, 720p 2.0, 1080p 3.5 Mbps)에 코덱 효율 배수를 곱한 값이다. VP9·AV1은 같은 화질에서 대략 30~40% 적게 쓴다고 보고 단순화했다. 음성은 Opus 32 kbps, 20 ms 패킷, 패킷당 헤더 50 B(IPv4 20 + UDP 8 + RTP 12 + SRTP 태그 10). 영상 패킷은 약 1,100 B 조각에 같은 헤더가 붙는다. 실제 앱은 화면 크기·움직임·네트워크에 따라 비트레이트를 계속 바꾼다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="scenes">
+    <h2>같은 눈으로 본 두 장면</h2>
+    <p>지도를 그리는 법을 익혔으니, 다른 장면도 짧게 같은 방식으로 따라가 보자. 경로의 모양이 달라지면 병목도 달라진다.</p>
+    <h3>장면 A. 비행기 Wi-Fi에서 메시지 보내기</h3>
+    <p>태평양 위 고도 10 km. 기내 Wi-Fi로 “곧 도착해”를 보낸다. 휴대폰 → 기내 Wi-Fi 공유기(13장) → 동체 위 위성 안테나 → <b>위성</b> → 지상국(게이트웨이) → 지상 인터넷 → 메신저 서버 → 친구로 이어진다(15장). 기내와 지상 구간은 익숙한 그대로이고, 새로 생긴 것은 우주를 다녀오는 구간 하나다.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 270" role="img" aria-label="비행기 Wi-Fi의 정지궤도와 저궤도 위성 경로 비교">
+        <defs><marker id="jp-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+        <marker id="jp-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"/></marker></defs>
+        <path d="M0 236 Q400 206 800 236" class="s-axis"/><text x="400" y="258" text-anchor="middle" class="t-dim">지구 표면</text>
+        <g><rect x="40" y="168" width="110" height="34" rx="17" class="f-acc-soft"/><text x="95" y="190" text-anchor="middle" class="t" style="font-size:12px">비행기 (고도 10 km)</text></g>
+        <g><rect x="620" y="196" width="130" height="34" rx="8" class="f-elev"/><text x="685" y="217" text-anchor="middle" class="t" style="font-size:12px">지상국 → 인터넷</text></g>
+        <!-- GEO -->
+        <rect x="330" y="10" width="140" height="38" rx="8" class="f-acc2-soft"/><text x="400" y="26" text-anchor="middle" class="t" style="font-size:12px">정지궤도 위성</text><text x="400" y="41" text-anchor="middle" class="t-mono" style="font-size:10px">고도 35,786 km</text>
+        <path d="M110 166 L362 50" stroke="var(--accent-2)" stroke-width="2" marker-end="url(#jp-b)"/><path d="M440 50 L680 194" stroke="var(--accent-2)" stroke-width="2" marker-end="url(#jp-b)"/>
+        <text x="120" y="84" class="t-mono" style="fill:var(--accent-2)">올라가기 ≈ 120 ms</text><text x="560" y="104" class="t-mono" style="fill:var(--accent-2)">내려오기 ≈ 120 ms</text>
+        <!-- LEO -->
+        <circle cx="400" cy="140" r="16" class="f-acc-soft"/><text x="400" y="144" text-anchor="middle" class="t-mono" style="font-size:9px">LEO</text>
+        <text x="426" y="136" class="t-mono" style="font-size:10.5px">저궤도 약 550 km</text>
+        <path d="M150 182 L382 146" class="s-acc" marker-end="url(#jp-a)"/><path d="M416 146 L620 206" class="s-acc" marker-end="url(#jp-a)"/>
+        <text x="250" y="186" class="t-mono" style="fill:var(--accent);font-size:11px">왕복 수십 ms</text>
+      </svg>
+      <figcaption><b>그림 24-4.</b> 비행기 Wi-Fi의 우주 구간. 정지궤도 위성을 거치면 빛의 속도로도 한쪽에 약 0.25초가 걸려 영상 통화의 예산을 혼자 다 써 버린다. 저궤도 위성군은 거리가 수십 분의 1이라 지상 인터넷과 비슷한 지연을 낸다(15장). 그림의 거리는 비례가 아니다.</figcaption>
+    </figure>
+    <div class="table-wrap"><table>
+      <thead><tr><th>비행기 Wi-Fi 경로</th><th class="num">한쪽 지연(대략)</th><th class="num">왕복(핑)</th><th>메시지 / 영상 통화</th></tr></thead>
+      <tbody>
+        <tr><td>정지궤도(GEO) 위성</td><td class="num">≈ 270~300 ms</td><td class="num">≈ 600 ms 이상</td><td>메시지는 충분 / 통화는 말이 겹침</td></tr>
+        <tr><td>저궤도(LEO) 위성군</td><td class="num">≈ 20~40 ms</td><td class="num">≈ 40~80 ms</td><td>둘 다 무난</td></tr>
+        <tr><td>(비교) 지상 FTTH, 서울-부산</td><td class="num">≈ 5~10 ms</td><td class="num">≈ 10~20 ms</td><td>둘 다 여유</td></tr>
+      </tbody>
+    </table></div>
+    <p>메시지 한 통은 수백 바이트이고 1초 늦어도 아무도 모르니, 정지궤도 위성으로도 충분하다. 다만 메신저가 TCP+TLS 연결을 새로 맺어야 한다면 왕복이 몇 번 필요해서(9·22장) 첫 메시지가 2~3초 걸릴 수 있다. 같은 정지궤도 링크로 영상 통화를 하면 지연 예산 시뮬레이터의 “먼 릴레이”보다도 나쁘다. <b>병목이 대역폭이 아니라 거리</b>인 대표적인 경우다.</p>
+
+    <h3>장면 B. AI 챗봇에 질문하기</h3>
+    <p>휴대폰 앱에서 AI 챗봇에게 “부산 맛집 추천해 줘”라고 묻는다. 앞부분은 이미 아는 길이다. Wi-Fi(13장) → 공유기 NAT(7장) → 통신사 → 백본(5·8장) → 클라우드 리전의 로드밸런서(21장)까지 HTTPS(TLS 1.3, 22장)로 간다. 새로운 것은 그다음, 데이터센터 안쪽이다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg style="min-width:600px" viewBox="0 0 800 250" role="img" aria-label="AI 챗봇 요청이 GPU 클러스터로 가서 토큰이 스트리밍되는 과정">
+        <defs><marker id="ja-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+        <marker id="ja-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ok)"/></marker></defs>
+        <rect x="14" y="80" width="90" height="56" rx="10" class="f-acc-soft"/><text x="59" y="104" text-anchor="middle" class="t" style="font-size:12px">휴대폰 앱</text><text x="59" y="122" text-anchor="middle" class="t-mono" style="font-size:10px">HTTPS</text>
+        <rect x="134" y="80" width="100" height="56" rx="10" class="f-elev"/><text x="184" y="104" text-anchor="middle" class="t" style="font-size:12px">인터넷</text><text x="184" y="122" text-anchor="middle" class="t-mono" style="font-size:10px">5·7·8장</text>
+        <rect x="262" y="20" width="524" height="210" rx="14" class="f-acc2-soft"/><text x="276" y="40" class="t" style="font-weight:700;font-size:12.5px">클라우드 리전 · AI 데이터센터</text>
+        <rect x="276" y="80" width="100" height="56" rx="10" class="f-elev"/><text x="326" y="104" text-anchor="middle" class="t" style="font-size:12px">로드밸런서</text><text x="326" y="122" text-anchor="middle" class="t-mono" style="font-size:10px">TLS 종료 · 21장</text>
+        <rect x="400" y="80" width="100" height="56" rx="10" class="f-elev"/><text x="450" y="104" text-anchor="middle" class="t" style="font-size:12px">API 서버</text><text x="450" y="122" text-anchor="middle" class="t-mono" style="font-size:10px">대기열·배치</text>
+        <g>
+          <rect x="530" y="56" width="240" height="122" rx="10" class="f-surface"/><text x="650" y="74" text-anchor="middle" class="t" style="font-size:12px">GPU 추론 서버들</text>
+          <g class="f-acc-soft"><rect x="546" y="84" width="44" height="28" rx="5"/><rect x="596" y="84" width="44" height="28" rx="5"/><rect x="646" y="84" width="44" height="28" rx="5"/><rect x="696" y="84" width="44" height="28" rx="5"/>
+          <rect x="546" y="118" width="44" height="28" rx="5"/><rect x="596" y="118" width="44" height="28" rx="5"/><rect x="646" y="118" width="44" height="28" rx="5"/><rect x="696" y="118" width="44" height="28" rx="5"/></g>
+          <text x="650" y="166" text-anchor="middle" class="t-mono" style="font-size:10px">GPU끼리 수백 Gbps 전용망 · 20장</text>
+        </g>
+        <path d="M104 100 H130 M234 100 H272 M376 100 H396 M500 100 H526" class="s-acc" marker-end="url(#ja-a)"/>
+        <path d="M526 124 H504 M396 124 H380 M272 124 H238 M130 124 H108" stroke="var(--ok)" stroke-width="2" fill="none" marker-end="url(#ja-b)"/>
+        <text x="400" y="204" text-anchor="middle" class="t-mono" style="fill:var(--ok)">← 토큰 · 토큰 · 토큰 … 한 조각씩 스트리밍 (같은 HTTPS 연결)</text>
+      </svg></div>
+      <figcaption><b>그림 24-5.</b> AI 챗봇 요청. 질문은 수 KB에 불과하지만, 데이터센터 안에서 하나의 거대 모델이 여러 GPU에 나뉘어 있어 GPU들이 매 단어마다 초고속 전용망으로 중간 결과를 주고받는다(20장). 답은 다 만들어질 때까지 기다리지 않고 만들어지는 대로 흘려 보낸다.</figcaption>
+    </figure>
+    <div class="table-wrap"><table>
+      <thead><tr><th>단계</th><th class="num">대략의 시간</th><th>무엇이 병목인가</th></tr></thead>
+      <tbody>
+        <tr><td>휴대폰 → 리전 (연결이 열려 있으면 요청 한 번)</td><td class="num">10~50 ms</td><td>거리와 접속망 (영상 통화와 같다)</td></tr>
+        <tr><td>대기열 + 질문 읽기(프리필)</td><td class="num">0.2~2 s</td><td>GPU 연산, 붐비는 정도</td></tr>
+        <tr><td>첫 토큰 도착(TTFT)</td><td class="num">0.3~2 s</td><td>대부분 데이터센터 안</td></tr>
+        <tr><td>이후 토큰 스트리밍</td><td class="num">초당 수십~100여 토큰</td><td>GPU 메모리 대역폭, GPU 간 통신</td></tr>
+      </tbody>
+    </table></div>
+    <p>영상 통화와 비교하면 무게중심이 정반대다. 영상 통화는 <b>가는 길</b>이 대부분이었지만, AI 챗봇은 네트워크 왕복 수십 ms보다 데이터센터 안의 계산과 GPU 사이 통신이 훨씬 길다. 그래서 AI 데이터센터는 GPU들을 잇는 내부 네트워크(20장)와 광 연결(19장)에 막대한 돈을 쓴다. 답을 토큰 단위로 흘려 보내는 스트리밍은 10장의 동영상 스트리밍처럼 “다 받기 전에 보기 시작”하게 해 체감 지연을 줄인다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="bottleneck">
+    <h2>병목 찾기 연습</h2>
+    <p>통화 품질이 나쁠 때 원인은 대개 한 구간이다. 23장의 측정 도구로 증상을 구간에 대응시키는 감각을 연습해 보자. 먼저 결과를 예측하고 위 시뮬레이터로 확인하자.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>증상</th><th>먼저 의심할 곳</th><th>확인 방법(23장)</th></tr></thead>
+      <tbody>
+        <tr><td>말이 계속 겹친다 (지연이 큼)</td><td>먼 릴레이, 해외 경로, 정지궤도 위성, 과한 지터 버퍼</td><td>통화 앱의 통계 화면(RTT), traceroute</td></tr>
+        <tr><td>화면이 자주 멈추고 소리가 뭉개진다</td><td>Wi-Fi 혼잡·약한 신호, 셀 가장자리 (손실·지터)</td><td>신호 세기(RSSI), 공유기 가까이에서 다시 측정</td></tr>
+        <tr><td>처음엔 좋다가 점점 흐려진다</td><td>업로드 대역폭 부족 → 비트레이트 적응</td><td>속도 측정의 업로드 값, 같은 회선의 대용량 업로드</td></tr>
+        <tr><td>연결 자체가 안 된다</td><td>방화벽의 UDP 차단, TURN 서버 접근 불가</td><td>다른 네트워크(5G)로 바꿔 시도</td></tr>
+      </tbody>
+    </table></div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">카페 Wi-Fi에서 부산 친구와 통화한다. 지연 예산은 120 ms로 여유가 있는데 화면이 자꾸 멈추고 소리가 끊긴다. 측정해 보니 Wi-Fi 구간의 지터가 평균 30 ms, 손실률이 4%다. 가장 효과적인 첫 조치는?</p><p class="wi-hint">지터 버퍼 시뮬레이터에서 지터 30 ms, 손실 4%로 놓고 버퍼와 FEC를 바꿔 보자.</p><div class="opts">
+      <button class="opt">해상도를 1080p로 올린다</button>
+      <button class="opt">지터 버퍼를 0으로 줄여 지연을 없앤다</button>
+      <button class="opt" data-correct>공유기 가까이 가거나 5 GHz·유선 백홀이 좋은 곳으로 옮겨 Wi-Fi 구간의 손실·지터를 줄인다</button>
+      <button class="opt">부산 쪽 백본 회선을 더 굵게 해 달라고 요청한다</button>
+    </div><div class="quiz-exp">지연 예산이 남아 있으니 문제는 지연이 아니라 <b>손실과 지터</b>다. 손실 4%는 버퍼를 아무리 키워도 남는다(시뮬레이터에서 FEC 없이 4% 아래로 안 내려간다). 원인 구간인 Wi-Fi를 고치는 것이 가장 효과적이다. 앱 쪽에서 버티려면 FEC를 켜고 버퍼를 약 95 ms 이상으로 키워야 1% 아래가 되는데, 그러면 지연이 55 ms 늘어 120 ms 예산이 175 ms로 넘친다. 버퍼를 줄이면 늦은 패킷이 모두 버려져 더 끊긴다. 해상도를 올리면 오히려 큐가 더 막힌다.</div></div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">뉴욕 친구와 통화하면 지연이 약 190 ms라 조금 어색하다. 지연 예산 시뮬레이터의 기본값에서 “뉴욕”만 고른 상태다. 다음 중 150 ms 아래로 내려 줄 수 있는 조치는?</p><p class="wi-hint">지연 예산 시뮬레이터에서 “뉴욕”을 고르고 하나씩 바꿔 보자.</p><div class="opts">
+      <button class="opt" data-correct>지터 버퍼 40 → 10 ms, 캡처·인코딩 25 → 15 ms, 디코딩·표시 20 → 15 ms (휴대폰 안의 시간 줄이기)</button>
+      <button class="opt">친구가 LTE에서 5G로 옮긴다 (이미 5G다)</button>
+      <button class="opt">릴레이를 “가까운 릴레이”로 바꾼다</button>
+      <button class="opt">광섬유를 더 좋은 제품으로 바꿔 빛을 빠르게 한다</button>
+    </div><div class="quiz-exp">기본값 + 뉴욕은 약 193 ms다. 바다를 건너는 95 ms는 유리 속 빛의 속도(진공의 약 3분의 2)가 정한 바닥이라 장비로 줄일 수 없다(5장). 릴레이는 경유를 늘릴 뿐이다. 남은 수단은 휴대폰 안의 시간이다. 버퍼 −30, 인코딩 −10, 표시 −5 ms면 약 148 ms로 목표 안에 들어온다. 대신 버퍼가 얕아지면 지터에 약해진다. 먼 거리 통화가 늘 줄타기인 이유다. (중공 코어 광섬유처럼 빛이 공기 속을 지나게 해 지연을 약 30% 줄이는 연구도 있지만, 아직 대륙 간 해저 구간에 쓰는 단계는 아니다.)</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="together">
+    <h2>이 책의 모든 층이 0.1초 안에 함께 일한다</h2>
+    <p>영상 통화 한 번을 다시 펼쳐 보면, 이 책의 장들이 하나도 빠짐없이 그 0.1초 안에서 맡은 일을 하고 있다.</p>
+    <div class="table-wrap"><table class="recap">
+      <thead><tr><th>장</th><th>영상 통화에서 맡은 일</th></tr></thead>
+      <tbody>
+        <tr><td><a href="intro.html">01 네트워크</a></td><td>두 휴대폰이 “망들의 망”을 거쳐 대역폭과 지연이라는 두 숫자로 연결된다.</td></tr>
+        <tr><td><a href="signal.html">02 신호</a></td><td>빛(카메라) → 숫자 → 전기·빛·전파 → 숫자 → 빛(화면). 섀넌 한계가 각 링크의 최대 속도를 정한다.</td></tr>
+        <tr><td><a href="layers.html">03 계층</a></td><td>RTP·UDP·IP·링크 헤더가 겹겹이 씌워지고 벗겨진다(캡슐화).</td></tr>
+        <tr><td><a href="copper.html">04 구리선</a></td><td>공유기와 광 단말 사이의 랜선, 기지국과 장비 사이의 짧은 연결.</td></tr>
+        <tr><td><a href="optical.html">05 광통신</a></td><td>FTTH(PON)와 서울-부산 백본, 뉴욕까지라면 해저 케이블.</td></tr>
+        <tr><td><a href="ethernet.html">06 이더넷</a></td><td>공유기·국사·데이터센터 안의 모든 프레임과 스위치.</td></tr>
+        <tr><td><a href="ip.html">07 IP</a></td><td>사설 주소, 카페 공유기 NAT와 통신사 CGNAT, 그리고 그것을 뚫는 STUN.</td></tr>
+        <tr><td><a href="routing.html">08 라우팅</a></td><td>통신사 라우터들의 최장 접두사 일치, 통신사 사이의 BGP.</td></tr>
+        <tr><td><a href="tcp.html">09 TCP/UDP</a></td><td>영상은 UDP + RTP, 시그널링은 TCP, 그리고 혼잡 제어의 생각을 빌린 비트레이트 적응.</td></tr>
+        <tr><td><a href="apps.html">10 DNS·웹·스트리밍</a></td><td>서버 이름 찾기, 코덱 압축, 스트리밍과 실시간 통신의 차이.</td></tr>
+        <tr><td><a href="radio.html">11 전파</a></td><td>카페 안 5 GHz와 거리의 3.5 GHz 전파, 감쇠와 벽.</td></tr>
+        <tr><td><a href="modulation.html">12 변조</a></td><td>Wi-Fi와 5G 모두 OFDM, MIMO, 오류 정정 부호.</td></tr>
+        <tr><td><a href="wifi.html">13 Wi-Fi</a></td><td>CSMA/CA로 순서 기다리기. 첫 번째 지터의 원천.</td></tr>
+        <tr><td><a href="cellular.html">14 이동통신</a></td><td>5G 코어의 GTP 터널, 기지국 스케줄러, 이동해도 끊기지 않는 핸드오버.</td></tr>
+        <tr><td><a href="satellite.html">15 위성</a></td><td>비행기·바다 위에서의 연결, 정지궤도와 저궤도의 지연 차이.</td></tr>
+        <tr><td><a href="serdes.html">16 SerDes</a></td><td>라우터·스위치·모뎀 칩 사이를 수십 Gbps로 잇는 직렬 링크.</td></tr>
+        <tr><td><a href="netchips.html">17 네트워크 칩</a></td><td>모든 라우터·스위치 안에서 ns 단위로 길을 고르는 스위칭 칩과 NIC.</td></tr>
+        <tr><td><a href="rfchips.html">18 RF 반도체</a></td><td>두 휴대폰의 Wi-Fi·5G RF 칩: 증폭기, 필터, 믹서, 데이터 변환기.</td></tr>
+        <tr><td><a href="photonics.html">19 광 반도체</a></td><td>ONT와 백본의 레이저·광검출기, 데이터센터의 광 트랜시버.</td></tr>
+        <tr><td><a href="datacenter.html">20 데이터센터</a></td><td>TURN·SFU·시그널링 서버가 있는 리프-스파인 망.</td></tr>
+        <tr><td><a href="cloud.html">21 클라우드</a></td><td>사용자와 가까운 리전에 릴레이를 두고, 로드밸런서로 나눈다.</td></tr>
+        <tr><td><a href="security.html">22 보안</a></td><td>TLS로 로그인, DTLS로 열쇠를 나누고 SRTP로 종단 간 암호화.</td></tr>
+        <tr><td><a href="ops.html">23 운영</a></td><td>RTT·손실·지터 측정, 병목 구간 찾기.</td></tr>
+      </tbody>
+    </table></div>
+    <p>그리고 이 여행에서 반복해서 나타난 큰 원리 몇 가지를 남겨 두자.</p>
+    <ol>
+      <li><b>계층은 서로를 모른다.</b> 통화 앱은 지금 패킷이 전파인지 빛인지 모르고, 백본 라우터는 그 안에 얼굴이 들었는지 모른다. 정해진 헤더만 읽고 넘기기 때문에 각 층이 따로 발전할 수 있다(3장).</li>
+      <li><b>모든 경계에서 신호가 바뀐다.</b> 빛 → 전기 → 전파 → 전기 → 빛. 바뀌는 곳마다 반도체(16~19장)가 있다.</li>
+      <li><b>빛의 속도는 협상할 수 없다.</b> 먼 통화의 지연은 거리가 정하고, 우리가 줄일 수 있는 것은 양 끝의 처리와 기다림이다.</li>
+      <li><b>실시간에서는 늦은 것이 없는 것이다.</b> 그래서 재전송 대신 버퍼, FEC, 은닉, 적응으로 버틴다.</li>
+      <li><b>가까운 곳에 둔다.</b> 릴레이, 서버, CDN, GPU를 사용자 가까이 둘수록 빨라진다(10·21장).</li>
+    </ol>
+    <div class="callout tip"><strong>다음 걸음</strong><p>25장에서는 봉화와 전신에서 6G와 양자 통신까지, 이 모든 층이 어떻게 하나씩 쌓여 왔는지 역사를 따라간다. 26장의 용어집과 종합 퀴즈로 전체를 점검할 수 있다. 직접 확인해 보고 싶다면, 영상 통화 중에 브라우저의 WebRTC 내부 통계 페이지(크롬의 <code>chrome://webrtc-internals</code>)를 열어 보자. 이 장에서 본 RTT, 지터, 손실, 비트레이트, 선택된 ICE 후보가 실시간으로 나온다.</p></div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>영상 통화 패킷은 카메라 → 코덱 → RTP/SRTP → UDP/IP → Wi-Fi → NAT → FTTH → 라우터·백본 → (필요하면 TURN) → 5G 코어·기지국 → RF 칩 → 지터 버퍼 → 디코더 → 화면을 지나며, 신호는 빛·전기·전파로 여러 번 모습을 바꾼다.</li>
+      <li>통화를 맺으려면 DNS·TLS로 서버에 붙고, SDP로 조건을 맞추는 시그널링을 한 뒤, STUN·TURN 후보를 ICE로 시험해 NAT를 통과할 길을 찾고, DTLS로 SRTP 열쇠를 나눈다.</li>
+      <li>대화가 자연스러우려면 입-귀 지연이 한쪽 150 ms 이내여야 한다. 국내 통화에서는 네트워크보다 휴대폰 안(캡처·인코딩·지터 버퍼·디코딩·표시)이 더 오래 걸리고, 먼 나라와의 통화는 빛의 속도가 바닥을 정한다.</li>
+      <li>실시간 미디어는 늦은 패킷을 버린다. 지터 버퍼는 지연과 끊김을 맞바꾸고, FEC·손실 은닉·비트레이트 적응이 나쁜 네트워크를 견디게 한다.</li>
+      <li>720p 통화는 한 방향 약 2 Mbps, 1시간 양방향 약 1.8 GB 수준이다. 정지궤도 위성은 거리 때문에, AI 챗봇은 데이터센터 안의 계산 때문에 병목의 위치가 달라진다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>영상 통화의 영상 패킷을 TCP가 아닌 UDP로 보내는 가장 큰 이유는?</p><div class="opts">
+        <button class="opt">UDP 헤더가 더 커서 정보를 많이 담을 수 있어서</button>
+        <button class="opt">UDP는 암호화가 자동으로 되어서</button>
+        <button class="opt" data-correct>재생 시각을 놓친 패킷은 쓸모가 없는데, TCP는 재전송을 기다리느라 뒤 패킷까지 멈추게 하기 때문</button>
+        <button class="opt">공유기가 TCP를 통과시키지 않아서</button>
+      </div><div class="quiz-exp">실시간 미디어에서는 늦은 것이 없는 것이다. 순서와 시각 정보는 RTP가 붙이고, 손실은 FEC·은닉으로 메운다(9장).</div></div>
+      <div class="quiz-q"><p>STUN 서버가 하는 일로 옳은 것은?</p><div class="opts">
+        <button class="opt" data-correct>NAT 바깥에서 보이는 내 공인 주소와 포트를 알려 준다</button>
+        <button class="opt">모든 영상 패킷을 받아 상대에게 중계한다</button>
+        <button class="opt">서버 이름을 IP 주소로 바꿔 준다</button>
+        <button class="opt">영상을 압축해 준다</button>
+      </div><div class="quiz-exp">STUN은 “거울”이다. 중계는 TURN, 이름 찾기는 DNS의 일이다. ICE가 이 후보들을 모아 시험해 최선의 길을 고른다.</div></div>
+      <div class="quiz-q"><p>서울-부산 영상 통화의 한쪽 지연 약 100 ms 가운데 가장 큰 몫을 차지하는 것은 보통 어디인가?</p><div class="opts">
+        <button class="opt">서울-부산 백본 광섬유를 빛이 지나는 시간</button>
+        <button class="opt">통신사 라우터가 경로를 찾는 시간</button>
+        <button class="opt">TURN 서버의 처리 시간</button>
+        <button class="opt" data-correct>양 끝 휴대폰 안의 캡처·인코딩·지터 버퍼·디코딩·표시</button>
+      </div><div class="quiz-exp">400 km 광섬유는 약 2 ms다. 국내 통화에서는 네트워크 전체가 20 ms 안팎이고, 나머지 대부분은 휴대폰 안에서 쓰인다.</div></div>
+      <div class="quiz-q"><p>지터 버퍼를 깊게(예: 40 → 150 ms) 하면 일어나는 일은?</p><div class="opts">
+        <button class="opt">지연과 끊김이 모두 줄어든다</button>
+        <button class="opt" data-correct>늦은 패킷으로 인한 끊김은 줄지만 모든 소리가 그만큼 늦게 들린다</button>
+        <button class="opt">네트워크 손실률이 0이 된다</button>
+        <button class="opt">비트레이트가 자동으로 두 배가 된다</button>
+      </div><div class="quiz-exp">버퍼는 지연과 끊김을 맞바꾼다. 네트워크에서 아예 사라진 패킷은 버퍼로 되살릴 수 없고, FEC나 은닉이 필요하다.</div></div>
+      <div class="quiz-q"><p>카페 Wi-Fi가 붐벼서 대역폭이 갑자기 줄었는데도 앱이 같은 비트레이트로 계속 보내면 가장 먼저 나타나는 현상은?</p><div class="opts">
+        <button class="opt">화질이 저절로 좋아진다</button>
+        <button class="opt">패킷이 더 빨리 도착한다</button>
+        <button class="opt" data-correct>병목의 큐가 차면서 지연이 크게 늘고, 넘치면 패킷이 버려진다</button>
+        <button class="opt">TURN 서버가 자동으로 대역폭을 늘려 준다</button>
+      </div><div class="quiz-exp">그래서 WebRTC의 혼잡 제어는 지연이 늘기 시작하는 순간을 감지해 큐가 넘치기 전에 비트레이트를 낮춘다(9장의 혼잡 제어와 같은 생각).</div></div>
+      <div class="quiz-q"><p>정지궤도 위성을 쓰는 비행기 Wi-Fi에서 영상 통화가 어색한 주된 이유는?</p><div class="opts">
+        <button class="opt">위성의 대역폭이 0이라서</button>
+        <button class="opt" data-correct>약 36,000 km 고도를 오르내리느라 한쪽 지연만 약 0.25초 이상이라 예산 150 ms를 넘기 때문</button>
+        <button class="opt">비행기 안에서는 UDP를 쓸 수 없어서</button>
+        <button class="opt">위성이 영상 코덱을 지원하지 않아서</button>
+      </div><div class="quiz-exp">병목이 대역폭이 아니라 거리다. 저궤도 위성군(고도 수백 km)은 이 문제를 크게 줄인다(15장).</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const P = () => NB.palette();
+  const ms = (v) => (v < 10 ? (Math.round(v * 10) / 10).toString() : Math.round(v).toString()) + " ms";
+  const chLink = (n) => { const c = NB.CHAPTERS.find((x) => Number(x.num) === n); return c ? `<a class="pill acc" href="${c.slug}.html">${c.num} ${c.title}</a>` : ""; };
+  const CATC = (C) => ({ dev: C.accent, radio: C.accent2, wire: C.ok, srv: C.dim, buf: C.warn });
+  const CATN = { dev: "휴대폰 안 처리", radio: "무선 구간", wire: "유선·광 구간", srv: "서버 경유", buf: "지터 버퍼" };
+
+  /* ================================================================ 1. trip */
+  const HD = {
+    frame: { l: "원본 프레임 1280×720", b: 1382400, k: "pay" },
+    frameP: { l: "화면 픽셀 1280×720", b: 1382400, k: "pay" },
+    payC: { l: "영상 조각 (평문)", b: 1100, k: "pay" },
+    payE: { l: "영상 조각 (암호문)", b: 1100, k: "pay" },
+    rtp: { l: "RTP", b: 12, k: "app" }, tag: { l: "SRTP 태그", b: 10, k: "app" },
+    turn: { l: "TURN 채널", b: 4, k: "net" }, udp: { l: "UDP", b: 8, k: "net" },
+    ipA: { l: "IP", b: 20, k: "net" }, ipB: { l: "IP", b: 20, k: "net" }, ipC: { l: "IP", b: 20, k: "net" }, ipD: { l: "IP", b: 20, k: "net" },
+    phy: { l: "PHY 프리앰블", b: 0, k: "link" }, wifi: { l: "802.11 MAC·LLC", b: 34, k: "link" }, fcs: { l: "FCS", b: 4, k: "link" },
+    eth: { l: "이더넷", b: 14, k: "link" }, gem: { l: "GEM", b: 5, k: "link" }, mpls: { l: "MPLS", b: 4, k: "link" },
+    gtp: { l: "GTP-U 터널(+IP·UDP)", b: 36, k: "link" }, ran: { l: "PDCP·RLC·MAC", b: 6, k: "link" },
+  };
+  const grp = (k) => k.replace(/[A-Z]$/, "");
+  const ADR = {
+    me: "192.168.0.7:50000", cafe: "198.51.100.24:61002", turn: "203.0.113.10:3478", relay: "203.0.113.10:49170", fpub: "192.0.2.77:40123", fpriv: "10.45.0.9:52000",
+  };
+  // at: position key, t: ms, cat, med: medium label, ch: chapters
+  const STEPS = [
+    { at: "A0", t: 15, cat: "dev", ch: [2], med: "빛 → 전기 (이미지 센서)", st: ["frame"], title: "① 카메라가 빛을 숫자로",
+      text: "이미지 센서의 수백만 화소가 들어온 빛을 전하로 바꾸고, ADC가 숫자로 만든다(2장). 1초에 30장이면 33 ms마다 한 장이 찍히므로, 표정이 바뀐 순간부터 다음 장면이 찍혀 읽혀 나오기까지 평균 15 ms쯤 걸린다. 720p 한 장은 압축 전 약 1.4 MB다." },
+    { at: "A1", t: 10, cat: "dev", ch: [10, 2], med: "전기 (칩 안 디지털 회로)", st: ["payC"], title: "② 인코더가 170분의 1로 줄인다",
+      text: "휴대폰의 하드웨어 영상 인코더가 <b>코덱</b>(H.264, VP8·VP9, AV1 등)의 규칙대로 앞 장면과 달라진 부분만 골라 압축한다. 2 Mbps로 보내면 한 장에 평균 약 8 KB, 원본의 약 170분의 1이다. 이 장면을 약 1,100바이트짜리 조각 7~8개로 나눈다. 1500바이트 MTU(6장)를 넘지 않게 헤더 자리를 남겨 둔 크기다. 지금 따라가는 것은 그중 한 조각이다." },
+    { at: "A2", t: 1, cat: "dev", ch: [9, 22], med: "전기 (CPU·메모리)", st: ["rtp", "payE", "tag"], title: "③ 앱이 RTP 번호표를 붙이고 암호화",
+      text: "통화 앱이 조각마다 <b>RTP</b> 헤더(12 B: 순서 번호, 타임스탬프, 스트림 번호)를 붙이고, <b>SRTP</b>로 내용을 암호화한 뒤 위조 방지용 인증 태그를 단다. 열쇠는 통화를 맺을 때 DTLS로 나눴다(22장). 이제부터 중간의 어떤 장비도 화면 내용을 볼 수 없다." },
+    { at: "A3", t: 0.2, cat: "dev", ch: [9, 7, 3], med: "전기 (커널 네트워크 스택)", st: { relay: ["ipA", "udp", "turn", "rtp", "payE", "tag"], p2p: ["ipA", "udp", "rtp", "payE", "tag"] },
+      adr: { relay: [ADR.me, ADR.turn], p2p: [ADR.me, ADR.fpub] }, title: "④ 운영체제가 UDP·IP 봉투를 씌운다",
+      text: { relay: "커널이 UDP(8 B, 포트)와 IP(20 B, 주소) 헤더를 씌운다. TURN을 경유하므로 받는 주소는 친구가 아니라 TURN 서버이고, 어느 상대에게 갈지 알리는 TURN 채널 헤더(4 B)가 끼어 있다. TCP가 아닌 UDP인 이유: 늦게 온 조각은 이미 쓸모가 없으니, 재전송을 기다리느라 뒤 조각까지 멈추는 TCP(9장)보다 “일단 보내고, 잃으면 다른 방법으로 메운다”가 낫다.",
+        p2p: "커널이 UDP(8 B, 포트)와 IP(20 B, 주소) 헤더를 씌운다. 받는 주소는 ICE가 찾아 둔 친구의 바깥 주소다. TCP가 아닌 UDP인 이유: 늦게 온 조각은 이미 쓸모가 없으니, 재전송을 기다리느라 뒤 조각까지 멈추는 TCP(9장)보다 “일단 보내고, 잃으면 다른 방법으로 메운다”가 낫다." } },
+    { at: "R", t: 3, cat: "radio", ch: [13, 12, 18], med: "전파 (5 GHz, OFDM)", st: { relay: ["phy", "wifi", "ipA", "udp", "turn", "rtp", "payE", "tag", "fcs"], p2p: ["phy", "wifi", "ipA", "udp", "rtp", "payE", "tag", "fcs"] },
+      adr: { relay: [ADR.me, ADR.turn], p2p: [ADR.me, ADR.fpub] }, title: "⑤ Wi-Fi 칩: 전파로 공유기까지",
+      text: "Wi-Fi 칩이 802.11 헤더를 붙이고, 채널이 비었는지 듣고 순서를 기다린 뒤(CSMA/CA, 13장) OFDM으로 5 GHz 전파에 싣는다(12장). 공유기가 받으면 짧은 ACK를 돌려준다. 손님이 많은 카페에서는 기다림과 재전송이 늘어 이 구간이 출렁인다. <b>지터의 첫 번째 원천</b>이다." },
+    { at: "O", t: 0.3, cat: "wire", ch: [7, 6, 4], med: "전기 (랜선, 이더넷)", st: { relay: ["eth", "ipB", "udp", "turn", "rtp", "payE", "tag", "fcs"], p2p: ["eth", "ipB", "udp", "rtp", "payE", "tag", "fcs"] },
+      adr: { relay: [ADR.cafe, ADR.turn], p2p: [ADR.cafe, ADR.fpub] }, title: "⑥ 공유기: NAT로 주소를 바꾼다",
+      text: "공유기가 802.11 헤더를 벗기고, 출발 주소 192.168.0.7:50000을 카페의 공인 주소 198.51.100.24:61002로 바꿔 변환표에 적는다(NAT, 7장). STUN이 알려 준 바로 그 주소다. 그리고 이더넷 프레임에 담아 랜선(전기)으로 광 단말(ONT)에 넘긴다(4·6장)." },
+    { at: "I", t: 1, cat: "wire", ch: [5, 19], med: "빛 (상향 1270~1310 nm, PON)", st: { relay: ["gem", "eth", "ipB", "udp", "turn", "rtp", "payE", "tag", "fcs"], p2p: ["gem", "eth", "ipB", "udp", "rtp", "payE", "tag", "fcs"] },
+      adr: { relay: [ADR.cafe, ADR.turn], p2p: [ADR.cafe, ADR.fpub] }, title: "⑦ 광섬유로 통신사 국사까지 (FTTH)",
+      text: "ONT의 레이저가 전기 신호를 빛으로 바꾼다(19장). 수동 광 분배기(PON)로 수십 가구가 광섬유 한 가닥을 나눠 쓰기 때문에, 각 집은 국사의 OLT가 정해 준 시간 칸에만 빛을 쏠 수 있다. 그 차례를 기다리는 시간이 이 구간의 대부분이고, 수 km 광섬유를 지나는 시간 자체는 수십 µs다(5장)." },
+    { at: "B1", t: 1, cat: "wire", ch: [8, 17], med: "빛 ↔ 전기 (라우터 안은 전기)", st: { relay: ["eth", "mpls", "ipB", "udp", "turn", "rtp", "payE", "tag", "fcs"], p2p: ["eth", "mpls", "ipB", "udp", "rtp", "payE", "tag", "fcs"] },
+      adr: { relay: [ADR.cafe, ADR.turn], p2p: [ADR.cafe, ADR.fpub] }, title: "⑧ 통신사 라우터들",
+      text: "OLT가 빛을 다시 전기로 바꾸고, 통신사의 에지·코어 라우터가 목적지 IP를 보고 최장 접두사 일치로 다음 홉을 고른다(8장). 판단은 라우터 안 스위칭 칩이 하드웨어로 수백 ns 만에 한다(17장). 통신사 망 안에서는 앞에 MPLS 라벨이 붙어 미리 정한 길로 가기도 한다. 홉마다 IP의 TTL이 1씩 줄어든다." },
+    { at: "D", t: 1.5, cat: "srv", ch: [20, 21], med: "빛 → 전기 → 빛", only: "relay", st: ["eth", "ipC", "udp", "rtp", "payE", "tag", "fcs"],
+      adr: { relay: [ADR.relay, ADR.fpub] }, title: "⑨ 데이터센터의 TURN 릴레이",
+      text: "패킷이 통화 서비스의 데이터센터에 들어온다. 경계 라우터 → 스파인·리프 스위치(20장) → 릴레이 서버의 NIC. TURN 서버는 채널 번호를 보고 “부산 친구에게 갈 것”임을 알아내, 바깥 IP·UDP만 새로 써서(출발: 릴레이 주소) 다시 내보낸다. SRTP 안의 내용은 건드리지도, 볼 수도 없다. 서비스는 사용자와 가까운 리전에 릴레이를 둔다(21장)." },
+    { at: "B2", t: 4, cat: "wire", ch: [5, 8], med: "빛 (DWDM, 1550 nm 대역)", st: { relay: ["eth", "mpls", "ipC", "udp", "rtp", "payE", "tag", "fcs"], p2p: ["eth", "mpls", "ipB", "udp", "rtp", "payE", "tag", "fcs"] },
+      adr: { relay: [ADR.relay, ADR.fpub], p2p: [ADR.cafe, ADR.fpub] }, title: "⑩ 백본: 서울에서 부산으로",
+      text: "백본 광섬유를 따라 약 400 km를 달린다. 한 가닥에 수십 개 파장이 실려 있고(DWDM), 유리 속 빛은 1 km에 약 5 µs라 거리만으로 약 2 ms, 중간 라우터와 큐를 합해 약 4 ms다. BGP(8장)가 정한 대로 친구의 이동통신사 망으로 넘어간다. 다른 통신사로 넘어가는 지점(IX)도 이 구간에 있다." },
+    { at: "C", t: 1, cat: "wire", ch: [14, 7], med: "빛 (코어망)", st: ["gtp", "ipD", "udp", "rtp", "payE", "tag"],
+      adr: { relay: [ADR.relay, ADR.fpriv], p2p: [ADR.cafe, ADR.fpriv] }, title: "⑪ 이동통신 코어: 터널 속으로",
+      text: "친구 이동통신사의 코어(5G의 UPF)에 도착한다. 통신사 NAT(CGNAT)가 공인 주소를 친구 휴대폰의 내부 주소로 되돌리고, UPF는 “이 휴대폰은 지금 해운대의 저 기지국에 붙어 있다”는 정보를 보고 패킷을 GTP-U 터널(바깥 IP·UDP + 8 B)에 넣어 그 기지국으로 보낸다. 친구가 걸어서 다른 기지국으로 옮겨도 터널의 끝만 바꾸면 된다(14장)." },
+    { at: "G", t: 3, cat: "radio", ch: [14, 12], med: "빛 → 전기 (기지국 베이스밴드)", st: ["ran", "ipD", "udp", "rtp", "payE", "tag"],
+      adr: { relay: [ADR.relay, ADR.fpriv], p2p: [ADR.cafe, ADR.fpriv] }, title: "⑫ 기지국: 무선 자원 스케줄링",
+      text: "기지국(gNB)이 GTP 터널을 벗기고 무선 구간용 PDCP·RLC·MAC 헤더를 붙인다. 스케줄러는 0.5 ms 슬롯(3.5 GHz 대역의 흔한 설정)마다 어느 휴대폰에 어떤 주파수 블록을 줄지 정한다(14장). 셀이 붐비면 차례를 기다리는 시간이 늘어난다. <b>지터의 두 번째 원천</b>이다." },
+    { at: "F4", t: 4, cat: "radio", ch: [11, 18, 12, 16], med: "전파 (3.5 GHz) → 전기", st: ["ipD", "udp", "rtp", "payE", "tag"],
+      adr: { relay: [ADR.relay, ADR.fpriv], p2p: [ADR.cafe, ADR.fpriv] }, title: "⑬ 전파로 친구 휴대폰까지, RF 칩이 받는다",
+      text: "3.5 GHz 전파가 거리 수백 m를 1 µs 남짓에 건넌다(11장). 친구 휴대폰의 안테나 → 저잡음 증폭기(LNA) → 믹서 → ADC를 거쳐(18장) 모뎀이 OFDM을 풀고 LDPC 오류 정정 부호로 비트를 복원한다(12장). 깨진 블록은 HARQ로 수 ms 뒤 다시 받는다. 모뎀과 프로세서 사이는 고속 직렬 링크로 잇는다(16장)." },
+    { at: "F3", t: 0.2, cat: "dev", ch: [3, 9], med: "전기 (커널)", st: ["rtp", "payE", "tag"], title: "⑭ 친구 휴대폰 OS: 봉투를 벗긴다",
+      text: "커널이 IP·UDP 헤더를 확인하고, UDP 포트 번호를 보고 통화 앱의 소켓에 건넨다(역캡슐화, 3장). 여기까지 온 헤더들은 모두 제 몫을 하고 사라졌다." },
+    { at: "F2", t: 40, cat: "buf", ch: [9], med: "전기 (메모리 속 대기)", st: ["rtp", "payC"], title: "⑮ 지터 버퍼에서 기다린다",
+      text: "앱이 SRTP 태그로 변조 여부를 확인하고 복호화한다. 그런데 바로 재생하지 않는다! 패킷마다 도착 간격이 들쭉날쭉하므로 약 40 ms를 <b>지터 버퍼</b>에 모았다가 RTP 순서 번호와 타임스탬프대로 일정한 박자에 꺼낸다. 이 경로에서 가장 긴 단일 대기다. 뒤 절에서 이 숫자를 직접 조절해 본다." },
+    { at: "F1", t: 8, cat: "dev", ch: [10], med: "전기 (하드웨어 디코더)", st: ["frame"], title: "⑯ 디코더가 장면을 복원한다",
+      text: "같은 장면의 조각 7~8개가 다 모이면 하드웨어 디코더가 “앞 장면 + 달라진 부분”으로 1280×720 픽셀을 되살린다. 조각 하나가 끝내 오지 않으면? 다음 절의 손실 은닉과 FEC가 나선다." },
+    { at: "F0", t: 12, cat: "dev", ch: [2], med: "전기 → 빛 (OLED 화면)", st: ["frameP"], title: "⑰ 친구 화면에 내 얼굴이",
+      text: "완성된 장면은 다음 화면 갱신 순간(60 Hz면 16.7 ms마다)을 기다려 디스플레이로 나가고, OLED 픽셀이 빛을 낸다. 서울 카페에서 카메라에 들어온 빛이 약 0.1초 뒤 부산에서 다시 빛이 되었다. 같은 순간 반대 방향으로도 친구의 얼굴과 목소리가 똑같은 여행을 하고 있다." },
+  ];
+  const NODE = { R: [208, "공유기"], O: [282, "광 단말\nONT"], I: [358, "국사\nOLT"], B1: [436, "통신사\n라우터"], D: [522, "데이터센터\nTURN"], B2: [606, "백본\n(→부산)"], C: [684, "5G 코어\nUPF"], G: [760, "기지국\ngNB"] };
+  const AROWS = ["카메라", "인코더", "앱: RTP·SRTP", "OS: UDP·IP", "Wi-Fi 칩"];
+  const FROWS = ["화면", "디코더", "앱: 지터 버퍼", "OS: 봉투 벗기기", "RF 칩·모뎀"];
+  const LY = 187; // link line y (virtual)
+  const jmode = NB.seg("jmode", () => { stopAuto(); si = -1; anim = 1; render(); });
+  const steps = () => STEPS.filter((s) => !s.only || s.only === jmode());
+  const pick = (v) => (v && !Array.isArray(v) && typeof v === "object" ? v[jmode()] : v);
+  let si = -1, anim = 1, auto = null, phase = 0;
+  function posOf(k) {
+    if (k[0] === "A" && k.length === 2) return [87, 63 + Number(k[1]) * 31];
+    if (k[0] === "F" && k.length === 2) return [913, 63 + Number(k[1]) * 31];
+    const n = NODE[k];
+    if (k === "D" && jmode() === "p2p") return [n[0], 96];
+    return [n[0], LY];
+  }
+  const LINKS = [["A", "R", "wave"], ["R", "O", "wire"], ["O", "I", "light"], ["I", "B1", "light"], ["B1", "D", "light"], ["D", "B2", "light"], ["B2", "C", "light"], ["C", "G", "light"], ["G", "F", "wave"]];
+  const tripCv = NB.canvas("#cv-trip", (ctx, w, h) => {
+    const C = P(), S = steps(), st = si >= 0 ? S[si] : null, p2p = jmode() === "p2p";
+    const sx = w / 1000, sy = sx; // uniform scale
+    const X = (v) => v * sx, Y = (v) => v * sy;
+    const fs = (v) => Math.max(9, v * sx);
+    // region labels
+    const band = (x1, x2, label) => { ctx.strokeStyle = C.border; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(x1), Y(140)); ctx.lineTo(X(x1), Y(134)); ctx.lineTo(X(x2), Y(134)); ctx.lineTo(X(x2), Y(140)); ctx.stroke(); NB.text(ctx, label, X((x1 + x2) / 2), Y(124), { align: "center", size: fs(11.5), color: C.dim }); };
+    band(190, 316, "카페 · 서울");
+    band(326, 470, "통신사 유선망");
+    band(572, 640, "백본");
+    band(650, 780, "친구의 이동통신망");
+    NB.text(ctx, "서울 ─────────────  약 400 km  ─────────────▶ 부산", X(500), Y(20), { align: "center", size: fs(11.5), color: C.faint });
+    // phones
+    const phone = (x, title, rows, prefix) => {
+      NB.rrect(ctx, X(x), Y(30), X(150), Y(178), 12); ctx.fillStyle = C.surface; ctx.fill(); ctx.strokeStyle = C.border; ctx.lineWidth = 1; ctx.stroke();
+      NB.text(ctx, title, X(x + 75), Y(42), { align: "center", size: fs(12), bold: true, color: C.text });
+      rows.forEach((r, i) => { const on = st && st.at === prefix + i; NB.box(ctx, X(x + 8), Y(51 + i * 31), X(134), Y(25), { fill: on ? C.accent : C.bg, stroke: on ? C.accent : C.border, text: r, color: on ? "#fff" : C.text, size: fs(11.5), bold: on, r: 6 }); });
+    };
+    phone(12, "내 휴대폰 · 서울", AROWS, "A");
+    phone(838, "친구 휴대폰 · 부산", FROWS, "F");
+    // links
+    const ends = (a, b) => {
+      const pa = a === "A" ? [162, LY] : posOf(a), pb = b === "F" ? [838, LY] : posOf(b);
+      const ha = a === "A" ? 0 : (a === "D" ? 42 : 33), hb = b === "F" ? 0 : (b === "D" ? 42 : 33);
+      return [pa[0] + ha, pa[1], pb[0] - hb, pb[1]];
+    };
+    let curLink = null;
+    if (st && anim < 1 && si > 0) {
+      const prev = S[si - 1].at, cur = st.at;
+      const a = prev[0] === "A" ? "A" : prev, b = cur[0] === "F" && cur.length === 2 ? "F" : cur;
+      curLink = a + ">" + b;
+    }
+    const drawLink = (a, b, kind, faded) => {
+      const [x1, y1, x2, y2] = ends(a, b);
+      const active = curLink === a + ">" + b;
+      ctx.globalAlpha = faded ? 0.25 : 1;
+      if (kind === "wave") {
+        ctx.strokeStyle = C.accent; ctx.lineWidth = active ? 2.2 : 1.4; ctx.beginPath();
+        const L = Math.hypot(X(x2) - X(x1), Y(y2) - Y(y1));
+        for (let i = 0; i <= 60; i++) { const t = i / 60, xx = NB.lerp(X(x1), X(x2), t), yy = NB.lerp(Y(y1), Y(y2), t) + Math.sin(t * L / 4 - (active ? phase * 10 : 0)) * 4 * sx; i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); }
+        ctx.stroke();
+      } else if (kind === "wire") {
+        ctx.strokeStyle = C.dim; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(X(x1), Y(y1)); ctx.lineTo(X(x2), Y(y2)); ctx.stroke();
+        if (active) { ctx.strokeStyle = C.warn; ctx.setLineDash([3, 6]); ctx.lineDashOffset = -phase * 30; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(X(x1), Y(y1)); ctx.lineTo(X(x2), Y(y2)); ctx.stroke(); ctx.setLineDash([]); }
+      } else {
+        ctx.strokeStyle = C.accent2; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(X(x1), Y(y1)); ctx.lineTo(X(x2), Y(y2)); ctx.stroke();
+        if (active) { ctx.strokeStyle = C.bg; ctx.setLineDash([4, 10]); ctx.lineDashOffset = -phase * 50; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(X(x1), Y(y1)); ctx.lineTo(X(x2), Y(y2)); ctx.stroke(); ctx.setLineDash([]); }
+      }
+      ctx.globalAlpha = 1;
+    };
+    LINKS.forEach(([a, b, k]) => { if (p2p && (a === "D" || b === "D")) return; drawLink(a, b, k, false); });
+    if (p2p) { drawLink("B1", "B2", "light", false); }
+    // middle nodes
+    Object.keys(NODE).forEach((k) => {
+      const [cx, cy] = posOf(k), ww = k === "D" ? 84 : 66, on = st && st.at === k, faded = p2p && k === "D";
+      ctx.globalAlpha = faded ? 0.35 : 1;
+      NB.box(ctx, X(cx - ww / 2), Y(cy - 23), X(ww), Y(46), { fill: on ? C.accent : C.bg, stroke: on ? C.accent : k === "D" ? C.accent2 : C.border, text: NODE[k][1], color: on ? "#fff" : C.text, size: fs(11), bold: on, r: 8 });
+      if (faded) NB.text(ctx, "(이번엔 경유 안 함)", X(cx), Y(cy + 32), { align: "center", size: fs(10), color: C.faint });
+      ctx.globalAlpha = 1;
+    });
+    // packet glyph
+    if (st) {
+      const from = si > 0 ? posOf(S[si - 1].at) : posOf(st.at), to = posOf(st.at);
+      let px, py;
+      const t = Math.min(1, anim);
+      if (si > 0 && (from[1] !== to[1]) && (from[0] !== to[0])) {
+        if (from[1] !== LY) { // leave the phone: vertical first, then along the link
+          if (t < 0.35) { px = from[0]; py = NB.lerp(from[1], LY, t / 0.35); } else { px = NB.lerp(from[0], to[0], (t - 0.35) / 0.65); py = LY; }
+        } else { // along the link first, then up into the phone
+          if (t < 0.65) { px = NB.lerp(from[0], to[0], t / 0.65); py = from[1]; } else { px = to[0]; py = NB.lerp(from[1], to[1], (t - 0.65) / 0.35); }
+        }
+      } else { px = NB.lerp(from[0], to[0], t); py = NB.lerp(from[1], to[1], t); }
+      // inside a phone: park the glyph just outside the phone box, beside the active row
+      const atA = t >= 1 && st.at[0] === "A" && st.at.length === 2, atF = t >= 1 && st.at[0] === "F" && st.at.length === 2;
+      if (atA) px = 192; else if (atF) px = 808;
+      const stk = pick(st.st), gw = 50 * sx, gh = 14 * sx, gx = X(px) - gw / 2, gy = atA || atF ? Y(py) - gh / 2 : Y(py) - 44 * sx;
+      const kc = { link: C.accent2, net: C.accent, app: C.warn, pay: C.ok };
+      const segw = gw / stk.length;
+      stk.forEach((k, i) => { ctx.fillStyle = kc[HD[k].k]; ctx.fillRect(gx + i * segw, gy, segw - 0.6, gh); });
+      ctx.strokeStyle = C.text; ctx.lineWidth = 1; ctx.strokeRect(gx, gy, gw, gh);
+      if (atA || atF) { const ex = atA ? X(162) : X(838); ctx.beginPath(); ctx.moveTo(atA ? gx : gx + gw, gy + gh / 2); ctx.lineTo(ex, gy + gh / 2); ctx.stroke(); }
+      else { ctx.beginPath(); ctx.moveTo(X(px), gy + gh); ctx.lineTo(X(px), gy + gh + 20 * sx); ctx.stroke(); }
+    }
+    // lower panel: header stack
+    const top = Y(226);
+    ctx.strokeStyle = C.border; ctx.beginPath(); ctx.moveTo(0, top - 8 * sx); ctx.lineTo(w, top - 8 * sx); ctx.stroke();
+    if (!st) { NB.text(ctx, "“다음 →”을 누르면 카메라에서 출발한다. 여기에 패킷의 헤더(바깥 → 안쪽)와 신호의 모습이 나타난다.", w / 2, top + 50 * sx, { align: "center", size: fs(13), color: C.dim }); return; }
+    const stk = pick(st.st);
+    const prevStk = si > 0 ? pick(S[si - 1].st) : [];
+    NB.text(ctx, "지금 이 패킷의 모습  (바깥 ← → 안쪽)", X(20), top + 4 * sx, { size: fs(12), bold: true, color: C.text });
+    const pad = X(20), avail = w - 2 * pad, fsz = fs(11.5);
+    ctx.font = fsz + "px " + NB.font();
+    const kc2 = { link: C.accent2, net: C.accent, app: C.warn, pay: C.ok };
+    let widths = stk.map((k) => (HD[k].k === "pay" ? 0 : ctx.measureText(HD[k].l).width + 16));
+    let sum = widths.reduce((a, b) => a + b, 0);
+    const payw = Math.max(110 * sx, avail - sum);
+    widths = widths.map((v, i) => (HD[stk[i]].k === "pay" ? payw : v));
+    sum = widths.reduce((a, b) => a + b, 0);
+    const scale = Math.min(1, avail / sum);
+    let x = pad; const by = top + 30 * sx, bh = 32 * sx;
+    const prevG = prevStk.map(grp);
+    stk.forEach((k, i) => {
+      const bw = widths[i] * scale, col = kc2[HD[k].k];
+      NB.rrect(ctx, x + 1, by, bw - 2, bh, 5); ctx.fillStyle = col; ctx.globalAlpha = 0.18; ctx.fill(); ctx.globalAlpha = 1;
+      const isNew = si > 0 && !prevStk.includes(k);
+      ctx.strokeStyle = col; ctx.lineWidth = isNew ? 2.6 : 1; ctx.stroke();
+      NB.text(ctx, HD[k].l, x + bw / 2, by + bh / 2, { align: "center", size: fsz * Math.min(1, scale + 0.1), color: C.text, bold: isNew });
+      const bt = HD[k].b >= 1e5 ? "≈1.4 MB" : HD[k].b ? HD[k].b + " B" : "수십 µs";
+      NB.text(ctx, bt, x + bw / 2, by + bh + 11 * sx, { align: "center", size: fs(10), mono: true, color: C.dim });
+      if (isNew) NB.text(ctx, prevG.includes(grp(k)) ? "바뀜" : "새로", x + bw / 2, by - 7 * sx, { align: "center", size: fs(9.5), bold: true, color: col });
+      x += bw;
+    });
+    const total = stk.reduce((a, k) => a + HD[k].b, 0);
+    const y2 = by + bh + 34 * sx;
+    NB.text(ctx, "신호: " + st.med, pad, y2, { size: fs(12.5), color: C.text, bold: true });
+    NB.text(ctx, total >= 1e5 ? "크기 ≈ 1.4 MB (압축 전)" : "크기 " + total.toLocaleString() + " B", w - pad, y2, { align: "right", size: fs(12), mono: true, color: C.dim });
+    const adr = st.adr ? st.adr[jmode()] : null;
+    NB.text(ctx, adr ? "주소: " + adr[0] + "  →  " + adr[1] : "주소: (아직/이미 IP 헤더가 없다. 휴대폰 안의 일)", pad, y2 + 20 * sx, { size: fs(11.5), mono: true, color: adr ? C.text : C.faint });
+  }, { aspect: 0.36, minHeight: 260 });
+
+  function barDraw(ctx, w, h, S, upto) {
+    const C = P(), cc = CATC(C);
+    const tot = S.slice(0, upto + 1).reduce((a, s) => a + s.t, 0);
+    const full = S.reduce((a, s) => a + s.t, 0);
+    const max = Math.max(160, full + 10);
+    const L = 16, R = 16, bw = w - L - R, y = 30, bh = 26;
+    const Xp = (v) => L + (v / max) * bw;
+    NB.text(ctx, "누적 지연 (한쪽 방향)", L, 14, { size: 12, bold: true, color: C.text });
+    NB.rrect(ctx, L, y, bw, bh, 5); ctx.fillStyle = C.surface; ctx.fill();
+    let acc = 0;
+    S.forEach((s, i) => {
+      if (i > upto) return;
+      const x1 = Xp(acc), x2 = Xp(acc + s.t);
+      ctx.fillStyle = cc[s.cat]; ctx.globalAlpha = i === upto ? 1 : 0.75; ctx.fillRect(x1, y, Math.max(1, x2 - x1 - 0.5), bh); ctx.globalAlpha = 1;
+      if (x2 - x1 > 34) NB.text(ctx, s.title.split(" ")[0] + " " + ms(s.t), (x1 + x2) / 2, y + bh / 2, { align: "center", size: 10.5, color: "#fff", bold: true });
+      acc += s.t;
+    });
+    ctx.strokeStyle = C.bad; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(Xp(150), y - 6); ctx.lineTo(Xp(150), y + bh + 6); ctx.stroke(); ctx.setLineDash([]);
+    NB.text(ctx, "목표 150 ms", Xp(150) - 4, 14, { align: "right", size: 11, color: C.bad });
+    NB.text(ctx, "0", L, y + bh + 12, { size: 10.5, mono: true, color: C.dim });
+    if (upto >= 0) NB.text(ctx, ms(tot), Math.min(Xp(tot) + 4, w - 60), y + bh + 12, { size: 11, mono: true, bold: true, color: C.text });
+    // legend
+    let lx = L, ly = y + bh + 34;
+    Object.keys(CATN).forEach((k) => { ctx.font = "11px " + NB.font(); const iw = 28 + ctx.measureText(CATN[k]).width; if (lx + iw > w - 4) { lx = L; ly += 17; } ctx.fillStyle = cc[k]; ctx.fillRect(lx, ly - 5, 12, 10); NB.text(ctx, CATN[k], lx + 16, ly, { size: 11, color: C.dim }); lx += iw; });
+  }
+  const tbar = NB.canvas("#cv-tbar", (ctx, w, h) => barDraw(ctx, w, h, steps(), si), { height: 122 });
+
+  function render() {
+    const S = steps();
+    $("jstep").textContent = si + 1 + " / " + S.length;
+    const upto = S.slice(0, si + 1);
+    const total = upto.reduce((a, s) => a + s.t, 0);
+    const net = upto.filter((s) => s.cat === "wire" || s.cat === "radio" || s.cat === "srv").reduce((a, s) => a + s.t, 0);
+    NB.stat("o-tsum", ms(total)); NB.stat("o-tnet", ms(net)); NB.stat("o-tdev", ms(total - net));
+    if (si < 0) $("jdesc").innerHTML = `<h4>출발 준비</h4><p>통화가 연결되었다. 카메라 앞에서 내가 웃는 순간, 그 장면을 담은 패킷 하나를 부산까지 따라가 보자. <b>다음 →</b>을 누르자.</p>`;
+    else {
+      const s = S[si], prev = si > 0 ? pick(S[si - 1].st) : [], cur = pick(s.st);
+      const pg = prev.map(grp), cg = cur.map(grp);
+      const added = cur.filter((k) => !pg.includes(grp(k))).map((k) => HD[k].l);
+      const changed = cur.filter((k) => pg.includes(grp(k)) && !prev.includes(k)).map((k) => HD[k].l);
+      const removed = prev.filter((k) => !cg.includes(grp(k))).map((k) => HD[k].l);
+      const uniq = (a) => [...new Set(a)];
+      const chg = [];
+      if (added.length) chg.push(`<b class="add">+ 붙음</b> ${uniq(added).join(", ")}`);
+      if (changed.length) chg.push(`<b class="add">↻ 바뀜</b> ${uniq(changed).join(", ")}`);
+      if (removed.length) chg.push(`<b class="rm">− 벗김</b> ${uniq(removed).join(", ")}`);
+      $("jdesc").innerHTML = `<h4>${s.title}</h4><p>${pick(s.text)}</p>${chg.length ? `<div class="chg">${chg.join(" · ")}</div>` : ""}<div class="meta">${s.ch.map(chLink).join("")}<span class="pill">이 구간 ≈ ${ms(s.t)}</span><span class="pill">누적 ≈ ${ms(total)}</span></div>`;
+    }
+    $("jprev").disabled = si < 0; $("jnext").disabled = $("jall").disabled = si >= S.length - 1;
+    tripCv.redraw(); tbar.redraw();
+    // narrow screens: keep the packet's current place in view
+    const wrap = $("cv-trip").parentElement.parentElement;
+    if (wrap.scrollWidth > wrap.clientWidth + 4) {
+      const vx = si >= 0 ? posOf(S[si].at)[0] : 0, cw = $("cv-trip").clientWidth;
+      const target = Math.max(0, (vx / 1000) * cw - wrap.clientWidth / 2);
+      try { wrap.scrollTo({ left: target, behavior: "smooth" }); } catch (e) { wrap.scrollLeft = target; }
+    }
+  }
+  function stopAuto() { if (auto) { clearInterval(auto); auto = null; $("jauto").textContent = "자동 재생"; } }
+  $("jnext").onclick = () => { stopAuto(); if (si < steps().length - 1) { si++; anim = 0; render(); } };
+  $("jprev").onclick = () => { stopAuto(); if (si >= 0) { si--; anim = 1; render(); } };
+  $("jall").onclick = () => { stopAuto(); si = steps().length - 1; anim = 1; render(); };
+  $("jreset").onclick = () => { stopAuto(); si = -1; anim = 1; render(); };
+  $("jauto").onclick = () => {
+    if (auto) return stopAuto();
+    if (si >= steps().length - 1) si = -1;
+    $("jauto").textContent = "멈춤";
+    const go = () => { if (si >= steps().length - 1) return stopAuto(); si++; anim = 0; render(); };
+    go(); auto = setInterval(go, 3800);
+  };
+  NB.loop($("cv-trip"), (dt) => { phase += dt; if (anim < 1) { anim = Math.min(1, anim + dt * 0.8); } if (si >= 0) tripCv.redraw(); });
+  render();
+
+  /* ================================================================ 2. budget */
+  const DIST = { busan: [4, "부산"], tokyo: [16, "도쿄"], ny: [95, "뉴욕"] };
+  const FAR2 = { busan: 65, tokyo: 55, ny: 35 };
+  const bCap = NB.range("b-cap", (v) => v + " ms", () => bcv.redraw());
+  const bJb = NB.range("b-jb", (v) => v + " ms", () => bcv.redraw());
+  const bDec = NB.range("b-dec", (v) => v + " ms", () => bcv.redraw());
+  const bWifi = NB.seg("b-wifi", () => bcv.redraw()), bAcc = NB.seg("b-acc", () => bcv.redraw()), bDist = NB.seg("b-dist", () => bcv.redraw()), bRelay = NB.seg("b-relay", () => bcv.redraw()), bMob = NB.seg("b-mob", () => bcv.redraw());
+  function bParts() {
+    const d = DIST[bDist()][0], r = bRelay();
+    const extra = r === "p2p" ? 0 : r === "near" ? 1.5 : 65 + FAR2[bDist()] - d;
+    return [
+      { k: "캡처·인코딩", v: bCap(), c: "dev", net: false },
+      { k: "내 Wi-Fi", v: Number(bWifi()), c: "radio", net: true },
+      { k: "접속망", v: Number(bAcc()), c: "wire", net: true },
+      { k: "거리·백본(" + DIST[bDist()][1] + ")", v: d, c: "wire", net: true },
+      { k: "서버 경유", v: extra, c: "srv", net: true },
+      { k: "상대 이동통신", v: Number(bMob()), c: "radio", net: true },
+      { k: "지터 버퍼", v: bJb(), c: "buf", net: false },
+      { k: "디코딩·표시", v: bDec(), c: "dev", net: false },
+    ];
+  }
+  const bcv = NB.canvas("#cv-budget", (ctx, w, h) => {
+    const C = P(), cc = CATC(C), parts = bParts();
+    const tot = parts.reduce((a, p) => a + p.v, 0);
+    const max = Math.max(400, Math.ceil((tot + 30) / 100) * 100);
+    const L = 14, R = 14, bw = w - L - R, Xp = (v) => L + (v / max) * bw;
+    // zones
+    const y0 = 26, bh = 40;
+    [[0, 150, C.ok], [150, 300, C.warn], [300, max, C.bad]].forEach(([a, b, col]) => { ctx.fillStyle = col; ctx.globalAlpha = 0.12; ctx.fillRect(Xp(a), y0 - 8, Xp(b) - Xp(a), bh + 16); ctx.globalAlpha = 1; });
+    NB.text(ctx, "자연스러움", Xp(75), 10, { align: "center", size: 11, color: C.ok, bold: true });
+    NB.text(ctx, "약간 어색", Xp(225), 10, { align: "center", size: 11, color: C.warn, bold: true });
+    NB.text(ctx, "대화 겹침", Xp(Math.min(max, 300 + (max - 300) / 2)), 10, { align: "center", size: 11, color: C.bad, bold: true });
+    let acc = 0;
+    parts.forEach((p) => {
+      if (p.v <= 0) return;
+      const x1 = Xp(acc), x2 = Xp(acc + p.v);
+      ctx.fillStyle = cc[p.c]; ctx.fillRect(x1, y0, Math.max(1, x2 - x1 - 1), bh);
+      if (x2 - x1 > 30) NB.text(ctx, Math.round(p.v) + "", (x1 + x2) / 2, y0 + bh / 2, { align: "center", size: 11, color: "#fff", bold: true, mono: true });
+      acc += p.v;
+    });
+    [150, 300].forEach((v) => { ctx.strokeStyle = C.text; ctx.globalAlpha = 0.5; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(Xp(v), y0 - 8); ctx.lineTo(Xp(v), y0 + bh + 8); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; NB.text(ctx, v + "", Xp(v), y0 + bh + 15, { align: "center", size: 10.5, mono: true, color: C.dim }); });
+    ctx.fillStyle = C.text; ctx.beginPath(); ctx.moveTo(Xp(tot), y0 + bh + 1); ctx.lineTo(Xp(tot) - 5, y0 + bh + 9); ctx.lineTo(Xp(tot) + 5, y0 + bh + 9); ctx.fill();
+    NB.text(ctx, "총 " + Math.round(tot) + " ms", NB.clamp(Xp(tot), L + 40, w - R - 40), y0 + bh + 31, { align: "center", size: 12, mono: true, bold: true, color: C.text });
+    // breakdown rows
+    const top = y0 + bh + 46, rh = Math.min(22, (h - top - 6) / parts.length), lw = Math.min(150, w * 0.36);
+    const pmax = Math.max(...parts.map((p) => p.v), 50);
+    parts.forEach((p, i) => {
+      const y = top + i * rh;
+      NB.text(ctx, p.k, L + lw - 8, y + rh / 2, { align: "right", size: w < 480 ? 10.5 : 12, color: C.text });
+      const bwid = (p.v / pmax) * (w - L - lw - 70);
+      NB.rrect(ctx, L + lw, y + rh * 0.2, Math.max(2, bwid), rh * 0.6, 3); ctx.fillStyle = cc[p.c]; ctx.globalAlpha = 0.85; ctx.fill(); ctx.globalAlpha = 1;
+      NB.text(ctx, (p.v % 1 ? p.v.toFixed(1) : p.v) + " ms", L + lw + Math.max(2, bwid) + 6, y + rh / 2, { size: 11, mono: true, color: C.dim });
+    });
+    const net = parts.filter((p) => p.net).reduce((a, p) => a + p.v, 0);
+    let mx = parts[0]; parts.forEach((p) => { if (p.v > mx.v) mx = p; });
+    NB.stat("o-bsum", Math.round(tot) + " ms");
+    const ver = tot <= 150 ? ["자연스러움", C.ok] : tot <= 300 ? ["약간 어색", C.warn] : ["대화 겹침", C.bad];
+    $("o-bver").textContent = ver[0]; $("o-bver").style.color = ver[1];
+    NB.stat("o-bnet", Math.round((net / tot) * 100) + " %");
+    NB.stat("o-bmax", mx.k + " " + Math.round(mx.v) + " ms");
+  }, { height: 300 });
+  const preset = (o) => { bCap.set(o.cap); bJb.set(o.jb); bDec.set(o.dec); bWifi.set(o.wifi); bAcc.set(o.acc); bRelay.set(o.relay); bMob.set(o.mob); };
+  $("b-best").onclick = () => preset({ cap: 12, jb: 15, dec: 12, wifi: "3", acc: "2", relay: "p2p", mob: "8" });
+  $("b-def").onclick = () => { preset({ cap: 25, jb: 40, dec: 20, wifi: "3", acc: "2", relay: "p2p", mob: "8" }); bDist.set("busan"); };
+  $("b-worst").onclick = () => preset({ cap: 60, jb: 160, dec: 45, wifi: "40", acc: "25", relay: "far", mob: "35" });
+
+  /* ================================================================ 3. jitter buffer */
+  const NPK = 150;
+  let seed = 7, U1 = [], U2 = [];
+  const regen = () => { const r = NB.rng(seed++); U1 = []; U2 = []; for (let i = 0; i < NPK; i++) { U1.push(Math.max(1e-6, r())); U2.push(r()); } };
+  regen();
+  const jJit = NB.range("j-jit", (v) => v + " ms", () => jdraw());
+  const jLoss = NB.range("j-loss", (v) => v + " %", () => jdraw());
+  const jBuf = NB.range("j-buf", (v) => v + " ms", () => jdraw());
+  $("j-fec").addEventListener("change", () => jdraw());
+  $("j-new").onclick = () => { regen(); jdraw(); };
+  function packets() {
+    const s = jJit(), p = jLoss() / 100, B = jBuf(), fec = $("j-fec").checked;
+    const pk = [];
+    for (let i = 0; i < NPK; i++) { const d = -s * Math.log(U1[i]); const lost = U2[i] < p; pk.push({ d, lost, late: !lost && d > B }); }
+    pk.forEach((q, i) => { q.rec = false; if ((q.lost || q.late) && fec && i + 1 < NPK) { const n = pk[i + 1]; if (!n.lost && n.d <= B - 20) q.rec = true; } });
+    return pk;
+  }
+  const effQ = (B, s, p) => p + (1 - p) * Math.exp(-Math.max(0, B) / s);
+  const resid = (B, s, p, fec) => { const q = effQ(B, s, p); if (!fec) return q; const q2 = B < 20 ? 1 : effQ(B - 20, s, p); return q * q2; };
+  const jcv = NB.canvas("#cv-jit", (ctx, w, h) => {
+    const C = P(), pk = packets(), B = jBuf();
+    const ymax = Math.max(120, Math.ceil((Math.max(B, ...pk.map((q) => q.d)) + 20) / 20) * 20);
+    const yv = Math.min(ymax, 300);
+    const ch = NB.chart(ctx, null, { x: [0, 3], y: [0, yv], xLabel: "보낸 시각 (초, 20 ms마다 한 개)", yLabel: "추가 지연 (ms)", hlines: [{ y: B, color: C.accent, label: "버퍼 깊이 " + B + " ms", dash: [6, 4] }] });
+    pk.forEach((q, i) => {
+      const x = ch.X(i * 0.02), y = ch.Y(Math.min(q.d, yv));
+      let col = q.lost ? C.bad : q.late ? C.warn : C.ok; if (q.rec) col = C.accent2;
+      if (q.lost) { const yy = ch.Y(yv * 0.96); ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(x - 3, yy - 3); ctx.lineTo(x + 3, yy + 3); ctx.moveTo(x + 3, yy - 3); ctx.lineTo(x - 3, yy + 3); ctx.stroke(); if (q.rec) { ctx.beginPath(); ctx.arc(x, yy, 5, 0, 7); ctx.stroke(); } return; }
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, q.late || q.rec ? 3.2 : 2.4, 0, 7); ctx.fill();
+    });
+    NB.text(ctx, "✕ = 네트워크에서 사라짐 (맨 위에 표시)", ch.box.x + 6, ch.box.y + 8, { size: 10.5, color: C.dim });
+  }, { aspect: 0.42, minHeight: 230, maxHeight: 320 });
+  const jcv2 = NB.canvas("#cv-jit2", (ctx, w, h) => {
+    const C = P(), s = jJit(), p = jLoss() / 100, B = jBuf(), fec = $("j-fec").checked;
+    const d0 = [], d1 = [];
+    for (let b = 0; b <= 200; b += 2) { d0.push([b, Math.max(1e-4, resid(b, s, p, false) * 100)]); d1.push([b, Math.max(1e-4, resid(b, s, p, true) * 100)]); }
+    let rec = null; for (let b = 0; b <= 200; b++) if (resid(b, s, p, fec) <= 0.01) { rec = b; break; }
+    const cur = resid(B, s, p, fec) * 100;
+    NB.chart(ctx, null, { x: [0, 200], y: [0.01, 100], logY: true, xLabel: "지터 버퍼 깊이 (ms) = 더해지는 지연", yLabel: "최종 끊김 (%)",
+      series: [{ data: d0, color: C.warn, width: 2.2 }, { data: d1, color: C.accent2, width: 2, dash: [6, 4] }],
+      hlines: [{ y: 1, color: C.ok, label: "1% (거의 못 느낌)" }],
+      vlines: [{ x: B, color: C.accent, label: "지금" }].concat(rec != null ? [{ x: rec, color: C.ok, label: "1% 도달" }] : []),
+      points: [{ x: B, y: Math.max(0.01, cur), color: C.accent, r: 5 }] });
+    NB.text(ctx, "실선: FEC 없음 · 점선: FEC", w - 18, 22, { align: "right", size: 11, color: C.dim });
+  }, { aspect: 0.36, minHeight: 210, maxHeight: 280 });
+  function jdraw() {
+    jcv.redraw(); jcv2.redraw();
+    const pk = packets(), C = P();
+    const late = pk.filter((q) => q.late).length, bad = pk.filter((q) => (q.lost || q.late) && !q.rec).length;
+    const s = jJit(), p = jLoss() / 100, B = jBuf(), fec = $("j-fec").checked;
+    const lateA = (1 - p) * Math.exp(-B / s) * 100, res = resid(B, s, p, fec) * 100;
+    NB.stat("o-jbuf", B + " ms");
+    NB.stat("o-jlate", lateA.toFixed(lateA < 10 ? 1 : 0) + " % <small>(표본 " + late + "/" + NPK + ")</small>");
+    NB.stat("o-jres", res.toFixed(res < 10 ? 1 : 0) + " % <small>(표본 " + bad + ")</small>");
+    const v = res <= 1 ? ["거의 못 느낌", C.ok] : res <= 5 ? ["가끔 뭉개짐 (은닉으로 메움)", C.warn] : ["자주 끊김", C.bad];
+    if (B > 150) v[0] += " · 대신 지연 큼";
+    $("o-jver").textContent = v[0]; $("o-jver").style.color = v[1];
+  }
+  jdraw();
+
+  /* ================================================================ 4. adaptation */
+  const aSc = NB.seg("a-sc", () => aReset());
+  const AW = 30; // seconds shown
+  let A;
+  function aReset() { A = { t: 0, R: 2.0, Q: 0, hist: [], tick: 0, lastDec: -9, sent: 0, drop: 0, recent: [] }; }
+  aReset();
+  $("a-reset").onclick = aReset;
+  $("a-on").addEventListener("change", () => { if (!$("a-on").checked) A.R = 2.5; });
+  function capAt(t) {
+    const sc = aSc(), tt = t % 30;
+    if (sc === "stable") return 5;
+    if (sc === "elev") return tt >= 8 && tt < 16 ? 0.4 : 4;
+    return Math.max(0.6, 2.4 + 1.1 * Math.sin(t * 0.7) + 0.6 * Math.sin(t * 2.3 + 1));
+  }
+  const QMAX = 0.5; // seconds of capacity... queue cap in Mbit computed vs capacity
+  function aStep(dt) {
+    const C = capAt(A.t), on = $("a-on").checked;
+    if (!on) A.R = 2.5;
+    const inb = A.R * dt; A.sent += inb;
+    A.Q += inb - C * dt; if (A.Q < 0) A.Q = 0;
+    const cap = Math.max(0.25, 2.5 * QMAX); // ~1.25 Mbit buffer
+    let dropped = 0; if (A.Q > cap) { dropped = A.Q - cap; A.Q = cap; }
+    A.drop += dropped;
+    A.recent.push([A.t, inb, dropped]); while (A.recent.length && A.recent[0][0] < A.t - 2) A.recent.shift();
+    const qd = (A.Q / C) * 1000;
+    A.tick += dt;
+    if (on && A.tick >= 0.1) {
+      A.tick = 0;
+      if (qd > 60) { if (A.t - A.lastDec > 0.4) { A.R = Math.max(0.15, Math.min(A.R * 0.85, C * 0.9)); A.lastDec = A.t; } }
+      else if (qd < 20) A.R = Math.min(2.5, A.R + 0.04);
+    }
+    A.t += dt;
+    A.hist.push([A.t, C, A.R, qd]);
+    while (A.hist.length && A.hist[0][0] < A.t - AW) A.hist.shift();
+  }
+  const acv = NB.canvas("#cv-adapt", (ctx, w, h) => {
+    const C = P(), H = A.hist;
+    const t1 = Math.max(AW, A.t), t0 = t1 - AW;
+    const h1 = Math.floor(h * 0.5);
+    NB.chart(ctx, { x: 50, y: 14, w: w - 66, h: h1 - 30 }, { x: [t0, t1], y: [0, 6], yLabel: "Mbps", xFmt: () => "",
+      series: [{ data: H.map((r) => [r[0], r[1]]), color: C.dim, width: 1.6, dash: [5, 4] }, { data: H.map((r) => [r[0], r[2]]), color: C.accent, width: 2.4 }] });
+    const ymax = 600;
+    NB.chart(ctx, { x: 50, y: h1 + 4, w: w - 66, h: h - h1 - 48 }, { x: [t0, t1], y: [0, ymax], yLabel: "ms", xLabel: "시간 (초)", xFmt: (v) => Math.round(v) + "",
+      hlines: [{ y: 150, color: C.bad, label: "150 ms" }],
+      series: [{ data: H.map((r) => [r[0], Math.min(ymax, r[3])]), color: C.warn, width: 2 }] });
+  }, { aspect: 0.5, minHeight: 280, maxHeight: 380 });
+  NB.loop($("cv-adapt"), (dt) => {
+    dt = Math.min(dt, 0.1);
+    const n = 5; for (let i = 0; i < n; i++) aStep(dt / n);
+    acv.redraw();
+    const last = A.hist[A.hist.length - 1];
+    if (!last) return;
+    const sent = A.recent.reduce((a, r) => a + r[1], 0), dr = A.recent.reduce((a, r) => a + r[2], 0);
+    NB.stat("o-arate", last[2].toFixed(2) + " Mbps");
+    NB.stat("o-adelay", Math.round(last[3]) + " ms");
+    NB.stat("o-aloss", (sent > 0 ? ((dr / sent) * 100).toFixed(0) : 0) + " %");
+    const R = last[2];
+    const q = last[3] > 400 ? "멈춤·끊김" : R >= 1.5 ? "720p 선명" : R >= 0.8 ? "540p" : R >= 0.4 ? "360p 흐림" : "180p / 음성 우선";
+    NB.stat("o-aq", q);
+  });
+
+  /* ================================================================ 5. data */
+  const dRes = NB.seg("d-res", () => dcv.redraw()), dCodec = NB.seg("d-codec", () => dcv.redraw());
+  const dMin = NB.range("d-min", (v) => (v >= 60 ? Math.floor(v / 60) + "시간 " + (v % 60 ? (v % 60) + "분" : "") : v + "분"), () => dcv.redraw());
+  const dPlan = NB.range("d-plan", (v) => v + " GB", () => dcv.redraw());
+  const AUD = (80 + 50) * 8 * 50 / 1e6; // Mbps incl headers
+  const vidRate = (base) => base * Number(dCodec()) * (1150 / 1100); // headers ~50B per 1100B
+  const dcv = NB.canvas("#cv-data", (ctx, w, h) => {
+    const C = P(), mins = dMin();
+    const GB = (mbps) => (mbps * 2 * mins * 60) / 8 / 1000; // both directions
+    const items = [
+      { k: "음성 통화만", v: GB(AUD), sel: false },
+      { k: "360p 영상 통화", v: GB(vidRate(0.6) + AUD), sel: dRes() === "0.6" },
+      { k: "720p 영상 통화", v: GB(vidRate(2.0) + AUD), sel: dRes() === "2.0" },
+      { k: "1080p 영상 통화", v: GB(vidRate(3.5) + AUD), sel: dRes() === "3.5" },
+      { k: "(비교) HD 영화 스트리밍", v: (5 * mins * 60) / 8 / 1000, ref: true },
+      { k: "(비교) 음악 스트리밍", v: (0.32 * mins * 60) / 8 / 1000, ref: true },
+    ];
+    const max = Math.max(...items.map((i) => i.v)) * (w < 520 ? 1.45 : 1.2);
+    const L = Math.min(170, w * 0.38), top = 30, rh = (h - top - 10) / items.length;
+    NB.text(ctx, "같은 시간 동안 쓰는 데이터 (영상 통화는 보내기+받기)", 14, 14, { size: 12, bold: true, color: C.text });
+    items.forEach((it, i) => {
+      const y = top + i * rh, bw = (it.v / max) * (w - L - 20);
+      NB.text(ctx, it.k, L - 8, y + rh / 2, { align: "right", size: w < 480 ? 10.5 : 12, color: it.ref ? C.dim : C.text, bold: it.sel });
+      NB.rrect(ctx, L, y + rh * 0.2, Math.max(2, bw), rh * 0.6, 4);
+      ctx.fillStyle = it.sel ? C.accent : it.ref ? C.faint : C.accent2; ctx.globalAlpha = it.sel ? 1 : 0.6; ctx.fill(); ctx.globalAlpha = 1;
+      const lbl = it.v >= 1 ? it.v.toFixed(2) + " GB" : Math.round(it.v * 1000) + " MB";
+      NB.text(ctx, lbl, L + Math.max(2, bw) + 6, y + rh / 2, { size: 11, mono: true, color: C.dim });
+    });
+    const one = vidRate(Number(dRes())) + AUD;
+    const tot = GB(one);
+    NB.stat("o-drate", one.toFixed(2) + " Mbps");
+    NB.stat("o-dtot", tot >= 1 ? tot.toFixed(2) + " GB" : Math.round(tot * 1000) + " MB");
+    NB.stat("o-dhdr", Math.round((50 / 130) * 100) + " %");
+    const perHour = GB(one) * (60 / mins);
+    const hrs = dPlan() / perHour;
+    NB.stat("o-dhours", (hrs >= 10 ? Math.round(hrs) : hrs.toFixed(1)) + " 시간");
+  }, { height: 240 });
+})();
+</script>
+</body>
+</html>

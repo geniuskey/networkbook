@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>RF 반도체: 휴대폰 속 통신 칩 · NetworkBook</title>
+<meta name="description" content="스마트폰의 안테나에서 모뎀까지 신호가 지나는 칩들. 믹서와 PLL, 전력 증폭기의 효율과 선형성, GaAs·GaN·RF-SOI 같은 재료, 저잡음 증폭기와 잡음 지수, SAW·BAW 필터, ADC, 베이스밴드 모뎀, mmWave 안테나 인 패키지를 시뮬레이터로 익힌다.">
+<link rel="canonical" href="https://networkbook.euiyun.com/chapters/rfchips.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="NetworkBook">
+<meta property="og:title" content="RF 반도체: 휴대폰 속 통신 칩 · NetworkBook">
+<meta property="og:description" content="스마트폰의 안테나에서 모뎀까지 신호가 지나는 칩들. 믹서와 PLL, 전력 증폭기의 효율과 선형성, GaAs·GaN·RF-SOI 같은 재료, 저잡음 증폭기와 잡음 지수, SAW·BAW 필터, ADC, 베이스밴드 모뎀, mmWave 안테나 인 패키지를 시뮬레이터로 익힌다.">
+<meta property="og:url" content="https://networkbook.euiyun.com/chapters/rfchips.html">
+<meta property="og:image" content="https://networkbook.euiyun.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"RF 반도체: 휴대폰 속 통신 칩","name":"RF 반도체: 휴대폰 속 통신 칩 · NetworkBook","url":"https://networkbook.euiyun.com/chapters/rfchips.html","mainEntityOfPage":"https://networkbook.euiyun.com/chapters/rfchips.html","inLanguage":"ko","isAccessibleForFree":true,"learningResourceType":"interactive textbook chapter","position":18,"image":"https://networkbook.euiyun.com/og.png","dateModified":"2026-10-05","isPartOf":{"@type":"Book","@id":"https://networkbook.euiyun.com/#book","name":"NetworkBook — 인터랙티브 네트워크 교과서","url":"https://networkbook.euiyun.com/"},"publisher":{"@type":"Organization","name":"NetworkBook","url":"https://networkbook.euiyun.com/"},"description":"스마트폰의 안테나에서 모뎀까지 신호가 지나는 칩들. 믹서와 PLL, 전력 증폭기의 효율과 선형성, GaAs·GaN·RF-SOI 같은 재료, 저잡음 증폭기와 잡음 지수, SAW·BAW 필터, ADC, 베이스밴드 모뎀, mmWave 안테나 인 패키지를 시뮬레이터로 익힌다."},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"NetworkBook","item":"https://networkbook.euiyun.com/"},{"@type":"ListItem","position":2,"name":"18 RF 반도체: 휴대폰 속 통신 칩","item":"https://networkbook.euiyun.com/chapters/rfchips.html"}]}]}</script>
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .trio { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px; background: var(--border); }
+  .trio > div { background: var(--canvas-bg); min-width: 0; }
+  .trio canvas { display: block; width: 100%; }
+  .mat-tbl td:first-child { white-space: nowrap; font-weight: 700; }
+  .verdict-ok { color: var(--ok); }
+  .verdict-bad { color: var(--bad); }
+</style>
+</head>
+<body data-chapter="rfchips">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 18</div>
+    <h1>RF 반도체: 휴대폰 속 통신 칩</h1>
+    <p class="lead">스마트폰은 지하철 안에서도 수 km 떨어진 기지국이 보낸, 1조분의 1 와트보다 약한 전파를 골라 듣는다. 동시에 같은 안테나로 수백 mW짜리 전파를 내보내면서도 자기 목소리에 귀가 먹지 않는다. 이 일을 하는 것은 손톱만 한 칩 수십 개다. 이 장에서는 안테나에서 모뎀까지 신호가 지나는 길을 따라가며, 각 칩이 하는 일과 그것이 왜 어려운지, 어떤 재료로 그 어려움을 푸는지 살펴본다.</p>
+    <ul class="objectives">
+      <li>스마트폰 통신부의 블록도(안테나 → 프런트엔드 → 트랜시버 → 모뎀)를 그리고 각 칩의 역할을 설명한다.</li>
+      <li>믹서가 주파수를 옮기는 원리와 이미지 주파수 문제, 슈퍼헤테로다인과 직접 변환 구조의 차이를 안다.</li>
+      <li>PLL이 수정 발진기로 VCO를 원하는 주파수에 묶는 법과 위상 잡음이 성좌도를 번지게 하는 이유를 이해한다.</li>
+      <li>전력 증폭기의 효율과 선형성의 맞교환, 백오프·포락선 추적·DPD를 시뮬레이터로 체험한다.</li>
+      <li>프리스 공식으로 첫 단 LNA가 수신 감도를 좌우하는 이유를 계산한다.</li>
+      <li>GaAs·GaN·SiGe·RF-SOI·CMOS가 각각 어느 칩에 쓰이는지와 그 물리적 이유를 비교한다.</li>
+      <li>SAW·BAW 필터, ADC, 베이스밴드 모뎀, mmWave 안테나 인 패키지의 역할과 대표 수치를 안다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="map">
+    <h2>휴대폰 통신부의 지도</h2>
+    <p>휴대폰이 전파로 데이터를 주고받으려면 크게 세 가지 일을 해야 한다. 공기 중의 고주파 전파를 다루는 일(아날로그 RF), 고주파와 컴퓨터가 다룰 수 있는 낮은 주파수 사이를 오가는 일(주파수 변환과 디지털화), 그리고 비트를 심볼로 바꾸고 오류를 고치는 일(디지털 신호 처리)이다. 이 순서대로 칩이 늘어서 있다.</p>
+    <ul>
+      <li><span class="term">RF 프런트엔드</span><span class="en">(RF front-end, RFFE)</span>: 안테나 바로 뒤의 칩 묶음. 안테나 튜너와 스위치, 대역별 필터와 듀플렉서, 송신용 <b>전력 증폭기(PA)</b>, 수신용 <b>저잡음 증폭기(LNA)</b>가 한 모듈 안에 들어간다. 대역마다 길이 따로 있어서 휴대폰 안에서 가장 부품이 많은 부분이다.</li>
+      <li><b>RF 트랜시버</b><span class="en">(transceiver)</span>: 수 GHz의 신호를 0 Hz 근처로 내리고(수신), 거꾸로 올린다(송신). 믹서, PLL, 아날로그 필터, ADC·DAC가 들어 있는 혼성 신호(mixed-signal) 칩이다.</li>
+      <li><b>베이스밴드 모뎀</b><span class="en">(baseband modem)</span>: 디지털로 바뀐 신호에서 OFDM(12장) 심볼을 풀고, 채널을 추정하고, 오류 정정 부호를 풀어 비트를 꺼낸다. 요즘은 AP(애플리케이션 프로세서)와 한 칩에 합쳐지기도 한다.</li>
+    </ul>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 900 340" style="min-width:640px" role="img" aria-label="스마트폰 통신부 블록도">
+        <defs><marker id="rf-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+        <marker id="rf-a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--warn)"/></marker></defs>
+        <!-- antennas -->
+        <g stroke="var(--text-dim)" stroke-width="2" fill="none">
+          <path d="M28 72 V102 M18 72 L28 86 L38 72"/><path d="M28 152 V182 M18 152 L28 166 L38 152"/><path d="M28 232 V262 M18 232 L28 246 L38 232"/>
+          <path d="M28 102 H84 M28 182 H84 M28 262 H60 V200 H84"/>
+        </g>
+        <text x="28" y="290" text-anchor="middle" class="t-dim" style="font-size:11px">안테나</text><text x="28" y="304" text-anchor="middle" class="t-dim" style="font-size:11px">4~10개+</text>
+        <!-- RFFE boundary -->
+        <rect x="74" y="34" width="396" height="270" rx="14" fill="none" stroke="var(--accent-2)" stroke-dasharray="6 5" stroke-width="1.5"/>
+        <text x="272" y="26" text-anchor="middle" class="t" style="font-weight:700;fill:var(--accent-2)">RF 프런트엔드(RFFE) 모듈</text>
+        <rect x="88" y="90" width="84" height="124" rx="10" class="f-elev" stroke="var(--border)"/>
+        <text x="130" y="140" text-anchor="middle" class="t" style="font-weight:700">안테나</text><text x="130" y="158" text-anchor="middle" class="t" style="font-weight:700">튜너·스위치</text><text x="130" y="180" text-anchor="middle" class="t-mono" style="font-size:10.5px">RF-SOI</text>
+        <path d="M172 152 H192" class="s-acc" marker-end="url(#rf-a)" marker-start="url(#rf-a)"/>
+        <rect x="196" y="50" width="112" height="240" rx="10" class="f-acc2-soft"/>
+        <text x="252" y="72" text-anchor="middle" class="t" style="font-weight:700">필터·듀플렉서</text>
+        <g class="t-mono" style="font-size:10.5px">
+          <rect x="208" y="84" width="88" height="24" rx="5" class="f-surface"/><text x="252" y="100" text-anchor="middle">B1 듀플렉서</text>
+          <rect x="208" y="114" width="88" height="24" rx="5" class="f-surface"/><text x="252" y="130" text-anchor="middle">B3 듀플렉서</text>
+          <rect x="208" y="144" width="88" height="24" rx="5" class="f-surface"/><text x="252" y="160" text-anchor="middle">B7 듀플렉서</text>
+          <rect x="208" y="174" width="88" height="24" rx="5" class="f-surface"/><text x="252" y="190" text-anchor="middle">n41 필터</text>
+          <rect x="208" y="204" width="88" height="24" rx="5" class="f-surface"/><text x="252" y="220" text-anchor="middle">n77/78 필터</text>
+          <text x="252" y="250" text-anchor="middle" class="t-dim">… 수십 개</text>
+          <text x="252" y="276" text-anchor="middle" class="t-dim">SAW · BAW</text>
+        </g>
+        <rect x="346" y="74" width="106" height="66" rx="10" fill="color-mix(in srgb, var(--warn) 16%, transparent)" stroke="var(--warn)"/>
+        <text x="399" y="100" text-anchor="middle" class="t" style="font-weight:700">PA (송신)</text><text x="399" y="120" text-anchor="middle" class="t-mono" style="font-size:10.5px">GaAs HBT</text>
+        <rect x="346" y="196" width="106" height="66" rx="10" class="f-acc-soft"/>
+        <text x="399" y="222" text-anchor="middle" class="t" style="font-weight:700">LNA (수신)</text><text x="399" y="242" text-anchor="middle" class="t-mono" style="font-size:10.5px">RF-SOI · SiGe</text>
+        <path d="M346 107 H312" stroke="var(--warn)" stroke-width="2" fill="none" marker-end="url(#rf-a2)"/>
+        <path d="M312 229 H342" class="s-acc" marker-end="url(#rf-a)"/>
+        <!-- transceiver -->
+        <rect x="496" y="56" width="168" height="236" rx="12" class="f-elev" stroke="var(--border)"/>
+        <text x="580" y="80" text-anchor="middle" class="t" style="font-weight:700">RF 트랜시버</text>
+        <text x="580" y="96" text-anchor="middle" class="t-mono" style="font-size:10.5px">CMOS</text>
+        <g class="t" style="font-size:12px">
+          <rect x="510" y="108" width="66" height="34" rx="6" class="f-surface"/><text x="543" y="130" text-anchor="middle">믹서 ×</text>
+          <rect x="584" y="108" width="66" height="34" rx="6" class="f-surface"/><text x="617" y="130" text-anchor="middle">PLL·VCO</text>
+          <rect x="510" y="152" width="66" height="34" rx="6" class="f-surface"/><text x="543" y="174" text-anchor="middle">필터·증폭</text>
+          <rect x="584" y="152" width="66" height="34" rx="6" class="f-surface"/><text x="617" y="174" text-anchor="middle">ADC·DAC</text>
+        </g>
+        <text x="580" y="214" text-anchor="middle" class="t-dim" style="font-size:11.5px">수 GHz ↔ 0 Hz 근처</text>
+        <text x="580" y="232" text-anchor="middle" class="t-dim" style="font-size:11.5px">아날로그 ↔ 디지털</text>
+        <text x="580" y="270" text-anchor="middle" class="t-mono" style="font-size:10.5px">수신 경로 여러 개 동시</text>
+        <path d="M452 229 H492" class="s-acc" marker-end="url(#rf-a)"/>
+        <path d="M492 107 H456" stroke="var(--warn)" stroke-width="2" fill="none" marker-end="url(#rf-a2)"/>
+        <text x="474" y="320" text-anchor="middle" class="t-dim" style="font-size:11px">아날로그 RF</text>
+        <!-- modem -->
+        <path d="M664 174 H692" class="s-acc" marker-end="url(#rf-a)" marker-start="url(#rf-a)"/>
+        <text x="678" y="160" text-anchor="middle" class="t-dim" style="font-size:10.5px">I/Q</text>
+        <rect x="696" y="100" width="104" height="148" rx="12" class="f-acc"/>
+        <text x="748" y="140" text-anchor="middle" class="t" style="font-weight:700;fill:#fff">베이스밴드</text><text x="748" y="158" text-anchor="middle" class="t" style="font-weight:700;fill:#fff">모뎀</text>
+        <text x="748" y="186" text-anchor="middle" class="t-mono" style="font-size:10.5px;fill:#fff">FFT · 채널 추정</text><text x="748" y="202" text-anchor="middle" class="t-mono" style="font-size:10.5px;fill:#fff">LDPC · 폴라</text><text x="748" y="226" text-anchor="middle" class="t-mono" style="font-size:10.5px;fill:#fff">3~5 nm급</text>
+        <path d="M800 174 H822" class="s-acc" marker-end="url(#rf-a)" marker-start="url(#rf-a)"/>
+        <rect x="826" y="132" width="64" height="84" rx="10" class="f-surface" stroke="var(--border)"/>
+        <text x="858" y="170" text-anchor="middle" class="t" style="font-weight:700">AP</text><text x="858" y="188" text-anchor="middle" class="t-dim" style="font-size:10.5px">앱·OS</text>
+        <text x="748" y="290" text-anchor="middle" class="t-dim" style="font-size:11px">디지털 (비트)</text>
+      </svg></div>
+      <figcaption><b>그림 18-1.</b> 스마트폰 통신부 블록도(단순화). 수신 신호(파랑)는 안테나 → 스위치 → 필터 → LNA → 트랜시버 → 모뎀으로, 송신 신호(주황)는 반대로 흐른다. 점선 안의 RF 프런트엔드는 여러 재료의 칩과 필터를 한 모듈에 담은 것이다. 실제 휴대폰은 LTE·5G를 합쳐 수십 개 대역과 여러 안테나를 동시에 쓰므로 이 경로가 몇 겹으로 늘어선다.</figcaption>
+    </figure>
+    <div class="callout analogy"><strong>국제 항구의 하역장</strong><p>안테나는 항구, RF 프런트엔드는 부두마다 있는 하역장이다. 부두(주파수 대역)마다 크레인(필터)과 하역 인부(증폭기)가 따로 있어 자기 배만 받는다. 트랜시버는 컨테이너를 내려 트럭 규격으로 바꿔 싣는 환적장이고(주파수 변환·디지털화), 모뎀은 상자를 열어 내용물을 검수하고 송장(오류 정정)을 맞춰 보는 물류 센터다. 그리고 AP가 실제 주인에게 물건을 전한다.</p></div>
+    <p>왜 이렇게 많은 칩이 필요할까? 세계의 통신사들이 쓰는 주파수 대역이 제각각이라 한 휴대폰이 600 MHz부터 6 GHz(그리고 mmWave 26~40 GHz)까지 수십 개 대역을 지원해야 하고, 여러 대역을 묶어 쓰는 반송파 집성(CA)과 4×4 MIMO(12장) 때문에 수신 경로가 동시에 여러 개 열려 있어야 하기 때문이다. 고급 5G 휴대폰 한 대에는 필터만 수십~100개 가까이 들어간다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="mixer">
+    <h2>주파수를 옮기는 곱셈기: 믹서와 수신기 구조</h2>
+    <p>2 GHz 전파를 그대로 디지털로 바꾸려면 초당 수십억 번 이상 정밀하게 재야 해서 전력이 너무 많이 든다. 그래서 먼저 신호를 낮은 주파수로 <b>옮긴다</b>. 이 일을 하는 회로가 <span class="term">믹서</span><span class="en">(mixer)</span>다. 믹서는 두 신호를 곱한다. 삼각함수 공식에 따라 cos(2πf<sub>RF</sub>t)·cos(2πf<sub>LO</sub>t) = ½cos(2π(f<sub>RF</sub>−f<sub>LO</sub>)t) + ½cos(2π(f<sub>RF</sub>+f<sub>LO</sub>)t) 이므로, 곱하면 <b>차 주파수</b>와 <b>합 주파수</b>가 생긴다. 곱하는 쪽의 깨끗한 사인파를 <span class="term">국부 발진기</span><span class="en">(local oscillator, LO)</span>라 하고, 차 주파수를 <span class="term">중간 주파수</span><span class="en">(intermediate frequency, IF)</span>라 한다.</p>
+    <p>문제는 “차”가 절댓값이라는 데 있다. LO가 1,750 MHz일 때 1,950 MHz 신호도 200 MHz로, <b>1,550 MHz 신호도 200 MHz로</b> 내려온다. LO를 사이에 두고 원하는 신호와 거울처럼 대칭인 이 주파수를 <span class="term">이미지 주파수</span><span class="en">(image frequency)</span>라 한다. 이미지에 다른 사람의 전파가 있으면 IF에서 원하는 신호와 완전히 겹쳐서 나중에 어떤 필터로도 떼어 낼 수 없다. 그러니 믹서에 들어가기 <b>전에</b> 걸러야 한다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 860 270" style="min-width:620px" role="img" aria-label="슈퍼헤테로다인과 직접 변환 수신기 비교">
+        <defs><marker id="mx-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <text x="10" y="22" class="t" style="font-weight:700">① 슈퍼헤테로다인 (1918년~, 옛 휴대폰·라디오)</text>
+        <g class="t" style="font-size:12px">
+          <rect x="10" y="40" width="80" height="44" rx="8" class="f-acc2-soft"/><text x="50" y="58" text-anchor="middle">RF 필터</text><text x="50" y="74" text-anchor="middle" class="t-dim" style="font-size:10.5px">이미지 제거</text>
+          <rect x="112" y="40" width="64" height="44" rx="8" class="f-acc-soft"/><text x="144" y="67" text-anchor="middle">LNA</text>
+          <circle cx="222" cy="62" r="20" class="f-surface" stroke="var(--border)"/><text x="222" y="68" text-anchor="middle" style="font-size:18px">×</text>
+          <text x="222" y="112" text-anchor="middle" class="t-dim" style="font-size:11px">LO = RF − IF</text>
+          <rect x="266" y="40" width="96" height="44" rx="8" class="f-acc2-soft"/><text x="314" y="58" text-anchor="middle">IF 필터</text><text x="314" y="74" text-anchor="middle" class="t-dim" style="font-size:10.5px">고정 주파수, 날카로움</text>
+          <rect x="384" y="40" width="72" height="44" rx="8" class="f-surface"/><text x="420" y="67" text-anchor="middle">IF 증폭</text>
+          <circle cx="500" cy="62" r="20" class="f-surface" stroke="var(--border)"/><text x="500" y="68" text-anchor="middle" style="font-size:18px">×</text>
+          <rect x="546" y="40" width="80" height="44" rx="8" class="f-surface"/><text x="586" y="67" text-anchor="middle">ADC</text>
+        </g>
+        <path d="M90 62 H108 M176 62 H198 M242 62 H262 M362 62 H380 M456 62 H476 M520 62 H542" class="s-acc" marker-end="url(#mx-a)"/>
+        <path d="M222 100 V86" class="s-line" stroke-dasharray="3 3"/>
+        <text x="650" y="56" class="t-dim" style="font-size:12px">+ 선택도·잡음 성능 우수</text>
+        <text x="650" y="74" class="t-dim" style="font-size:12px">− 외장 필터 많고 대역마다 따로</text>
+        <text x="10" y="150" class="t" style="font-weight:700">② 직접 변환 = 제로 IF (오늘날 휴대폰의 기본)</text>
+        <g class="t" style="font-size:12px">
+          <rect x="10" y="190" width="64" height="44" rx="8" class="f-acc-soft"/><text x="42" y="217" text-anchor="middle">LNA</text>
+          <circle cx="140" cy="176" r="18" class="f-surface" stroke="var(--border)"/><text x="140" y="182" text-anchor="middle" style="font-size:16px">×</text>
+          <circle cx="140" cy="250" r="18" class="f-surface" stroke="var(--border)"/><text x="140" y="256" text-anchor="middle" style="font-size:16px">×</text>
+          <rect x="196" y="190" width="104" height="44" rx="8" class="f-elev" stroke="var(--border)"/><text x="248" y="208" text-anchor="middle">LO = RF</text><text x="248" y="224" text-anchor="middle" class="t-dim" style="font-size:10.5px">0°, 90° 두 개</text>
+          <rect x="330" y="158" width="86" height="36" rx="8" class="f-acc2-soft"/><text x="373" y="181" text-anchor="middle">저역 필터</text>
+          <rect x="330" y="232" width="86" height="36" rx="8" class="f-acc2-soft"/><text x="373" y="255" text-anchor="middle">저역 필터</text>
+          <rect x="440" y="158" width="70" height="36" rx="8" class="f-surface"/><text x="475" y="181" text-anchor="middle">ADC I</text>
+          <rect x="440" y="232" width="70" height="36" rx="8" class="f-surface"/><text x="475" y="255" text-anchor="middle">ADC Q</text>
+        </g>
+        <path d="M74 212 H96 V176 H118 M96 212 V250 H118 M158 176 H326 M158 250 H326 M416 176 H436 M416 250 H436" class="s-acc" fill="none" marker-end="url(#mx-a)"/>
+        <path d="M200 200 L150 190 M200 224 L150 236" class="s-line" stroke-dasharray="3 3"/>
+        <text x="540" y="186" class="t-dim" style="font-size:12px">+ IF 필터·이미지 필터 불필요, 한 칩에 집적</text>
+        <text x="540" y="204" class="t-dim" style="font-size:12px">+ 대역폭을 소프트웨어로 바꾸기 쉬움</text>
+        <text x="540" y="222" class="t-dim" style="font-size:12px">− 0 Hz 근처 잡음(DC 오프셋, 1/f 잡음)</text>
+        <text x="540" y="240" class="t-dim" style="font-size:12px">− I/Q 두 경로의 불균형을 보정해야 함</text>
+      </svg></div>
+      <figcaption><b>그림 18-2.</b> 두 수신기 구조. 슈퍼헤테로다인은 고정된 IF에서 날카로운 필터로 이웃 신호를 걷어 내지만 이미지를 막을 필터가 앞에 필요하다. 직접 변환은 LO를 신호 주파수와 같게 놓아 곧장 0 Hz로 내리고, 90° 어긋난 두 LO로 I와 Q(12장의 성좌도 두 축)를 따로 얻는다. 이미지가 신호 자기 자신의 거울상이라 I/Q로 구분된다.</figcaption>
+    </figure>
+
+    <div class="sim" id="sim-mx">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>믹서: 합·차 주파수와 이미지 간섭</h3></div>
+      <div class="sim-view"><canvas id="cv-mx"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>수신기 구조</span><div class="seg" id="mx-mode"><button data-value="sh" class="on">슈퍼헤테로다인 (IF 200 MHz)</button><button data-value="zif">직접 변환 (제로 IF)</button></div></div>
+        <label class="ctrl"><span>원하는 신호 f<sub>RF</sub> <output id="mx-rf-out"></output></span><input type="range" id="mx-rf" min="1700" max="2200" step="10" value="1950"></label>
+        <label class="ctrl"><span>LO 주파수 f<sub>LO</sub> <output id="mx-lo-out"></output></span><input type="range" id="mx-lo" min="1300" max="2200" step="10" value="1750"></label>
+        <label class="ctrl"><span>다른 사람의 전파 (+10 dB 더 셈) <output id="mx-int-out"></output></span><input type="range" id="mx-int" min="1100" max="2600" step="10" value="1550"></label>
+        <label class="check"><input type="checkbox" id="mx-pre"> 믹서 앞에 RF 필터(이미지 제거 필터) 넣기</label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">원하는 신호의 IF</span><span class="v" id="mx-o-if">—</span></div>
+        <div class="stat"><span class="k">합 주파수 (버림)</span><span class="v" id="mx-o-sum">—</span></div>
+        <div class="stat"><span class="k">이미지 주파수</span><span class="v" id="mx-o-img">—</span></div>
+        <div class="stat"><span class="k">IF 필터 안의 간섭</span><span class="v" id="mx-o-int">—</span></div>
+      </div>
+      <div class="sim-note">위는 믹서 입력(안테나 쪽), 아래는 믹서 출력이다. 파랑 = 원하는 신호와 그 산물, 빨강 = 다른 사람의 전파와 그 산물, 점선 = LO, 초록 띠 = IF 필터가 통과시키는 구간. 해볼 것: ① 처음 상태에서 빨간 간섭이 원하는 신호와 같은 200 MHz로 내려와 겹친다(이미지). RF 필터를 켜면 사라진다. ② 간섭 주파수를 바꿔 이미지 = 2·f<sub>LO</sub> − f<sub>RF</sub>가 맞는지 확인하자. ③ 직접 변환으로 바꾸면 LO가 f<sub>RF</sub>에 붙고 신호가 0 Hz로 내려온다. 단순화: 이상적인 곱셈기, 신호는 선 하나로 그렸다.</div>
+    </div>
+    <p>오늘날 휴대폰 트랜시버는 거의 모두 직접 변환(또는 IF가 아주 낮은 low-IF) 구조다. 커다란 외장 IF 필터를 없애고 모든 것을 CMOS 칩 하나에 넣을 수 있기 때문이다. 대신 I와 Q 두 경로의 이득·위상이 조금만 어긋나도 신호가 자기 거울상과 섞이므로, 모뎀이 디지털로 이 불균형을 재서 보정한다. 아날로그의 불완전함을 디지털 계산으로 메우는 것이 현대 RF 칩의 공통된 전략이다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="pll">
+    <h2>PLL: 정확한 박자를 만드는 회로</h2>
+    <p>믹서에 넣을 LO는 정확하고 깨끗해야 한다. 휴대폰은 정해진 채널 주파수에 100만분의 0.1(0.1 ppm) 수준까지 맞춰야 한다. 정확한 박자는 작은 <b>수정 진동자</b><span class="en">(crystal)</span>가 만든다. 석영 조각이 고유한 진동수(예: 38.4 MHz)로 울리는 것을 이용한 것인데, 매우 안정하지만 주파수를 바꿀 수 없고 GHz까지 올라가지도 못한다. 반대로 <span class="term">전압 제어 발진기</span><span class="en">(VCO)</span>는 전압으로 주파수를 수 GHz 범위에서 쉽게 바꿀 수 있지만 혼자 두면 이리저리 흔들린다.</p>
+    <p><span class="term">위상 고정 루프</span><span class="en">(phase-locked loop, PLL)</span>는 둘의 장점을 합친다. VCO 출력을 N으로 나눈 신호를 수정 발진기와 계속 비교해서, 조금이라도 앞서거나 뒤처지면 VCO 전압을 고친다. 고정(lock)되면 f<sub>out</sub> = N × f<sub>ref</sub>가 된다. 요즘 PLL은 N을 정수가 아닌 값(예: 50.78125)으로 빠르게 바꿔 가며 평균을 맞추는 <b>분수 분주(fractional-N)</b>로 수 kHz 간격까지 주파수를 고른다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 220" style="min-width:600px" role="img" aria-label="PLL 블록도">
+        <defs><marker id="pl-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <g class="t" style="font-size:12.5px">
+          <rect x="10" y="40" width="120" height="60" rx="10" class="f-acc2-soft"/><text x="70" y="64" text-anchor="middle" style="font-weight:700">수정 발진기</text><text x="70" y="84" text-anchor="middle" class="t-mono" style="font-size:11px">f_ref = 38.4 MHz</text>
+          <rect x="170" y="40" width="120" height="60" rx="10" class="f-elev" stroke="var(--border)"/><text x="230" y="64" text-anchor="middle" style="font-weight:700">위상 비교기</text><text x="230" y="84" text-anchor="middle" class="t-dim" style="font-size:11px">앞섰나? 뒤졌나?</text>
+          <rect x="330" y="40" width="130" height="60" rx="10" class="f-elev" stroke="var(--border)"/><text x="395" y="64" text-anchor="middle" style="font-weight:700">루프 필터</text><text x="395" y="84" text-anchor="middle" class="t-dim" style="font-size:11px">오차 → 제어 전압</text>
+          <rect x="500" y="40" width="120" height="60" rx="10" class="f-acc-soft"/><text x="560" y="64" text-anchor="middle" style="font-weight:700">VCO</text><text x="560" y="84" text-anchor="middle" class="t-dim" style="font-size:11px">전압 → 주파수</text>
+          <rect x="330" y="140" width="130" height="50" rx="10" class="f-surface" stroke="var(--border)"/><text x="395" y="162" text-anchor="middle" style="font-weight:700">분주기 ÷N</text><text x="395" y="180" text-anchor="middle" class="t-dim" style="font-size:11px">N = 50.78125 …</text>
+          <text x="740" y="64" text-anchor="middle" style="font-weight:700">f_out = N × f_ref</text><text x="740" y="84" text-anchor="middle" class="t-mono" style="font-size:11px">→ 믹서의 LO로</text>
+        </g>
+        <path d="M130 70 H166 M290 70 H326 M460 70 H496 M620 70 H668" class="s-acc" marker-end="url(#pl-a)"/>
+        <path d="M640 70 V165 H464" class="s-acc" fill="none" marker-end="url(#pl-a)"/>
+        <path d="M330 165 H230 V104" class="s-acc" fill="none" marker-end="url(#pl-a)"/>
+        <text x="560" y="130" class="t-dim" style="font-size:11px">출력의 일부를 되먹임</text>
+      </svg></div>
+      <figcaption><b>그림 18-3.</b> PLL. VCO 출력을 N으로 나눈 것이 기준 수정 발진기와 박자가 맞을 때까지 VCO 전압을 고친다. 고정되면 출력 주파수는 수정의 정확도를 그대로 물려받는다. N만 바꾸면 다른 채널로 옮겨 간다.</figcaption>
+    </figure>
+    <p>PLL 출력은 완벽한 사인파가 아니다. 위상이 조금씩 앞뒤로 흔들리는 <span class="term">위상 잡음</span><span class="en">(phase noise)</span>이 있다. 스펙트럼에서는 반송파 양옆으로 퍼진 치마(skirt)로 보이고, 단위는 반송파에서 일정 주파수 떨어진 곳의 1 Hz당 상대 전력(dBc/Hz)이다. LO의 위상이 흔들리면 수신한 심볼 전체가 그만큼 회전하므로, 성좌도(12장)의 점들이 <b>원점을 중심으로 둥글게</b> 번진다. 바깥쪽 점일수록 같은 각도에서도 더 많이 움직이기 때문에 256QAM처럼 촘촘한 변조일수록 치명적이다. 또 분주비 N 배로 주파수를 곱하면 위상 흔들림도 N 배가 되므로, 같은 기준 발진기로 주파수를 두 배 올리면 위상 잡음은 20·log<sub>10</sub>2 ≈ 6 dB 나빠진다. mmWave가 어려운 이유 중 하나다.</p>
+    <div class="sim" id="sim-pl">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>PLL: 분주비로 주파수 고르기, 위상 잡음으로 성좌도 번지기</h3></div>
+      <div class="trio">
+        <div><canvas id="cv-pl-lock"></canvas></div>
+        <div><canvas id="cv-pl-pn"></canvas></div>
+        <div><canvas id="cv-pl-con"></canvas></div>
+      </div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>분주비 N <output id="pl-n-out"></output></span><input type="range" id="pl-n" min="45" max="110" step="0.1" value="50.8"></label>
+        <label class="ctrl"><span>PLL 품질: rms 위상 오차 (N=80 기준) <output id="pl-pn-out"></output></span><input type="range" id="pl-pn" min="0.2" max="6" step="0.1" value="1"></label>
+        <div class="ctrl"><span>변조</span><div class="seg" id="pl-mod"><button data-value="4">QPSK</button><button data-value="16">16QAM</button><button data-value="64" class="on">64QAM</button><button data-value="256">256QAM</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">출력 주파수</span><span class="v" id="pl-o-f">—</span></div>
+        <div class="stat"><span class="k">rms 위상 오차</span><span class="v" id="pl-o-rms">—</span></div>
+        <div class="stat"><span class="k">위상 잡음 @100 kHz</span><span class="v" id="pl-o-pn">—</span></div>
+        <div class="stat"><span class="k">EVM</span><span class="v" id="pl-o-evm">—</span></div>
+        <div class="stat"><span class="k">심볼 오류 (1,500개 중)</span><span class="v" id="pl-o-ser">—</span></div>
+      </div>
+      <div class="sim-note">왼쪽: N을 바꾸는 순간 VCO가 새 주파수로 옮겨 가 고정되는 과정(수십 µs). 가운데: 출력의 위상 잡음 스펙트럼(루프 대역 100 kHz 안은 평평하고 밖은 −20 dB/decade로 떨어지는 모양). 오른쪽: 이 LO로 받은 심볼들. 해볼 것: ① N을 두 배로 올려 보자. 같은 PLL 품질에서도 위상 오차가 두 배(위상 잡음 +6 dB)가 된다. ② 위상 오차 2°에서 QPSK와 256QAM을 비교하자. 단순화: 열잡음은 SNR 35 dB로 고정, 위상 잡음은 심볼마다 독립인 가우스 분포로 근사했다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="pa">
+    <h2>전력 증폭기: 효율과 선형성의 줄다리기</h2>
+    <p>송신 쪽 끝에는 <span class="term">전력 증폭기</span><span class="en">(power amplifier, PA)</span>가 있다. 트랜시버가 내보낸 약 1 mW(0 dBm)의 신호를 안테나에서 약 200 mW(23 dBm, 3GPP 단말 전력 등급 3) 수준까지 키운다. 필터와 스위치 손실을 고려하면 PA 출력은 그보다 2~4 dB 더 커야 한다. 휴대폰에서 배터리를 가장 많이 먹는 부품 중 하나이고, 남는 에너지는 모두 열이 된다.</p>
+    <p>PA의 성적표는 두 가지다. 하나는 <span class="term">전력 부가 효율</span><span class="en">(power-added efficiency, PAE)</span>로, 배터리에서 끌어온 직류 전력 중 몇 %가 전파 전력으로 바뀌는가 = (출력 − 입력) ÷ 직류 전력이다. 다른 하나는 <b>선형성</b>, 즉 입력을 두 배로 하면 출력도 정확히 두 배가 되는가이다. 트랜지스터는 공급 전압 이상으로 출력을 낼 수 없으므로 입력이 커지면 출력이 <b>포화</b>되어 꺾인다. 그런데 효율은 바로 이 포화점 근처에서 가장 높다. 효율을 원하면 포화 근처에서, 선형성을 원하면 포화에서 멀찍이 떨어져서 써야 한다.</p>
+    <p>OFDM(12장)은 수백 개의 부반송파가 더해진 신호라서 가끔 위상이 맞아떨어질 때 순간 전력이 평균보다 훨씬 커진다. 이 비율이 PAPR(최대 대 평균 전력비)이고 OFDM에서는 흔히 8~12 dB에 이른다. 이 순간 봉우리가 찌그러지지 않게 하려면 평균 출력을 포화점보다 그만큼 낮춰야 하는데, 이를 <span class="term">백오프</span><span class="en">(back-off)</span>라 한다. 백오프를 크게 하면 PA는 대부분의 시간을 효율이 낮은 구간에서 보낸다. 그래서 LTE 상향링크는 PAPR이 낮은 SC-FDMA(DFT-s-OFDM)를 쓰고, 칩 설계자들은 두 가지 기술을 더한다.</p>
+    <ul>
+      <li><span class="term">포락선 추적</span><span class="en">(envelope tracking, ET)</span>: 신호 크기(포락선)를 미리 알고, PA의 공급 전압을 그 순간 필요한 만큼만 빠르게 오르내린다. 작은 신호일 때 낭비되는 전압을 줄여 효율을 끌어올린다. 수십~100 MHz 대역폭으로 전압을 바꾸는 전용 전원 칩이 필요하다.</li>
+      <li><span class="term">디지털 전치 왜곡</span><span class="en">(digital pre-distortion, DPD)</span>: PA가 큰 신호를 얼마나 찌그러뜨리는지 측정해 두고, 디지털 단계에서 미리 <b>반대로</b> 찌그러뜨려 보낸다. 두 왜곡이 상쇄되어 포화점 바로 아래까지 직선처럼 쓸 수 있다. 기지국 PA에서는 필수다.</li>
+    </ul>
+    <div class="sim" id="sim-pa">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>PA: 입력을 키우면 무엇이 찌그러지는가</h3></div>
+      <div class="trio">
+        <div><canvas id="cv-pa-am"></canvas></div>
+        <div><canvas id="cv-pa-con"></canvas></div>
+        <div><canvas id="cv-pa-sp"></canvas></div>
+      </div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>평균 입력 전력 (포화 입력 대비) <output id="pa-in-out"></output></span><input type="range" id="pa-in" min="-20" max="4" step="0.5" value="-12"></label>
+        <label class="check"><input type="checkbox" id="pa-dpd"> DPD (디지털 전치 왜곡) 켜기</label>
+        <label class="check"><input type="checkbox" id="pa-et"> 포락선 추적(ET) 전원 켜기</label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">평균 출력</span><span class="v" id="pa-o-pout">—</span></div>
+        <div class="stat"><span class="k">출력 백오프</span><span class="v" id="pa-o-bo">—</span></div>
+        <div class="stat"><span class="k">EVM (16QAM 한도 12.5%)</span><span class="v" id="pa-o-evm">—</span></div>
+        <div class="stat"><span class="k">ACLR (한도 −30 dBc)</span><span class="v" id="pa-o-aclr">—</span></div>
+        <div class="stat"><span class="k">효율 (PAE 근사)</span><span class="v" id="pa-o-eff">—</span></div>
+      </div>
+      <div class="sim-note">왼쪽: PA의 입력-출력 곡선(dB, 포화 출력 = 0 dB)과 실제 OFDM 표본들(점). 가운데: 수신해서 FFT로 푼 16QAM 성좌도. 오른쪽: 출력 스펙트럼. 회색 띠 = 내 채널, 바깥 = 이웃 채널. 해볼 것: ① 입력을 −20 dB에서 0 dB 쪽으로 올리며 효율과 EVM·ACLR이 반대로 움직이는 것을 보자. 봉우리가 꺾이기 시작하면 성좌도 바깥 점이 안으로 찌그러지고 회전하며, 이웃 채널로 전력이 새어 나간다(스펙트럼 재성장). ② ACLR이 한도에 걸리는 지점에서 DPD를 켜면 몇 dB 더 올려 쓸 수 있다. ③ ET를 켜면 같은 출력에서 효율이 오른다. 단순화: Rapp 모델(매끄러운 포화, p=2) + 약한 AM-PM, 64개 부반송파·4배 오버샘플링 OFDM, 효율은 B급 증폭기 근사, 포화 출력 33 dBm.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">DPD 없이 ACLR 한도(−30 dBc)를 겨우 지키는 상태다. 이 상태에서 DPD를 켜고 ACLR이 다시 −30 dBc가 될 때까지 입력을 올리면, 효율은 어떻게 될까?</p><p class="wi-hint">PA 시뮬레이터에서 DPD를 끈 채 ACLR이 −30 dBc 근처가 되는 입력을 찾은 뒤, DPD를 켜고 입력을 더 올려 보자.</p><div class="opts">
+      <button class="opt">DPD가 계산을 하므로 효율이 떨어진다</button>
+      <button class="opt" data-correct>포화점에 더 가깝게 쓸 수 있어 효율이 올라간다</button>
+      <button class="opt">효율은 그대로이고 EVM만 좋아진다</button>
+      <button class="opt">입력을 올리면 PA가 망가진다</button>
+    </div><div class="quiz-exp">DPD는 PA를 직선으로 펴서 같은 왜곡 한도 안에서 백오프를 줄여 준다. 백오프가 줄면 PA가 효율 높은 영역에서 일하므로 PAE가 오른다. 실제 기지국에서는 DPD 덕분에 PA 효율이 크게 오르며, DPD 연산 전력은 PA가 아끼는 전력보다 훨씬 작다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="materials">
+    <h2>재료가 다르다: GaAs, GaN, SiGe, RF-SOI, CMOS</h2>
+    <p>컴퓨터의 칩은 거의 모두 실리콘 CMOS로 만들지만, 휴대폰의 RF 칩은 재료가 제각각이다. 각 칩이 요구하는 물리량이 다르기 때문이다. PA는 높은 전압을 견디며 큰 전류를 빠르게 흘려야 하고, LNA는 잡음이 적어야 하며, 스위치는 손실이 적고 큰 신호에도 찌그러지지 않아야 하고, 모뎀은 트랜지스터 수십억 개를 싸게 넣어야 한다.</p>
+    <div class="table-wrap"><table class="mat-tbl">
+      <thead><tr><th>재료</th><th class="num">밴드갭 (eV)</th><th class="num">전자 이동도 (cm²/V·s)</th><th class="num">항복 전계 (MV/cm)</th><th>주 용도</th></tr></thead>
+      <tbody>
+        <tr><td>Si (CMOS, RF-SOI)</td><td class="num">1.12</td><td class="num">≈1,400</td><td class="num">≈0.3</td><td>트랜시버·모뎀(첨단 CMOS), 안테나 스위치·튜너·LNA(RF-SOI)</td></tr>
+        <tr><td>SiGe (HBT)</td><td class="num">Si 기반<br><small>베이스만 SiGe</small></td><td class="num">Si 수준</td><td class="num">Si 수준</td><td>mmWave 트랜시버·빔포밍 칩, 광통신 TIA·드라이버(BiCMOS)</td></tr>
+        <tr><td>GaAs (HBT, pHEMT)</td><td class="num">1.42</td><td class="num">≈8,500</td><td class="num">≈0.4</td><td>휴대폰 PA(InGaP/GaAs HBT), 일부 스위치·LNA</td></tr>
+        <tr><td>GaN (HEMT)</td><td class="num">3.4</td><td class="num">≈1,000<br><small>2DEG 채널 ≈2,000</small></td><td class="num">≈3.3</td><td>기지국·레이더·위성 PA, 고속 충전기</td></tr>
+        <tr><td>InP (HBT, HEMT)</td><td class="num">1.34</td><td class="num">≈5,400</td><td class="num">≈0.5</td><td>100 GHz 이상 초고주파 소자, 광통신 레이저(19장)</td></tr>
+        <tr><td>SiC (기판)</td><td class="num">3.26</td><td class="num">≈900</td><td class="num">≈3</td><td>GaN-on-SiC의 기판(열을 잘 빼냄), 전력 반도체</td></tr>
+      </tbody>
+    </table></div>
+    <p>표를 읽는 법은 이렇다. <b>전자 이동도</b>가 높으면 같은 전압에서 전자가 빨리 달려 고주파에서 이득이 크다. GaAs가 실리콘보다 약 6배 높아서 오랫동안 휴대폰 PA의 주인공이었다. <b>밴드갭</b>이 넓으면 전자를 떼어 내는 데 큰 에너지가 필요하므로 <b>항복 전계</b>가 높다. 즉 높은 전압을 견딘다. 출력 전력은 대략 전압 × 전류에 비례하므로, 같은 크기의 트랜지스터에서 GaN은 GaAs보다 수 배 높은 전압으로 동작해 mm당 5~10 W 수준의 전력 밀도를 낸다(GaAs는 약 1 W/mm). 수십~수백 W를 내야 하는 5G 기지국 Massive MIMO 안테나의 PA가 GaN HEMT로 바뀐 이유다. 게다가 GaN과 AlGaN의 경계에는 결정의 분극 때문에 도핑 없이도 전자가 빽빽하게 모인 얇은 층(2차원 전자 가스, 2DEG)이 저절로 생겨 빠르고 전류가 크다.</p>
+    <p>반대로 휴대폰에서는 전압이 배터리의 3~5 V로 정해져 있어 GaN의 고전압 장점을 살리기 어렵고, GaAs HBT가 값과 성숙도에서 앞선다. <span class="term">RF-SOI</span>는 실리콘 기판과 트랜지스터 사이에 얇은 산화막을 끼운 웨이퍼로, 기판으로 새는 신호와 기생 용량이 작아 수십 개 스위치를 쌓은 안테나 스위치와 튜너, LNA를 값싸게 만든다. 트랜지스터를 직렬로 쌓아 높은 RF 전압을 나눠 견딘다. SiGe BiCMOS는 실리콘 공정에 게르마늄을 섞은 고속 바이폴라 트랜지스터를 넣어 차단 주파수(f<sub>T</sub>)가 300 GHz를 넘는다. 그리고 트랜시버와 모뎀은 디지털 회로가 대부분이므로 가장 앞선 CMOS 공정으로 만든다.</p>
+    <div class="callout deep"><strong>“하나의 재료로 통일”은 왜 안 될까</strong><p>CMOS만으로 휴대폰 PA를 만드는 시도는 계속되어 Wi-Fi와 2G PA 일부는 CMOS가 되었다. 하지만 미세한 CMOS 트랜지스터는 견딜 수 있는 전압이 1 V 안팎이라 수 W 첨두 출력과 높은 효율을 함께 얻기 어렵다. 그래서 RF 프런트엔드는 GaAs PA 칩, RF-SOI 스위치 칩, 압전 필터 칩, CMOS 제어 칩을 한 패키지에 올리는 시스템 인 패키지(SiP)로 만든다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="lna">
+    <h2>LNA와 잡음 지수: 첫 단이 모든 것을 정한다</h2>
+    <p>안테나에 도착한 신호는 −100 dBm(0.1 pW) 근처까지 약하다. 이것을 알아들을 수 있느냐는 신호 세기보다 <b>잡음</b>에 달려 있다. 절대 온도 0 K가 아닌 모든 저항은 전자의 열운동 때문에 잡음을 내는데, 실온(290 K)에서 그 세기는 1 Hz 폭당 −174 dBm이다(2장의 열잡음). 대역폭이 20 MHz면 여기에 10·log<sub>10</sub>(2×10<sup>7</sup>) ≈ 73 dB를 더해 −101 dBm이 된다. 이것이 출발점의 바닥이다.</p>
+    <p>증폭기·필터·믹서는 신호를 다루면서 자기 잡음을 조금씩 보탠다. 이 때문에 신호 대 잡음비(SNR)가 몇 dB 나빠지는지를 <span class="term">잡음 지수</span><span class="en">(noise figure, NF)</span>라 한다. 여러 단이 이어질 때 전체 잡음 지수는 <b>프리스 공식</b>(Friis formula)으로 계산한다.</p>
+    <div class="formula">F<sub>전체</sub> = F<sub>1</sub> + (F<sub>2</sub> − 1)/G<sub>1</sub> + (F<sub>3</sub> − 1)/(G<sub>1</sub>G<sub>2</sub>) + …<div class="where">F = 잡음 인수(선형값, NF = 10·log<sub>10</sub>F), G = 각 단의 전력 이득(선형값). 손실이 L dB인 수동 필터는 G = −L dB, NF = L dB로 친다.</div></div>
+    <p>뒤쪽 단의 잡음은 앞쪽 단의 이득으로 <b>나누어진다</b>. 첫 단에서 신호를 충분히 키워 두면 뒤쪽 믹서가 잡음이 많아도 별 영향이 없다. 그래서 안테나 가까이에 잡음이 적고 이득이 큰 <span class="term">저잡음 증폭기</span><span class="en">(low-noise amplifier, LNA)</span>를 둔다. 반대로 LNA 앞에 있는 필터·스위치의 손실은 그대로 전체 NF에 더해진다. 그 결과로 얻는 <span class="term">수신 감도</span><span class="en">(sensitivity)</span>, 즉 알아들을 수 있는 가장 약한 신호는 다음과 같다.</p>
+    <div class="formula">감도(dBm) = −174 + 10·log<sub>10</sub>(대역폭 Hz) + NF(dB) + 필요한 SNR(dB)</div>
+    <div class="sim" id="sim-nf">
+      <div class="sim-head"><span class="sim-tag">CALCULATOR</span><h3>수신기 연쇄: 잡음 지수와 수신 감도</h3></div>
+      <div class="sim-view"><canvas id="cv-nf"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>순서</span><div class="seg" id="nf-order"><button data-value="fl" class="on">필터 → LNA → 믹서</button><button data-value="lf">LNA → 필터 → 믹서</button><button data-value="nolna">LNA 없이</button></div></div>
+        <label class="ctrl"><span>필터·스위치 손실 <output id="nf-loss-out"></output></span><input type="range" id="nf-loss" min="0.5" max="4" step="0.1" value="2"></label>
+        <label class="ctrl"><span>LNA 이득 <output id="nf-g-out"></output></span><input type="range" id="nf-g" min="5" max="25" step="0.5" value="18"></label>
+        <label class="ctrl"><span>LNA 잡음 지수 <output id="nf-nf-out"></output></span><input type="range" id="nf-nf" min="0.5" max="4" step="0.1" value="1.2"></label>
+        <label class="ctrl"><span>믹서 이후 전체 NF <output id="nf-mx-out"></output></span><input type="range" id="nf-mx" min="6" max="20" step="0.5" value="12"></label>
+        <div class="ctrl"><span>채널 대역폭</span><div class="seg" id="nf-bw"><button data-value="10e6">10 MHz</button><button data-value="20e6" class="on">20 MHz</button><button data-value="100e6">100 MHz</button></div></div>
+        <label class="ctrl"><span>필요한 SNR (변조·부호율) <output id="nf-snr-out"></output></span><input type="range" id="nf-snr" min="-5" max="30" step="0.5" value="0"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">전체 잡음 지수</span><span class="v" id="nf-o-nf">—</span></div>
+        <div class="stat"><span class="k">잡음 바닥 (대역 전체)</span><span class="v" id="nf-o-floor">—</span></div>
+        <div class="stat"><span class="k">수신 감도</span><span class="v" id="nf-o-sens">—</span></div>
+      </div>
+      <div class="sim-note">위: 각 단의 이득·NF와 그 지점까지의 누적 NF. 아래 막대: 전체 잡음 중 각 단이 보탠 몫. 해볼 것: ① LNA 이득을 5 dB로 낮추면 믹서의 잡음 몫이 커진다. ② 순서를 “LNA → 필터”로 바꾸면 NF가 좋아지지만, 실제 휴대폰은 강한 송신 신호와 이웃 대역 전파가 LNA를 포화시키지 않도록 필터를 앞에 둔다. ③ “LNA 없이”는 감도가 얼마나 나빠지나? 필요한 SNR은 QPSK 저부호율이면 0 dB 안팎, 256QAM이면 25 dB 이상이다. 단순화: 믹서 이후는 한 덩어리로 묶었다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">LNA 이득이 18 dB일 때, 믹서 이후 NF를 12 dB에서 6 dB로 크게 개선하면 전체 NF는 얼마나 좋아질까?</p><p class="wi-hint">수신기 연쇄 계산기에서 믹서 이후 NF만 바꿔 보자.</p><div class="opts">
+      <button class="opt">약 6 dB 좋아진다</button>
+      <button class="opt">약 3 dB 좋아진다</button>
+      <button class="opt" data-correct>1 dB도 안 좋아진다</button>
+      <button class="opt">오히려 나빠진다</button>
+    </div><div class="quiz-exp">믹서의 잡음은 앞단 LNA 이득(18 dB ≈ 63배)으로 나뉘어 전체에 작게만 반영된다. 기본값에서 믹서 몫은 (15.8−1)/(63×0.63) ≈ 0.37로 전체 잡음 인수 약 2.6의 일부일 뿐이다. 그래서 RF 설계자는 첫 단 LNA와 그 앞 손실에 가장 공을 들인다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="filters">
+    <h2>필터: 전기를 소리로 바꿔 거른다</h2>
+    <p>휴대폰은 송신과 수신을 동시에 하는 FDD 대역에서 자기 PA가 내는 +25 dBm 근처의 신호 바로 옆에서 −100 dBm짜리 신호를 들어야 한다. 그 차이는 10<sup>12</sup>배가 넘는다. 이 둘을 가르는 것이 송신 필터와 수신 필터를 한 몸에 묶은 <span class="term">듀플렉서</span><span class="en">(duplexer)</span>다. 예를 들어 밴드 3은 송신 1,710~1,785 MHz, 수신 1,805~1,880 MHz로 간격이 20 MHz뿐이다. 2 GHz 근처에서 20 MHz 안에 수신 쪽을 수십 dB 떨어뜨리려면 매우 날카로운 필터(높은 Q)가 필요한데, 코일과 커패시터로 만든 LC 필터는 손톱만 한 크기에서 Q가 수십에 그친다.</p>
+    <p>해답은 <b>소리</b>다. 압전 결정은 전압을 걸면 찌그러지고, 찌그러지면 전압이 생긴다. 전기 신호를 결정 속의 음파(탄성파)로 바꾸면 음속이 빛보다 약 10만 배 느리므로 파장이 마이크로미터 수준으로 줄어, 칩 크기에서 정밀한 공진기를 만들 수 있다. 공진기들을 사다리처럼 이어 원하는 대역만 통과시킨다.</p>
+    <ul>
+      <li><span class="term">SAW 필터</span><span class="en">(surface acoustic wave)</span>: 탄탈산리튬(LiTaO<sub>3</sub>)·니오브산리튬 같은 압전 기판 표면에 빗살 모양 전극(IDT)을 새겨 표면파를 만든다. 싸고 성숙했지만 빗살 간격이 파장을 정하므로 약 2.5 GHz 이상에서는 만들기 어렵고, 온도에 따라 주파수가 꽤 움직인다(약 −40 ppm/°C). 온도 보상층(SiO<sub>2</sub>)을 덮은 TC-SAW가 이를 줄인다.</li>
+      <li><span class="term">BAW 필터</span><span class="en">(bulk acoustic wave)</span>: 질화알루미늄(AlN, 요즘은 Sc를 섞은 ScAlN) 박막을 두 전극 사이에 끼워 두께 방향으로 진동시킨다. 두께가 파장을 정하므로 수백 nm 박막으로 6 GHz 근처까지 간다. 아래를 비운 것을 FBAR, 음향 거울로 받친 것을 SMR이라 한다. Q가 높아 가파른 경계가 필요한 대역에 쓴다.</li>
+    </ul>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 250" style="min-width:600px" role="img" aria-label="SAW와 BAW 필터 구조">
+        <text x="200" y="22" text-anchor="middle" class="t" style="font-weight:700">SAW: 표면을 달리는 음파</text>
+        <text x="610" y="22" text-anchor="middle" class="t" style="font-weight:700">BAW(FBAR): 두께 방향으로 울리는 막</text>
+        <rect x="20" y="150" width="360" height="56" rx="6" class="f-acc2-soft"/><text x="200" y="226" text-anchor="middle" class="t-dim" style="font-size:12px">압전 기판 (LiTaO₃ 등)</text>
+        <g stroke="var(--accent)" stroke-width="4">
+          <path d="M50 60 H140 M50 140 H140"/>
+          <path d="M60 60 V128 M80 72 V140 M100 60 V128 M120 72 V140"/>
+          <path d="M260 60 H350 M260 140 H350"/>
+          <path d="M270 60 V128 M290 72 V140 M310 60 V128 M330 72 V140"/>
+        </g>
+        <text x="95" y="50" text-anchor="middle" class="t" style="font-size:12px">입력 IDT (전기→소리)</text>
+        <text x="305" y="50" text-anchor="middle" class="t" style="font-size:12px">출력 IDT (소리→전기)</text>
+        <path d="M150 100 q 10 -14 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0" stroke="var(--warn)" stroke-width="2.5" fill="none"/>
+        <text x="200" y="125" text-anchor="middle" class="t-dim" style="font-size:11px">표면파 → (음속 약 4 km/s)</text>
+        <text x="200" y="174" text-anchor="middle" class="t-mono" style="font-size:11px">빗살 간격 = 파장 ≈ 2 µm @ 2 GHz</text>
+        <!-- BAW -->
+        <rect x="460" y="190" width="300" height="34" rx="4" class="f-surface" stroke="var(--border)"/><text x="610" y="212" text-anchor="middle" class="t-dim" style="font-size:12px">실리콘 기판</text>
+        <rect x="470" y="150" width="70" height="40" class="f-surface" stroke="var(--border)"/><rect x="680" y="150" width="70" height="40" class="f-surface" stroke="var(--border)"/>
+        <text x="610" y="176" text-anchor="middle" class="t-dim" style="font-size:12px">공기 공동</text>
+        <rect x="490" y="136" width="240" height="10" fill="var(--text-dim)"/>
+        <rect x="490" y="90" width="240" height="46" class="f-acc2-soft" stroke="var(--accent-2)"/>
+        <rect x="490" y="80" width="240" height="10" fill="var(--text-dim)"/>
+        <text x="610" y="118" text-anchor="middle" class="t" style="font-size:12px">AlN / ScAlN 압전 박막</text>
+        <text x="760" y="88" class="t-dim" style="font-size:11px">전극</text><text x="760" y="144" class="t-dim" style="font-size:11px">전극</text>
+        <path d="M720 92 Q 735 113 720 134" stroke="var(--warn)" stroke-width="2.5" fill="none"/><path d="M500 92 Q 485 113 500 134" stroke="var(--warn)" stroke-width="2.5" fill="none"/>
+        <text x="610" y="62" text-anchor="middle" class="t-mono" style="font-size:11px">두께 ≈ 반파장 ≈ 수백 nm → 2~6 GHz</text>
+      </svg></div>
+      <figcaption><b>그림 18-4.</b> 음향파 필터. SAW는 빗살 전극이 기판 표면에 음파를 일으키고 받으며, 빗살 간격이 맞는 주파수만 잘 전달된다. BAW는 얇은 압전막이 두께 방향으로 공진하는데, 위아래를 공기(FBAR)나 음향 거울로 막아 에너지가 새지 않게 한다. 두 경우 모두 실제 필터는 이런 공진기 여러 개를 사다리꼴로 연결한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-flt">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>수신 필터 응답: 통과 대역, 삽입 손실, 이웃 대역 차단</h3></div>
+      <div class="sim-view"><canvas id="cv-flt"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>대역</span><div class="seg" id="fl-band"><button data-value="b3" class="on">밴드 3 수신 (옆: 자기 송신)</button><button data-value="b41">밴드 41 (옆: Wi-Fi 2.4 GHz)</button></div></div>
+        <div class="ctrl"><span>필터 기술</span><div class="seg" id="fl-tech"><button data-value="saw" class="on">SAW</button><button data-value="tcsaw">TC-SAW</button><button data-value="baw">BAW</button></div></div>
+        <label class="ctrl"><span>온도 <output id="fl-temp-out"></output></span><input type="range" id="fl-temp" min="-30" max="85" step="1" value="25"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">통과 대역 최악 손실</span><span class="v" id="fl-o-il">—</span></div>
+        <div class="stat"><span class="k">이웃 대역 최소 차단</span><span class="v" id="fl-o-rej">—</span></div>
+        <div class="stat"><span class="k">중심 이동</span><span class="v" id="fl-o-shift">—</span></div>
+        <div class="stat"><span class="k">판정 (차단 ≥ 40 dB)</span><span class="v" id="fl-o-ok">—</span></div>
+      </div>
+      <div class="sim-note">초록 띠 = 통과시켜야 할 대역, 빨간 띠 = 막아야 할 이웃 대역. 해볼 것: ① 밴드 3에서 SAW는 20 MHz 간격 안에서 40 dB를 못 만든다. TC-SAW나 BAW로 바꿔 보자. ② 밴드 41은 Wi-Fi와 간격이 12.5 MHz뿐이고 주파수도 높아 BAW가 필요하다. ③ 온도를 85 °C로 올리면 필터가 아래로 미끄러져 Wi-Fi 쪽 차단이 무너진다. 단순화: 공진기 Q와 온도 계수(SAW −40, TC-SAW −10, BAW −15 ppm/°C)로 경계의 가파름과 이동만 근사한 모형이다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="adc-modem">
+    <h2>ADC와 베이스밴드 모뎀: 아날로그에서 비트로</h2>
+    <p>트랜시버의 마지막 관문은 <b>ADC</b>(아날로그-디지털 변환기)다. 성능은 두 숫자로 요약된다. 1초에 몇 번 재는가(샘플링 속도)와 한 번에 몇 단계로 재는가(비트 수)다. 나이퀴스트 원리(2장)에 따라 I와 Q 각각 채널 대역폭 이상으로 재야 하므로, 100 MHz 5G 채널이면 I·Q 각각 초당 수억 번(예: 245.76 MS/s 이상)을 잰다. 비트 수가 N이면 이상적인 SNR은 약 6.02·N + 1.76 dB다. 실제 회로의 잡음과 왜곡까지 반영해 거꾸로 계산한 비트 수를 <span class="term">유효 비트 수</span><span class="en">(ENOB)</span>라 하며, 12비트 ADC의 ENOB는 보통 9~10비트다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>쓰임</th><th class="num">샘플링 속도</th><th class="num">비트 (ENOB)</th><th>특징</th></tr></thead>
+      <tbody>
+        <tr><td>휴대폰 트랜시버 수신 ADC</td><td class="num">수백 MS/s</td><td class="num">10~12 (≈9~10)</td><td>수신 경로마다 I/Q 한 쌍, 수 mW~수십 mW</td></tr>
+        <tr><td>기지국 직접 RF 샘플링 ADC</td><td class="num">3~10 GS/s 수준</td><td class="num">12~14 (≈9~10)</td><td>믹서 없이 GHz 신호를 바로 디지털화, 와트 단위</td></tr>
+        <tr><td>코히어런트 광통신 DSP의 ADC</td><td class="num">100~200 GS/s 수준</td><td class="num">6~8 (≈5~6)</td><td>초고속·저해상도, 여러 개를 번갈아 쓰는 인터리빙</td></tr>
+      </tbody>
+    </table></div>
+    <p>ADC 성능을 올리면 전력이 빠르게 늘어난다. 비트 하나를 늘리면 단계가 두 배로 촘촘해져 같은 방식으로는 대략 전력이 2~4배 늘고, 속도를 두 배로 하면 전력도 그만큼 는다. 그래서 휴대폰은 앞단 아날로그 필터로 쓸데없는 신호를 최대한 걸러 ADC가 감당할 범위(다이내믹 레인지)를 줄인다. 기지국에서는 전력보다 유연성이 중요해 GHz 신호를 바로 재는 <b>직접 RF 샘플링</b>이 늘고 있다. 믹서와 IF 단이 사라지고 주파수 변환이 디지털 계산이 된다.</p>
+    <p>ADC가 내놓은 숫자는 <b>베이스밴드 모뎀</b>이 받는다. 수신 쪽에서 모뎀이 하는 일은 대략 이렇다. ① 시간·주파수 동기를 맞추고 ② FFT로 OFDM 부반송파를 분리하고(12장) ③ 기준 신호(파일럿)로 각 부반송파의 감쇠와 위상 회전을 재는 <b>채널 추정</b>을 하고 ④ MIMO 신호를 분리하고 ⑤ 심볼을 비트의 확률(소프트 비트)로 바꾸고 ⑥ <b>LDPC</b>(5G 데이터)와 <b>폴라 부호</b>(5G 제어 채널)를 풀어 오류를 고친다. 초당 수 Gbps를 처리하려면 범용 CPU로는 어림없어서, 프로그래머블 DSP 코어와 FFT·MIMO·LDPC 전용 하드웨어 가속기를 섞어 만든다. 디지털 회로라 최신 공정의 혜택을 그대로 받으므로 3~5 nm급 공정으로 AP와 한 칩에 넣는 경우가 많다.</p>
+    <div class="callout tip"><strong>왜 휴대폰 모뎀은 따로 만들기 어려운가</strong><p>모뎀은 2G부터 5G까지 수십 년 치 표준을 모두 지원하고, 전 세계 통신사의 망에서 상호 운용성 시험을 통과해야 한다. 칩 설계 자체보다 이 검증과 특허가 더 큰 장벽이라, 모뎀을 자체 개발하는 회사는 손에 꼽힌다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="aip">
+    <h2>mmWave와 안테나 인 패키지, 그리고 산업 지형</h2>
+    <p>5G의 mmWave 대역(24~40 GHz, 14장)은 대역폭이 수백 MHz~GHz라 빠르지만 전파가 약하고 잘 막힌다(11장). 이를 메우려면 여러 안테나 소자의 위상을 조절해 전파를 한 방향으로 모으는 <b>빔포밍</b>(12장)이 필요하다. 28 GHz의 파장은 약 1.07 cm, 소자 간격은 보통 반 파장인 5~6 mm다. 안테나 배열 전체가 손톱만 해지므로 아예 칩 패키지 위에 안테나를 그려 넣는다. 이것이 <span class="term">안테나 인 패키지</span><span class="en">(antenna-in-package, AiP)</span>다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 250" style="min-width:600px" role="img" aria-label="mmWave 안테나 인 패키지 단면과 빔">
+        <text x="230" y="22" text-anchor="middle" class="t" style="font-weight:700">AiP 모듈 단면 (약 20 × 5 mm)</text>
+        <!-- beam -->
+        <path d="M230 70 L150 10 L310 10 Z" fill="color-mix(in srgb, var(--accent) 12%, transparent)" stroke="none"/>
+        <g fill="var(--warn)">
+          <rect x="80" y="74" width="40" height="6" rx="1"/><rect x="150" y="74" width="40" height="6" rx="1"/><rect x="220" y="74" width="40" height="6" rx="1"/><rect x="290" y="74" width="40" height="6" rx="1"/>
+        </g>
+        <text x="370" y="80" class="t-dim" style="font-size:11.5px">패치 안테나 ×4</text>
+        <rect x="60" y="80" width="300" height="40" class="f-acc2-soft" stroke="var(--accent-2)"/><text x="210" y="104" text-anchor="middle" class="t" style="font-size:12px">다층 기판 (배선·급전선)</text>
+        <rect x="140" y="120" width="140" height="40" rx="4" class="f-acc"/><text x="210" y="145" text-anchor="middle" class="t" style="fill:#fff;font-size:12px;font-weight:700">빔포밍 RFIC</text>
+        <g fill="var(--text-dim)"><circle cx="90" cy="130" r="6"/><circle cx="110" cy="130" r="6"/><circle cx="310" cy="130" r="6"/><circle cx="330" cy="130" r="6"/></g>
+        <text x="210" y="184" text-anchor="middle" class="t-dim" style="font-size:11.5px">소자마다 위상 변환기 + PA/LNA</text>
+        <path d="M100 66 V56 M170 66 V56 M100 61 H170" class="s-line"/><text x="135" y="52" text-anchor="middle" class="t-mono" style="font-size:10.5px">λ/2 ≈ 5.4 mm</text>
+        <!-- phone -->
+        <rect x="560" y="30" width="120" height="200" rx="18" class="f-surface" stroke="var(--border)" stroke-width="2"/>
+        <text x="620" y="135" text-anchor="middle" class="t-dim" style="font-size:12px">휴대폰</text>
+        <rect x="552" y="70" width="16" height="44" rx="3" fill="var(--warn)"/><rect x="672" y="150" width="16" height="44" rx="3" fill="var(--warn)"/><rect x="598" y="34" width="44" height="12" rx="3" fill="var(--warn)"/>
+        <text x="750" y="96" class="t" style="font-size:12px">AiP 모듈 2~3개</text>
+        <text x="750" y="114" class="t-dim" style="font-size:11.5px">가장자리에 분산</text>
+        <text x="750" y="140" class="t-dim" style="font-size:11.5px">손이 하나를</text>
+        <text x="750" y="156" class="t-dim" style="font-size:11.5px">가려도 다른 쪽으로</text>
+      </svg></div>
+      <figcaption><b>그림 18-5.</b> mmWave 안테나 인 패키지. 빔포밍 칩 바로 위의 기판에 안테나 소자를 반 파장 간격으로 배열한다. 칩과 안테나 사이 배선이 수 mm로 짧아 고주파 손실이 적다. 손바닥과 몸이 mmWave를 잘 막으므로 휴대폰 여러 면에 모듈을 나눠 둔다.</figcaption>
+    </figure>
+    <p>RF 반도체 산업은 칩 종류마다 강자가 다르다. 회사 이름은 2025년 무렵의 예시일 뿐이다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>분야</th><th>대표적인 예</th><th>핵심 기술</th></tr></thead>
+      <tbody>
+        <tr><td>모뎀·트랜시버</td><td>퀄컴, 미디어텍, 삼성(엑시노스), 애플(자체 모뎀), 하이실리콘</td><td>첨단 CMOS, 표준 대응, 소프트웨어</td></tr>
+        <tr><td>휴대폰 RF 프런트엔드</td><td>스카이웍스, 코보, 브로드컴(FBAR), 무라타(SAW), 퀄컴</td><td>GaAs PA, RF-SOI, 음향파 필터, 모듈 패키징</td></tr>
+        <tr><td>파운드리 (RF 공정)</td><td>TSMC, 글로벌파운드리스(RF-SOI·SiGe), 윈세미(GaAs)</td><td>특수 공정 웨이퍼 생산</td></tr>
+        <tr><td>기지국 PA</td><td>NXP, 스미토모전공, 암플리온 등</td><td>GaN-on-SiC HEMT</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>휴대폰 통신부는 <b>RF 프런트엔드</b>(스위치·필터·PA·LNA) → <b>트랜시버</b>(믹서·PLL·ADC/DAC) → <b>베이스밴드 모뎀</b> → AP 순으로 이어진다. 대역이 수십 개라 프런트엔드의 부품이 가장 많다.</li>
+      <li><b>믹서</b>는 곱셈으로 합·차 주파수를 만든다. LO를 사이에 둔 거울상 <b>이미지 주파수</b>는 믹서 앞에서 걸러야 한다. 요즘 휴대폰은 LO = RF인 <b>직접 변환</b>과 I/Q 두 경로를 쓴다.</li>
+      <li><b>PLL</b>은 수정 발진기 박자에 VCO를 묶어 f<sub>out</sub> = N·f<sub>ref</sub>를 만든다. <b>위상 잡음</b>은 성좌도를 원 방향으로 번지게 하고, 주파수를 N배 올리면 20·logN dB 나빠진다.</li>
+      <li><b>PA</b>는 포화 근처에서 효율이 높지만 찌그러진다. PAPR이 큰 OFDM은 <b>백오프</b>가 필요하고, <b>포락선 추적</b>과 <b>DPD</b>로 효율과 선형성을 함께 잡는다.</li>
+      <li>재료는 용도별로 다르다. 휴대폰 PA는 <b>GaAs HBT</b>, 기지국 PA는 넓은 밴드갭·높은 항복 전계의 <b>GaN HEMT</b>, 스위치·LNA는 <b>RF-SOI</b>, mmWave는 <b>SiGe</b>, 트랜시버·모뎀은 첨단 <b>CMOS</b>.</li>
+      <li><b>프리스 공식</b>에서 뒤 단의 잡음은 앞 단 이득으로 나뉜다. 감도 = −174 dBm/Hz + 10·logB + NF + 필요 SNR이며, 첫 단 LNA와 그 앞 손실이 감도를 좌우한다.</li>
+      <li><b>SAW·BAW 필터</b>는 전기를 음파로 바꿔 작은 칩에서 높은 Q를 얻는다. 고주파·가파른 경계는 BAW, mmWave는 안테나 배열을 패키지에 넣은 <b>AiP</b>로 푼다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>슈퍼헤테로다인 수신기에서 원하는 신호가 2,000 MHz, LO가 1,800 MHz다. 믹서 앞 필터가 없으면 어느 주파수의 전파가 원하는 신호와 같은 IF로 내려와 겹치는가?</p><div class="opts">
+        <button class="opt">200 MHz</button>
+        <button class="opt">3,800 MHz</button>
+        <button class="opt" data-correct>1,600 MHz</button>
+        <button class="opt">2,200 MHz</button>
+      </div><div class="quiz-exp">IF = 2,000 − 1,800 = 200 MHz. 이미지 주파수는 LO를 사이에 둔 거울상인 1,800 − 200 = 1,600 MHz(= 2·f<sub>LO</sub> − f<sub>RF</sub>)다. 이 전파도 |1,600 − 1,800| = 200 MHz로 내려온다.</div></div>
+      <div class="quiz-q"><p>기준 발진기 38.4 MHz를 쓰는 PLL에서 출력 주파수를 2 GHz에서 4 GHz로 올렸다(N을 두 배로). PLL의 다른 조건이 같다면 대역 안 위상 잡음은?</p><div class="opts">
+        <button class="opt" data-correct>약 6 dB 나빠진다</button>
+        <button class="opt">약 3 dB 나빠진다</button>
+        <button class="opt">그대로다</button>
+        <button class="opt">약 6 dB 좋아진다</button>
+      </div><div class="quiz-exp">주파수를 N배 곱하면 위상의 흔들림도 N배가 되고, 전력으로는 N²배다. 20·log<sub>10</sub>2 ≈ 6 dB.</div></div>
+      <div class="quiz-q"><p>OFDM 신호를 증폭하는 PA에서 백오프를 크게 하면 생기는 일로 옳은 것은?</p><div class="opts">
+        <button class="opt">선형성과 효율이 모두 좋아진다</button>
+        <button class="opt">선형성과 효율이 모두 나빠진다</button>
+        <button class="opt">효율은 좋아지고 선형성은 나빠진다</button>
+        <button class="opt" data-correct>선형성은 좋아지고 효율은 나빠진다</button>
+      </div><div class="quiz-exp">포화점에서 멀어질수록 신호 봉우리가 찌그러지지 않지만, PA가 효율이 낮은 영역에서 일하게 된다. 포락선 추적과 DPD가 이 맞교환을 완화한다.</div></div>
+      <div class="quiz-q"><p>5G 기지국의 전력 증폭기에 GaN HEMT가 널리 쓰이는 가장 중요한 물리적 이유는?</p><div class="opts">
+        <button class="opt">밴드갭이 좁아 전자가 쉽게 움직여서</button>
+        <button class="opt" data-correct>밴드갭이 넓어 항복 전계가 높으므로 고전압에서 높은 전력 밀도를 내서</button>
+        <button class="opt">실리콘 웨이퍼와 같은 공정으로 가장 싸게 만들 수 있어서</button>
+        <button class="opt">빛을 내므로 광통신과 함께 쓸 수 있어서</button>
+      </div><div class="quiz-exp">GaN은 밴드갭 3.4 eV, 항복 전계 약 3.3 MV/cm로 GaAs보다 훨씬 높은 전압을 견딘다. 출력 ∝ 전압 × 전류이므로 mm당 출력이 수 배 크다.</div></div>
+      <div class="quiz-q"><p>수신기의 첫 단 손실(필터·스위치)이 1 dB 늘었다. 전체 잡음 지수는 대략 어떻게 변하나?</p><div class="opts">
+        <button class="opt">LNA 이득으로 나뉘어 거의 변하지 않는다</button>
+        <button class="opt">0.1 dB 정도 늘어난다</button>
+        <button class="opt" data-correct>거의 1 dB 그대로 늘어난다</button>
+        <button class="opt">2 dB 늘어난다</button>
+      </div><div class="quiz-exp">LNA 앞의 손실은 프리스 공식의 첫 항이라 나눠 줄 이득이 없다. 그래서 수신 감도도 거의 1 dB 나빠진다.</div></div>
+      <div class="quiz-q"><p>휴대폰의 2~6 GHz 대역 필터에 LC 필터 대신 SAW·BAW 같은 음향파 필터를 쓰는 이유는?</p><div class="opts">
+        <button class="opt">음파는 빛보다 빨라 지연이 없으므로</button>
+        <button class="opt">디지털로 프로그램할 수 있으므로</button>
+        <button class="opt">전력을 증폭해 주므로</button>
+        <button class="opt" data-correct>음파는 파장이 아주 짧아 작은 칩에서 Q가 높은 공진기를 만들 수 있으므로</button>
+      </div><div class="quiz-exp">음속은 빛보다 약 10만 배 느려 같은 주파수에서 파장이 µm 수준이 된다. 압전 결정 속 공진기는 Q가 수백~수천이라 수십 MHz 간격의 이웃 대역도 가를 수 있다.</div></div>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const dB = (x) => 10 * Math.log10(x);
+  const lin = (d) => Math.pow(10, d / 10);
+  const narrow = (w) => w < 500;
+  /** 팔레트 색(#rrggbb 또는 rgb())에 투명도 입히기 */
+  const alpha = (c, a) => { c = (c || "").trim(); if (c[0] === "#") { if (c.length === 4) c = "#" + [...c.slice(1)].map((x) => x + x).join(""); const n = parseInt(c.slice(1, 7), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; } const m = c.match(/[\d.]+/g); return m ? `rgba(${m[0]},${m[1]},${m[2]},${a})` : c; };
+
+  /* =============== 1. Mixer =============== */
+  const mxMode = NB.seg("mx-mode", () => mxCv.redraw());
+  const mxRF = NB.range("mx-rf", (v) => v + " MHz", () => mxCv.redraw());
+  const mxLO = NB.range("mx-lo", (v) => v + " MHz", () => mxCv.redraw());
+  const mxInt = NB.range("mx-int", (v) => v + " MHz", () => mxCv.redraw());
+  $("mx-pre").addEventListener("change", () => mxCv.redraw());
+  const IFC = 200, IFBW = 20;
+  function spike(ctx, ch, f, lvl, color, label, floor, o = {}) {
+    const x = ch.X(f); if (x < ch.box.x - 1 || x > ch.box.x + ch.box.w + 1) return;
+    const y0 = ch.Y(floor), y1 = ch.Y(lvl);
+    ctx.strokeStyle = color; ctx.lineWidth = o.lw || 3; ctx.setLineDash(o.dash || []);
+    ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke(); ctx.setLineDash([]);
+    if (!o.dash) { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y1, 3.2, 0, 7); ctx.fill(); }
+    if (label) NB.text(ctx, label, x, y1 - 9 - (o.lift || 0), { align: "center", size: o.size || 11, color, bold: true });
+  }
+  const mxCv = NB.canvas($("cv-mx"), (ctx, w, h) => {
+    const P = NB.palette();
+    const zif = mxMode() === "zif";
+    mxLO.el.disabled = zif;
+    const rf = mxRF(), lo = zif ? rf : mxLO(), fi = mxInt(), pre = $("mx-pre").checked;
+    const preAtt = (f) => (pre ? Math.min(50, 6 * Math.pow(Math.max(0, Math.abs(f - rf) - 50) / 25, 2)) : 0);
+    const L = narrow(w) ? 44 : 56, fs = narrow(w) ? 10 : 11;
+    const h1 = (h - 70) / 2;
+    const b1 = { x: L, y: 26, w: w - L - 14, h: h1 - 10 }, b2 = { x: L, y: 26 + h1 + 34, w: w - L - 14, h: h1 - 10 };
+    NB.text(ctx, "믹서 입력 (안테나 쪽)", L, 12, { size: 12, bold: true, color: P.dim });
+    NB.text(ctx, "믹서 출력", L, b2.y - 14, { size: 12, bold: true, color: P.dim });
+    const yF = (v) => v + "";
+    const c1 = NB.chart(ctx, b1, { x: [1000, 2800], y: [-60, 25], xFmt: (v) => (v / 1000).toFixed(1) + "G", yFmt: yF, xTicks: [1000, 1400, 1800, 2200, 2600] });
+    if (pre) {
+      ctx.strokeStyle = P.ok; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.beginPath();
+      for (let f = 1000; f <= 2800; f += 5) { const a = preAtt(f); const x = c1.X(f), y = c1.Y(15 - a); f === 1000 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.stroke(); ctx.setLineDash([]);
+      NB.text(ctx, "RF 필터", c1.X(rf) + 30, c1.Y(15) - 6, { size: fs, color: P.ok });
+    }
+    spike(ctx, c1, lo, 22, P.dim, "LO", -60, { dash: [4, 3], lw: 2, size: fs });
+    spike(ctx, c1, rf, 0, P.accent, "원하는 신호", -60, { size: fs });
+    spike(ctx, c1, fi, 10 - preAtt(fi), P.bad, "간섭", -60, { size: fs, lift: 0 });
+    if (!zif) { const img = 2 * lo - rf; const x = c1.X(img); if (img > 1000 && img < 2800) { ctx.strokeStyle = P.faint; ctx.setLineDash([2, 3]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, b1.y); ctx.lineTo(x, b1.y + b1.h); ctx.stroke(); ctx.setLineDash([]); NB.text(ctx, "이미지", x, b1.y + b1.h - 8, { align: "center", size: fs - 1, color: P.faint }); } }
+    // output
+    const c2 = NB.chart(ctx, b2, { x: [0, 4800], y: [-60, 25], xFmt: (v) => (v / 1000).toFixed(1) + "G", yFmt: yF, xTicks: [0, 1000, 2000, 3000, 4000], bands: [] });
+    const fb0 = zif ? 0 : IFC - IFBW / 2, fb1 = zif ? 10 : IFC + IFBW / 2;
+    ctx.save(); ctx.globalAlpha = 0.22; ctx.fillStyle = P.ok; const xa = c2.X(fb0), xb = Math.max(c2.X(fb1), xa + 6); ctx.fillRect(xa - (zif ? 0 : 3), b2.y, xb - xa + (zif ? 0 : 6), b2.h); ctx.restore();
+    NB.text(ctx, zif ? "저역 필터" : "IF 필터", xb + 6, b2.y + 10, { size: fs, color: P.ok, bold: true });
+    const wl = 0 - 6, il = 10 - preAtt(fi) - 6;
+    spike(ctx, c2, Math.abs(rf - lo), wl, P.accent, zif ? "0 Hz" : "차 (IF)", -60, { size: fs, lift: 14 });
+    spike(ctx, c2, rf + lo, wl, P.accent, "합", -60, { size: fs });
+    spike(ctx, c2, Math.abs(fi - lo), il, P.bad, "", -60, { size: fs });
+    spike(ctx, c2, fi + lo, il, P.bad, "", -60, { size: fs });
+    // readouts
+    const ifw = Math.abs(rf - lo);
+    const wantedIn = ifw >= fb0 - 0.01 && ifw <= fb1 + 0.01;
+    const ifi = Math.abs(fi - lo), intIn = ifi >= fb0 && ifi <= fb1;
+    NB.stat("mx-o-if", zif ? "0 Hz (I/Q)" : ifw + " MHz" + (wantedIn ? "" : ' <small style="color:var(--bad)">필터 밖</small>'));
+    NB.stat("mx-o-sum", NB.fmt(rf + lo, 4) + " MHz");
+    NB.stat("mx-o-img", zif ? "<small>자기 거울상 → I/Q로 구분</small>" : 2 * lo - rf + " MHz");
+    if (intIn) {
+      const rel = il - wl;
+      NB.stat("mx-o-int", rel > -20 ? `<span class="verdict-bad">${rel > 0 ? "+" : ""}${rel.toFixed(0)} dB 겹침!</span>` : `<span class="verdict-ok">${rel.toFixed(0)} dB (무시 가능)</span>`);
+    } else NB.stat("mx-o-int", '<span class="verdict-ok">없음</span>');
+  }, { aspect: 0.62, minHeight: 360, maxHeight: 460 });
+
+  /* =============== 2. PLL =============== */
+  const FREF = 38.4;
+  const plN = NB.range("pl-n", (v) => v.toFixed(1), () => plUpdate(true));
+  const plPN = NB.range("pl-pn", (v) => v.toFixed(1) + "°", () => plUpdate(false));
+  const plMod = NB.seg("pl-mod", () => plUpdate(false));
+  let fStart = 70 * FREF, fTarget = plN() * FREF, tAnim = 0;
+  plN.el.addEventListener("pointerdown", () => { fStart = fTarget; });
+  plN.el.addEventListener("keydown", () => { fStart = fTarget; });
+  function gaussR(r) { let u = r() || 1e-9, v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  function levels(M) { const m = Math.sqrt(M); const a = []; for (let i = 0; i < m; i++) a.push(2 * i - (m - 1)); const norm = Math.sqrt((2 * (M - 1)) / 3); return { a, norm }; }
+  let plPts = [], plStats = {};
+  function plCompute() {
+    const N = plN(), M = Number(plMod());
+    const sig = (plPN() * N) / 80 * Math.PI / 180;
+    const { a, norm } = levels(M);
+    const r = NB.rng(7); const pts = []; let e2 = 0, s2 = 0, errs = 0; const nz = Math.pow(10, -35 / 20) / Math.SQRT2;
+    for (let i = 0; i < 1500; i++) {
+      const si = a[Math.floor(r() * a.length)] / norm, sq = a[Math.floor(r() * a.length)] / norm;
+      const th = sig * gaussR(r); const c = Math.cos(th), s = Math.sin(th);
+      const yi = si * c - sq * s + nz * gaussR(r), yq = si * s + sq * c + nz * gaussR(r);
+      pts.push([yi, yq]); e2 += (yi - si) ** 2 + (yq - sq) ** 2; s2 += si * si + sq * sq;
+      const dec = (v) => { let best = a[0], bd = 1e9; a.forEach((l) => { const d = Math.abs(v * norm - l); if (d < bd) { bd = d; best = l; } }); return best / norm; };
+      if (Math.abs(dec(yi) - si) > 1e-9 || Math.abs(dec(yq) - sq) > 1e-9) errs++;
+    }
+    plPts = pts;
+    const fL = 1e5, K = (sig * sig) / (Math.PI * fL); // 단측파대 L(f) = K/(1+(f/fL)²), 양쪽 적분 = σ²
+    plStats = { N, sig, K, fL, evm: Math.sqrt(e2 / s2) * 100, errs, M };
+  }
+  function plUpdate(freqChanged) {
+    plCompute();
+    const N = plN();
+    if (freqChanged) { fTarget = N * FREF; tAnim = 0; }
+    const f = N * FREF;
+    let band = "";
+    if (f >= 3300 && f <= 4200) band = "5G n77/n78 대역"; else if (f >= 2400 && f <= 2500) band = "Wi-Fi 2.4 GHz 근처"; else if (f >= 1710 && f <= 2200) band = "LTE B1/B3 근처"; else if (f >= 2496 && f <= 2690) band = "밴드 41 근처";
+    NB.stat("pl-o-f", (f / 1000).toFixed(3) + " GHz" + (band ? `<br><small style="margin:0">${band}</small>` : ""));
+    NB.stat("pl-o-rms", (plStats.sig * 180 / Math.PI).toFixed(2) + "°");
+    NB.stat("pl-o-pn", dB(plStats.K / (1 + 1)).toFixed(0) + " dBc/Hz");
+    NB.stat("pl-o-evm", plStats.evm.toFixed(1) + " %");
+    NB.stat("pl-o-ser", plStats.errs ? `<span class="verdict-bad">${plStats.errs}개</span>` : '<span class="verdict-ok">0개</span>');
+    plLock.redraw(); plPn.redraw(); plCon.redraw();
+  }
+  const plLock = NB.canvas($("cv-pl-lock"), (ctx, w, h) => {
+    const P = NB.palette();
+    NB.text(ctx, "주파수 고정 과정 (GHz)", 10, 12, { size: 12, bold: true, color: P.dim });
+    const f0 = fStart / 1000, f1 = fTarget / 1000;
+    const lo = Math.min(f0, f1), hi = Math.max(f0, f1), pad = Math.max(0.05, (hi - lo) * 0.35);
+    const ch = NB.chart(ctx, { x: 52, y: 26, w: w - 64, h: h - 66 }, { x: [0, 40], y: [lo - pad, hi + pad], xLabel: "시간 (µs)", yFmt: (v) => v.toFixed(2), xTicks: [0, 10, 20, 30, 40] });
+    const z = 0.55, wn = 2 * Math.PI * 0.05, wd = wn * Math.sqrt(1 - z * z);
+    const fAt = (t) => f1 + (f0 - f1) * Math.exp(-z * wn * t) * (Math.cos(wd * t) + (z / Math.sqrt(1 - z * z)) * Math.sin(wd * t));
+    ctx.save(); ctx.beginPath(); ctx.rect(ch.box.x, ch.box.y, ch.box.w, ch.box.h); ctx.clip();
+    ctx.strokeStyle = P.faint; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(ch.X(0), ch.Y(f1)); ctx.lineTo(ch.X(40), ch.Y(f1)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = P.accent; ctx.lineWidth = 2.2; ctx.beginPath();
+    const tEnd = Math.min(40, tAnim);
+    for (let t = 0; t <= tEnd; t += 0.2) { const x = ch.X(t), y = ch.Y(fAt(t)); t === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+    ctx.stroke(); ctx.restore();
+  }, { aspect: 0.75, minHeight: 220, maxHeight: 280 });
+  const plPn = NB.canvas($("cv-pl-pn"), (ctx, w, h) => {
+    const P = NB.palette();
+    NB.text(ctx, "위상 잡음 L(f), dBc/Hz", 10, 12, { size: 12, bold: true, color: P.dim });
+    const { K, fL } = plStats; const data = [];
+    for (let e = 3; e <= 7.001; e += 0.05) { const f = Math.pow(10, e); data.push([f, dB(K / (1 + (f / fL) ** 2) + 1e-15)]); }
+    NB.chart(ctx, { x: 52, y: 26, w: w - 64, h: h - 66 }, { x: [1e3, 1e7], y: [-160, -60], logX: true, xLabel: "반송파에서 떨어진 거리 (Hz)", xFmt: (v) => NB.si(v, "").replace(" ", ""), yTicks: [-160, -140, -120, -100, -80, -60], series: [{ data, color: P.accent2, width: 2.2 }], vlines: [{ x: fL, label: "루프 대역", color: P.faint }] });
+  }, { aspect: 0.75, minHeight: 220, maxHeight: 280 });
+  const plCon = NB.canvas($("cv-pl-con"), (ctx, w, h) => {
+    const P = NB.palette();
+    NB.text(ctx, "받은 성좌도", 10, 12, { size: 12, bold: true, color: P.dim });
+    const s = Math.min(w - 20, h - 30), cx = w / 2, cy = 24 + s / 2, R = s / 2 / 1.45;
+    ctx.strokeStyle = P.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx - s / 2, cy); ctx.lineTo(cx + s / 2, cy); ctx.moveTo(cx, cy - s / 2); ctx.lineTo(cx, cy + s / 2); ctx.stroke();
+    ctx.fillStyle = P.accent; ctx.globalAlpha = 0.55;
+    plPts.forEach(([x, y]) => { ctx.fillRect(cx + x * R - 1, cy - y * R - 1, 2, 2); });
+    ctx.globalAlpha = 1;
+    const { a, norm } = levels(plStats.M || 64);
+    ctx.fillStyle = P.text; a.forEach((i) => a.forEach((q) => { ctx.beginPath(); ctx.arc(cx + (i / norm) * R, cy - (q / norm) * R, 1.6, 0, 7); ctx.fill(); }));
+  }, { aspect: 0.75, minHeight: 220, maxHeight: 280 });
+  NB.loop($("cv-pl-lock"), (dt) => { if (tAnim < 40) { tAnim += dt * 30; plLock.redraw(); } });
+  plUpdate(true);
+
+  /* =============== 3. PA =============== */
+  function fft(re, im, inv) {
+    const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) { let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+    for (let len = 2; len <= n; len <<= 1) {
+      const ang = (2 * Math.PI) / len * (inv ? 1 : -1), wr = Math.cos(ang), wi = Math.sin(ang);
+      for (let i = 0; i < n; i += len) { let cr = 1, ci = 0; for (let j = 0; j < len / 2; j++) { const a = i + j, b = a + len / 2; const tr = re[b] * cr - im[b] * ci, ti = re[b] * ci + im[b] * cr; re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti; const nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr; } }
+    }
+    if (inv) for (let i = 0; i < n; i++) { re[i] /= n; im[i] /= n; }
+  }
+  const NF = 256, NSYM = 24, USED = []; for (let k = -32; k < 32; k++) if (k !== 0) USED.push(k);
+  const QL = [-3, -1, 1, 3].map((v) => v / Math.sqrt(10));
+  const ofdm = (() => {
+    const r = NB.rng(42); const syms = [];
+    let pw = 0;
+    for (let s = 0; s < NSYM; s++) {
+      const re = new Float64Array(NF), im = new Float64Array(NF), X = [];
+      USED.forEach((k) => { const xi = QL[Math.floor(r() * 4)], xq = QL[Math.floor(r() * 4)]; const idx = (k + NF) % NF; re[idx] = xi; im[idx] = xq; X.push([xi, xq]); });
+      fft(re, im, true); for (let i = 0; i < NF; i++) pw += re[i] * re[i] + im[i] * im[i];
+      syms.push({ re, im, X });
+    }
+    const sc = 1 / Math.sqrt(pw / (NF * NSYM));
+    let peak = 0;
+    syms.forEach((s) => { for (let i = 0; i < NF; i++) { s.re[i] *= sc; s.im[i] *= sc; peak = Math.max(peak, s.re[i] ** 2 + s.im[i] ** 2); } s.X = s.X.map(([a, b]) => [a, b]); });
+    return { syms, sc, papr: dB(peak) };
+  })();
+  const RP = 2, AMPM = 0.3, PSAT = 33;
+  const paAmp = (a) => a / Math.pow(1 + Math.pow(a, 2 * RP), 1 / (2 * RP));
+  const paPh = (a) => (AMPM * a * a) / (1 + a * a);
+  const paInv = (r) => r / Math.pow(1 - Math.pow(r, 2 * RP), 1 / (2 * RP));
+  const paIn = NB.range("pa-in", (v) => (v > 0 ? "+" : "") + v.toFixed(1) + " dB", paUpdate);
+  $("pa-dpd").addEventListener("change", paUpdate); $("pa-et").addEventListener("change", paUpdate);
+  let paRes = null;
+  function paRun() {
+    const s = Math.pow(10, paIn() / 20), dpd = $("pa-dpd").checked, et = $("pa-et").checked;
+    const RMAX = 0.97;
+    const psd = new Float64Array(NF), con = [], am = [];
+    let sumP = 0, sumDC = 0, e2 = 0, x2 = 0;
+    ofdm.syms.forEach((sym, si) => {
+      const yr = new Float64Array(NF), yi = new Float64Array(NF);
+      for (let i = 0; i < NF; i++) {
+        const xr = sym.re[i] * s, xq = sym.im[i] * s; const a = Math.hypot(xr, xq), th = Math.atan2(xq, xr);
+        let ain = a, thin = th;
+        if (dpd) { const rt = Math.min(a, RMAX); ain = a > 0 ? paInv(rt) : 0; thin = th - paPh(ain); }
+        const ro = paAmp(ain), ph = thin + paPh(ain);
+        yr[i] = ro * Math.cos(ph); yi[i] = ro * Math.sin(ph);
+        sumP += ro * ro / 2;
+        const vdd = et ? Math.max(0.2, Math.min(1, ro * 1.08 + 0.04)) : 1;
+        sumDC += (2 / Math.PI) * ro * vdd / (et ? 0.85 : 1) + 0.012;
+        if (si < 6 && (i % 2 === 0)) am.push([a, ro]);
+      }
+      fft(yr, yi, false);
+      // 등화용 복소 이득
+      let gr = 0, gi = 0, xx = 0;
+      USED.forEach((k, j) => { const idx = (k + NF) % NF; const [a, b] = sym.X[j]; gr += yr[idx] * a + yi[idx] * b; gi += yi[idx] * a - yr[idx] * b; xx += a * a + b * b; });
+      gr /= xx; gi /= xx; const gm = gr * gr + gi * gi;
+      USED.forEach((k, j) => { const idx = (k + NF) % NF; const [a, b] = sym.X[j]; const zr = (yr[idx] * gr + yi[idx] * gi) / gm, zi = (yi[idx] * gr - yr[idx] * gi) / gm; con.push([zr, zi]); e2 += (zr - a) ** 2 + (zi - b) ** 2; x2 += a * a + b * b; });
+      for (let i = 0; i < NF; i++) psd[i] += yr[i] * yr[i] + yi[i] * yi[i];
+    });
+    let pin = 0, padj = 0;
+    for (let k = -128; k < 128; k++) { const v = psd[(k + NF) % NF]; if (k >= -32 && k < 32 && k !== 0) pin += v; else if ((k >= 32 && k < 96) || (k < -32 && k >= -96)) padj += v; }
+    const aclr = dB((padj / 2 + pin * 1e-7) / pin);
+    const meanP = sumP / (NF * NSYM) * 2; // 포화 사인파 전력(=0.5) 대비
+    const eff = Math.min(0.9, (sumP / sumDC)) * 0.85;
+    return { psd, con, am, evm: Math.sqrt(e2 / x2) * 100, aclr, pout: PSAT + dB(meanP), bo: -dB(meanP), eff: eff * 100, s, dpd };
+  }
+  function paUpdate() {
+    paRes = paRun();
+    NB.stat("pa-o-pout", paRes.pout.toFixed(1) + " dBm<small>" + (Math.pow(10, paRes.pout / 10)).toFixed(0) + " mW</small>");
+    NB.stat("pa-o-bo", paRes.bo.toFixed(1) + " dB");
+    NB.stat("pa-o-evm", `<span class="${paRes.evm <= 12.5 ? "verdict-ok" : "verdict-bad"}">${paRes.evm.toFixed(1)} %</span>`);
+    NB.stat("pa-o-aclr", `<span class="${paRes.aclr <= -30 ? "verdict-ok" : "verdict-bad"}">${paRes.aclr < -69 ? "< −70" : paRes.aclr.toFixed(1)} dBc</span>`);
+    NB.stat("pa-o-eff", paRes.eff.toFixed(0) + " %");
+    paAm.redraw(); paCon.redraw(); paSp.redraw();
+  }
+  const paAm = NB.canvas($("cv-pa-am"), (ctx, w, h) => {
+    const P = NB.palette();
+    NB.text(ctx, "입력-출력 곡선 (AM-AM)", 10, 12, { size: 12, bold: true, color: P.dim });
+    const curve = [], lineD = [], dpdC = [];
+    for (let d = -30; d <= 10; d += 0.25) { const a = Math.pow(10, d / 20); curve.push([d, 20 * Math.log10(paAmp(a))]); lineD.push([d, d]); }
+    for (let d = -30; d <= 10; d += 0.25) { const a = Math.min(Math.pow(10, d / 20), 0.97); dpdC.push([d, 20 * Math.log10(paAmp(paInv(a)))]); }
+    const series = [{ data: lineD, color: P.faint, width: 1, dash: [4, 4] }, { data: curve, color: P.warn, width: 2.4 }];
+    if (paRes && paRes.dpd) series.push({ data: dpdC, color: P.ok, width: 2.4 });
+    const ch = NB.chart(ctx, { x: 46, y: 26, w: w - 58, h: h - 66 }, { x: [-30, 10], y: [-30, 4], xLabel: "입력 (dB, 포화 입력 = 0)", series, xTicks: [-30, -20, -10, 0, 10], yTicks: [-30, -20, -10, 0] });
+    if (paRes) {
+      ctx.save(); ctx.beginPath(); ctx.rect(ch.box.x, ch.box.y, ch.box.w, ch.box.h); ctx.clip();
+      ctx.fillStyle = P.accent; ctx.globalAlpha = 0.35;
+      paRes.am.forEach(([a, r]) => { if (a <= 0 || r <= 0) return; ctx.fillRect(ch.X(20 * Math.log10(a)) - 1, ch.Y(20 * Math.log10(r)) - 1, 2, 2); });
+      ctx.globalAlpha = 1; ctx.restore();
+      const avg = paIn(), pk = avg + ofdm.papr;
+      ctx.strokeStyle = P.accent; ctx.lineWidth = 1.2; ctx.setLineDash([3, 3]);
+      [avg, pk].forEach((d) => { if (d > -30 && d < 10) { ctx.beginPath(); ctx.moveTo(ch.X(d), ch.box.y); ctx.lineTo(ch.X(d), ch.box.y + ch.box.h); ctx.stroke(); } });
+      ctx.setLineDash([]);
+      if (avg > -30) NB.text(ctx, "평균", ch.X(avg) + 3, ch.box.y + ch.box.h - 10, { size: 10, color: P.accent });
+      if (pk < 10) NB.text(ctx, "봉우리", ch.X(pk) + 3, ch.box.y + 10, { size: 10, color: P.accent });
+    }
+  }, { aspect: 0.8, minHeight: 240, maxHeight: 300 });
+  const paCon = NB.canvas($("cv-pa-con"), (ctx, w, h) => {
+    const P = NB.palette();
+    NB.text(ctx, "받은 16QAM 성좌도", 10, 12, { size: 12, bold: true, color: P.dim });
+    const s = Math.min(w - 20, h - 30), cx = w / 2, cy = 24 + s / 2, R = s / 2 / 1.5;
+    ctx.strokeStyle = P.grid; ctx.beginPath(); ctx.moveTo(cx - s / 2, cy); ctx.lineTo(cx + s / 2, cy); ctx.moveTo(cx, cy - s / 2); ctx.lineTo(cx, cy + s / 2); ctx.stroke();
+    if (!paRes) return;
+    ctx.fillStyle = P.accent; ctx.globalAlpha = 0.5;
+    paRes.con.forEach(([x, y]) => ctx.fillRect(cx + x * R - 1, cy - y * R - 1, 2, 2));
+    ctx.globalAlpha = 1; ctx.fillStyle = P.text;
+    QL.forEach((i) => QL.forEach((q) => { ctx.beginPath(); ctx.arc(cx + i * R, cy - q * R, 1.8, 0, 7); ctx.fill(); }));
+  }, { aspect: 0.8, minHeight: 240, maxHeight: 300 });
+  const paSp = NB.canvas($("cv-pa-sp"), (ctx, w, h) => {
+    const P = NB.palette();
+    NB.text(ctx, "출력 스펙트럼", 10, 12, { size: 12, bold: true, color: P.dim });
+    if (!paRes) return;
+    let ref = 0; USED.forEach((k) => (ref += paRes.psd[(k + NF) % NF])); ref /= USED.length;
+    const data = [];
+    for (let k = -127; k < 128; k++) { if (k === 0) continue; data.push([k, Math.max(-75, dB(paRes.psd[(k + NF) % NF] / ref + 1e-9))]); }
+    const ch = NB.chart(ctx, { x: 46, y: 26, w: w - 58, h: h - 66 }, { x: [-128, 128], y: [-70, 5], xLabel: "주파수 (채널 폭 단위)", xTicks: [-128, -64, 0, 64, 128], xFmt: (v) => (v / 64).toFixed(0), yTicks: [-70, -60, -40, -20, 0], bands: [{ x0: -32, x1: 32, color: alpha(P.dim, 0.14) }], series: [{ data, color: P.accent2, width: 1.6 }], hlines: [{ y: -30, label: "−30 dBc", color: P.bad }] });
+    NB.text(ctx, "이웃", ch.X(-64), ch.box.y + 10, { align: "center", size: 10.5, color: P.faint });
+    NB.text(ctx, "이웃", ch.X(64), ch.box.y + 10, { align: "center", size: 10.5, color: P.faint });
+  }, { aspect: 0.8, minHeight: 240, maxHeight: 300 });
+  paUpdate();
+
+  /* =============== 4. Noise figure cascade =============== */
+  const nfOrder = NB.seg("nf-order", () => nfCv.redraw());
+  const nfBW = NB.seg("nf-bw", () => nfCv.redraw());
+  const fmtDB = (v) => v.toFixed(1) + " dB";
+  const nfLoss = NB.range("nf-loss", fmtDB, () => nfCv.redraw());
+  const nfG = NB.range("nf-g", fmtDB, () => nfCv.redraw());
+  const nfNF = NB.range("nf-nf", fmtDB, () => nfCv.redraw());
+  const nfMx = NB.range("nf-mx", fmtDB, () => nfCv.redraw());
+  const nfSNR = NB.range("nf-snr", fmtDB, () => nfCv.redraw());
+  const nfCv = NB.canvas($("cv-nf"), (ctx, w, h) => {
+    const P = NB.palette();
+    const flt = { name: "필터·스위치", short: "필터", g: -nfLoss(), nf: nfLoss(), col: P.accent2 };
+    const lna = { name: "LNA", short: "LNA", g: nfG(), nf: nfNF(), col: P.accent };
+    const mix = { name: "믹서 이후", short: "믹서~", g: 10, nf: nfMx(), col: P.warn };
+    const o = nfOrder();
+    const st = o === "fl" ? [flt, lna, mix] : o === "lf" ? [lna, flt, mix] : [flt, mix];
+    let F = 0, G = 1; const contrib = [], cum = [];
+    st.forEach((s, i) => { const c = i === 0 ? lin(s.nf) : (lin(s.nf) - 1) / G; contrib.push(c); F += c; cum.push(dB(F)); G *= lin(s.g); });
+    const NFt = dB(F), B = Number(nfBW());
+    const floor = -174 + dB(B) + NFt, sens = floor + nfSNR();
+    NB.stat("nf-o-nf", NFt.toFixed(2) + " dB");
+    NB.stat("nf-o-floor", floor.toFixed(1) + " dBm");
+    NB.stat("nf-o-sens", sens.toFixed(1) + " dBm");
+    // blocks
+    const nar = narrow(w), n = st.length + 1;
+    const gap = nar ? 10 : 22, bw = (w - 24 - gap * (n - 1)) / n, by = 18, bh = nar ? 70 : 64;
+    const fs = nar ? 10 : 12;
+    NB.box(ctx, 12, by, bw, bh, { text: nar ? "안테나\n−174\ndBm/Hz" : "안테나\n열잡음\n−174 dBm/Hz", size: fs - 0.5, fill: P.surface });
+    st.forEach((s, i) => {
+      const x = 12 + (i + 1) * (bw + gap);
+      NB.arrow(ctx, x - gap + 1, by + bh / 2, x - 2, by + bh / 2, { color: P.dim, head: 6 });
+      NB.box(ctx, x, by, bw, bh, { text: `${nar ? s.short : s.name}\nG ${s.g > 0 ? "+" : ""}${s.g.toFixed(1)}\nNF ${s.nf.toFixed(1)}`, size: fs - 0.5, fill: P.bg, stroke: s.col, lw: 2 });
+      NB.text(ctx, (nar ? "" : "누적 ") + cum[i].toFixed(2) + " dB", x + bw / 2, by + bh + 14, { align: "center", size: fs - 0.5, mono: true, color: s.col });
+    });
+    // contribution bar
+    const y = by + bh + 44, bx = 12, bwid = w - 24, bH = 26;
+    NB.text(ctx, "전체 잡음 인수 F = " + F.toFixed(2) + " 중 각 단의 몫", bx, y - 10, { size: fs, color: P.dim });
+    let x = bx;
+    st.forEach((s, i) => { const ww = (contrib[i] / F) * bwid; ctx.fillStyle = s.col; ctx.fillRect(x, y, Math.max(0, ww - 1), bH); if (ww > 46) NB.text(ctx, Math.round((contrib[i] / F) * 100) + "%", x + ww / 2, y + bH / 2, { align: "center", size: fs, bold: true, color: P.bg }); x += ww; });
+    const ly = y + bH + 16; let lx = bx;
+    st.forEach((s) => { ctx.fillStyle = s.col; ctx.fillRect(lx, ly - 5, 10, 10); NB.text(ctx, s.name, lx + 14, ly, { size: fs, color: P.text }); lx += ctx.measureText(s.name).width + 34; });
+  }, { aspect: 0.2, minHeight: 200, maxHeight: 205 });
+
+  /* =============== 5. Filter =============== */
+  const flBand = NB.seg("fl-band", () => flCv.redraw());
+  const flTech = NB.seg("fl-tech", () => flCv.redraw());
+  const flTemp = NB.range("fl-temp", (v) => v + " °C", () => flCv.redraw());
+  const BANDS = { b3: { pass: [1805, 1880], adj: [1710, 1785], adjName: "B3 송신", x: [1680, 1920] }, b41: { pass: [2496, 2690], adj: [2400, 2483.5], adjName: "Wi-Fi 2.4G", x: [2360, 2740] } };
+  const TECH = { saw: { Q: 800, il: 2.2, tcf: -40, floor: 45, name: "SAW" }, tcsaw: { Q: 1200, il: 1.9, tcf: -10, floor: 48, name: "TC-SAW" }, baw: { Q: 2500, il: 1.5, tcf: -15, floor: 52, name: "BAW" } };
+  const flCv = NB.canvas($("cv-flt"), (ctx, w, h) => {
+    const P = NB.palette();
+    const B = BANDS[flBand()], T = TECH[flTech()], temp = flTemp();
+    const f0 = (B.pass[0] + B.pass[1]) / 2, hb = (B.pass[1] - B.pass[0]) / 2;
+    let ilx = T.il; if (T.Q === 800 && f0 > 2400) ilx += 1.2; // SAW는 고주파에서 손실 증가
+    const Qe = T.Q === 800 && f0 > 2400 ? 500 : T.Q;
+    const TW = (f0 * 10.8) / Qe;
+    const shift = T.tcf * 1e-6 * (temp - 25) * f0;
+    const att = (f) => { const d = Math.abs(f - (f0 + shift)) - hb; if (d <= 0) return ilx + 1.0 * Math.exp(d / (TW * 0.25)) + 0.15 * Math.sin(f / 3); return Math.min(T.floor, ilx + 1 + 39 * Math.pow(d / TW, 1.5)) + 1.5 * Math.sin(f / 3.1) * Math.min(1, d / TW); };
+    const data = []; for (let f = B.x[0]; f <= B.x[1]; f += 0.5) data.push([f, -att(f)]);
+    const L = narrow(w) ? 44 : 56;
+    NB.chart(ctx, { x: L, y: 16, w: w - L - 14, h: h - 62 }, { x: B.x, y: [-60, 0], xLabel: "주파수 (MHz)", yLabel: narrow(w) ? "" : "투과 (dB)", bands: [{ x0: B.pass[0], x1: B.pass[1], color: alpha(P.ok, 0.16) }, { x0: B.adj[0], x1: B.adj[1], color: alpha(P.bad, 0.14) }], series: [{ data, color: P.accent, width: 2.2 }], hlines: [{ y: -40, label: "−40 dB", color: P.bad }] });
+    let worstIL = 0; for (let f = B.pass[0]; f <= B.pass[1]; f += 0.5) worstIL = Math.max(worstIL, att(f));
+    let minRej = 1e9; for (let f = B.adj[0]; f <= B.adj[1]; f += 0.5) minRej = Math.min(minRej, att(f));
+    const ok = minRej >= 40 && worstIL <= 4;
+    NB.stat("fl-o-il", worstIL.toFixed(1) + " dB");
+    NB.stat("fl-o-rej", `<span class="${minRej >= 40 ? "verdict-ok" : "verdict-bad"}">${minRej.toFixed(0)} dB</span>`);
+    NB.stat("fl-o-shift", (shift >= 0 ? "+" : "") + shift.toFixed(1) + " MHz");
+    NB.stat("fl-o-ok", ok ? '<span class="verdict-ok">합격</span>' : `<span class="verdict-bad">${minRej < 40 ? "차단 부족" : "손실 과다"}</span>`);
+  }, { aspect: 0.45, minHeight: 280, maxHeight: 380 });
+})();
+</script>
+</body>
+</html>

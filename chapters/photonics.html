@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>광 반도체와 실리콘 포토닉스 · NetworkBook</title>
+<meta name="description" content="빛을 만들고 바꾸고 받는 칩. 광 트랜시버 구조, 반도체 레이저와 밴드갭, 마하-젠더·링 변조기, 광검출기, 실리콘 포토닉스, 공동 패키징 광학(CPO)과 AI 클러스터의 광 수요를 시뮬레이터로 익힌다.">
+<link rel="canonical" href="https://networkbook.euiyun.com/chapters/photonics.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="NetworkBook">
+<meta property="og:title" content="광 반도체와 실리콘 포토닉스 · NetworkBook">
+<meta property="og:description" content="빛을 만들고 바꾸고 받는 칩. 광 트랜시버 구조, 반도체 레이저와 밴드갭, 마하-젠더·링 변조기, 광검출기, 실리콘 포토닉스, 공동 패키징 광학(CPO)과 AI 클러스터의 광 수요를 시뮬레이터로 익힌다.">
+<meta property="og:url" content="https://networkbook.euiyun.com/chapters/photonics.html">
+<meta property="og:image" content="https://networkbook.euiyun.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"광 반도체와 실리콘 포토닉스","name":"광 반도체와 실리콘 포토닉스 · NetworkBook","url":"https://networkbook.euiyun.com/chapters/photonics.html","mainEntityOfPage":"https://networkbook.euiyun.com/chapters/photonics.html","inLanguage":"ko","isAccessibleForFree":true,"learningResourceType":"interactive textbook chapter","position":19,"image":"https://networkbook.euiyun.com/og.png","dateModified":"2026-10-05","isPartOf":{"@type":"Book","@id":"https://networkbook.euiyun.com/#book","name":"NetworkBook — 인터랙티브 네트워크 교과서","url":"https://networkbook.euiyun.com/"},"publisher":{"@type":"Organization","name":"NetworkBook","url":"https://networkbook.euiyun.com/"},"description":"빛을 만들고 바꾸고 받는 칩. 광 트랜시버 구조, 반도체 레이저와 밴드갭, 마하-젠더·링 변조기, 광검출기, 실리콘 포토닉스, 공동 패키징 광학(CPO)과 AI 클러스터의 광 수요를 시뮬레이터로 익힌다."},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"NetworkBook","item":"https://networkbook.euiyun.com/"},{"@type":"ListItem","position":2,"name":"19 광 반도체와 실리콘 포토닉스","item":"https://networkbook.euiyun.com/chapters/photonics.html"}]}]}</script>
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1px; background: var(--border); }
+  .duo > div { background: var(--canvas-bg); min-width: 0; }
+  .duo canvas { display: block; width: 100%; }
+  .verdict-ok { color: var(--ok); }
+  .verdict-bad { color: var(--bad); }
+  .verdict-warn { color: var(--warn); }
+  .ff-tbl td:first-child { white-space: nowrap; font-weight: 700; }
+</style>
+</head>
+<body data-chapter="photonics">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 19</div>
+    <h1>광 반도체와 실리콘 포토닉스</h1>
+    <p class="lead">데이터센터 스위치의 앞면에는 손가락만 한 모듈이 수십 개 꽂혀 있다. 모듈 하나가 1초에 800기가비트를 빛으로 바꿔 내보내고, 동시에 같은 양을 빛에서 전기로 되돌린다. 안에는 손톱보다 작은 레이저와 변조기, 광검출기, 그리고 이들을 부리는 전자 칩이 들어 있다. 이 장에서는 반도체가 어떻게 빛을 만들고, 빛에 비트를 싣고, 다시 받아 내는지 살펴보고, 왜 실리콘으로 광 회로를 만들려 하는지, AI 시대에 광 칩의 전력이 왜 문제가 되는지까지 따라간다.</p>
+    <ul class="objectives">
+      <li>광 트랜시버 안의 레이저 → 변조기 → 광섬유 → 광검출기 → TIA → CDR/DSP 흐름을 설명한다.</li>
+      <li>반도체 레이저가 빛을 내는 원리(전자-정공 재결합, 유도 방출, 공진기)와 문턱 전류를 L-I 곡선으로 이해한다.</li>
+      <li>밴드갭과 파장의 관계(λ = 1240/E<sub>g</sub>)와, 실리콘이 간접 밴드갭이라 레이저가 되지 않는 이유를 안다.</li>
+      <li>VCSEL·DFB·EML·튜너블 레이저와 직접 변조·외부 변조(마하-젠더, 링)의 차이를 비교한다.</li>
+      <li>PIN·APD·Ge-on-Si 광검출기와 응답도, 양자 효율을 계산한다.</li>
+      <li>실리콘 포토닉스가 CMOS 공장에서 광 회로를 만드는 방법과 레이저를 붙이는 방법을 안다.</li>
+      <li>플러그형 모듈·LPO·CPO의 전력 차이를 계산하고, AI 클러스터의 광 수요와 광 회로 스위치를 이해한다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="transceiver">
+    <h2>광 트랜시버 들여다보기</h2>
+    <p>광섬유(5장)로 데이터를 보내려면 전기 신호를 빛으로 바꾸고, 반대편에서 다시 전기로 바꿔야 한다. 이 일을 하는 부품이 <span class="term">광 트랜시버</span><span class="en">(optical transceiver)</span>다. 송신 쪽은 <b>레이저</b>가 빛을 만들고 <b>변조기</b>가 그 빛의 세기(또는 위상)에 비트를 싣는다. 수신 쪽은 <b>광검출기</b>가 빛을 미세한 전류로 바꾸고 <span class="term">트랜스임피던스 증폭기</span><span class="en">(TIA)</span>가 그 전류를 전압으로 키운 뒤, <b>CDR</b>(클록·데이터 복원)이나 <b>DSP</b>가 박자를 찾고 일그러짐을 보정해 비트를 꺼낸다. 호스트 쪽 전기 인터페이스는 16장의 SerDes다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 900 300" style="min-width:660px" role="img" aria-label="광 트랜시버 블록도">
+        <defs>
+          <marker id="ph-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+          <marker id="ph-a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--warn)"/></marker>
+        </defs>
+        <rect x="120" y="28" width="560" height="244" rx="16" fill="none" stroke="var(--accent-2)" stroke-dasharray="6 5" stroke-width="1.5"/>
+        <text x="400" y="20" text-anchor="middle" class="t" style="font-weight:700;fill:var(--accent-2)">플러그형 광 모듈 (예: 800G OSFP)</text>
+        <rect x="10" y="100" width="90" height="100" rx="10" class="f-surface" stroke="var(--border)"/>
+        <text x="55" y="140" text-anchor="middle" class="t" style="font-weight:700">스위치 칩</text><text x="55" y="160" text-anchor="middle" class="t-dim" style="font-size:11px">SerDes</text><text x="55" y="176" text-anchor="middle" class="t-dim" style="font-size:11px">(16장)</text>
+        <text x="400" y="52" class="t" style="font-weight:700" text-anchor="middle">송신 (전기 → 빛)</text>
+        <g class="t" style="font-size:12px">
+          <rect x="140" y="64" width="100" height="56" rx="8" class="f-elev" stroke="var(--border)"/><text x="190" y="88" text-anchor="middle" style="font-weight:700">DSP / CDR</text><text x="190" y="106" text-anchor="middle" class="t-dim" style="font-size:10.5px">박자·보정</text>
+          <rect x="260" y="64" width="90" height="56" rx="8" class="f-elev" stroke="var(--border)"/><text x="305" y="88" text-anchor="middle" style="font-weight:700">드라이버</text><text x="305" y="106" text-anchor="middle" class="t-dim" style="font-size:10.5px">전압 증폭</text>
+          <rect x="370" y="64" width="90" height="56" rx="8" fill="color-mix(in srgb, var(--warn) 16%, transparent)" stroke="var(--warn)"/><text x="415" y="88" text-anchor="middle" style="font-weight:700">레이저</text><text x="415" y="106" text-anchor="middle" class="t-dim" style="font-size:10.5px">InP · GaAs</text>
+          <rect x="480" y="64" width="90" height="56" rx="8" class="f-acc2-soft"/><text x="525" y="88" text-anchor="middle" style="font-weight:700">변조기</text><text x="525" y="106" text-anchor="middle" class="t-dim" style="font-size:10.5px">EAM · MZM · 링</text>
+        </g>
+        <path d="M100 130 H118 V92 H136 M240 92 H256 M350 92 H366" class="s-acc" fill="none" marker-end="url(#ph-a)"/>
+        <path d="M305 120 V136 H525 V124" class="s-line" fill="none" stroke-dasharray="3 3"/>
+        <path d="M460 92 H476 M570 92 H720" stroke="var(--warn)" stroke-width="2.5" fill="none" marker-end="url(#ph-a2)"/>
+        <text x="400" y="176" class="t" style="font-weight:700" text-anchor="middle">수신 (빛 → 전기)</text>
+        <g class="t" style="font-size:12px">
+          <rect x="480" y="190" width="90" height="56" rx="8" class="f-acc-soft"/><text x="525" y="214" text-anchor="middle" style="font-weight:700">광검출기</text><text x="525" y="232" text-anchor="middle" class="t-dim" style="font-size:10.5px">PIN · APD</text>
+          <rect x="370" y="190" width="90" height="56" rx="8" class="f-elev" stroke="var(--border)"/><text x="415" y="214" text-anchor="middle" style="font-weight:700">TIA</text><text x="415" y="232" text-anchor="middle" class="t-dim" style="font-size:10.5px">µA → mV</text>
+          <rect x="140" y="190" width="210" height="56" rx="8" class="f-elev" stroke="var(--border)"/><text x="245" y="214" text-anchor="middle" style="font-weight:700">CDR / DSP</text><text x="245" y="232" text-anchor="middle" class="t-dim" style="font-size:10.5px">박자 복원, 등화, (FEC)</text>
+        </g>
+        <path d="M720 218 H574" stroke="var(--warn)" stroke-width="2.5" fill="none" marker-end="url(#ph-a2)"/>
+        <path d="M480 218 H464 M370 218 H354 M140 218 H118 V170 H104" class="s-acc" fill="none" marker-end="url(#ph-a)"/>
+        <g stroke="var(--warn)" stroke-width="5" fill="none" opacity=".5"><path d="M720 92 C 800 92, 800 150, 890 150"/><path d="M720 218 C 800 218, 800 160, 890 160"/></g>
+        <text x="800" y="128" class="t" style="font-size:12px" text-anchor="middle">광섬유 커넥터</text>
+        <text x="800" y="196" class="t-dim" style="font-size:11px" text-anchor="middle">송신 1쌍 + 수신 1쌍</text>
+        <text x="800" y="212" class="t-dim" style="font-size:11px" text-anchor="middle">(× 레인 수)</text>
+        <text x="400" y="266" text-anchor="middle" class="t-dim" style="font-size:11.5px">800G = 8 레인 × 100 Gb/s PAM4 (또는 4 레인 × 200 Gb/s)</text>
+      </svg></div>
+      <figcaption><b>그림 19-1.</b> 광 트랜시버의 구조. 위는 송신, 아래는 수신 경로다. 레이저·변조기·광검출기는 빛을 다루는 광 반도체이고, 드라이버·TIA·DSP는 전자 칩이다. 고속 모듈은 이 경로를 레인 수만큼(예: 8개) 나란히 갖춘다.</figcaption>
+    </figure>
+    <p>모듈은 스위치나 서버의 앞면 구멍(케이지)에 꽂았다 뺐다 하는 <b>플러그형</b>(pluggable)이 표준이다. 구멍 모양이 업계 표준(MSA)으로 정해져 있어 여러 회사 모듈을 섞어 쓸 수 있다. 속도가 오를수록 전력이 늘어 크기도 커졌다.</p>
+    <div class="table-wrap"><table class="ff-tbl">
+      <thead><tr><th>규격</th><th class="num">대략 크기 (폭 × 길이, mm)</th><th>대표 속도</th><th class="num">대표 전력</th></tr></thead>
+      <tbody>
+        <tr><td>SFP 계열 (SFP+, SFP28 …)</td><td class="num">13.4 × 56.5</td><td>10G, 25G (한 레인)</td><td class="num">≈1 W 안팎</td></tr>
+        <tr><td>QSFP28</td><td class="num">18.35 × 72.4</td><td>100G (4 × 25G)</td><td class="num">≈3.5 W</td></tr>
+        <tr><td>QSFP-DD</td><td class="num">18.35 × 89.4</td><td>400G, 800G (8 레인)</td><td class="num">400G ≈10~12 W</td></tr>
+        <tr><td>OSFP</td><td class="num">22.6 × 107.8</td><td>800G, 1.6T</td><td class="num">800G ≈15 W, 1.6T ≈25 W 수준</td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout analogy"><strong>항구의 컨테이너 크레인</strong><p>광 모듈은 육지(전기 회로)와 바다(광섬유)를 잇는 항구의 크레인이다. 육지에서 온 트럭 짐(전기 비트)을 배(빛)에 싣고, 들어온 배의 짐을 트럭으로 옮긴다. 배 한 척은 엄청난 양을 멀리까지 싸게 나르지만, 싣고 내리는 크레인은 전기를 많이 먹고 비싸다. 그래서 오늘날 광통신 기술의 상당 부분은 “항구를 얼마나 싸고 효율적으로 짓느냐”의 문제다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="laser">
+    <h2>반도체 레이저: 전자가 떨어지며 빛을 낸다</h2>
+    <p>반도체에서 전자는 두 에너지 띠에 산다. 아래의 꽉 찬 <b>가전자대</b>와 위의 거의 빈 <b>전도대</b>, 그 사이 간격이 <b>밴드갭</b> E<sub>g</sub>다. pn 접합에 순방향 전압을 걸면 n 쪽에서 전자가, p 쪽에서 정공(전자가 빠진 빈자리)이 접합으로 몰려와 만난다. 전도대의 전자가 가전자대의 빈자리로 떨어지면(재결합) 밴드갭만큼의 에너지가 남는데, 어떤 재료에서는 이것이 <b>광자 하나</b>로 나온다. 광자의 에너지가 밴드갭과 같으므로 파장도 재료가 정한다. 여기까지가 LED다.</p>
+    <p>레이저는 두 가지를 더한다. 첫째, <span class="term">유도 방출</span><span class="en">(stimulated emission)</span>: 들뜬 전자 옆을 광자가 지나가면 전자가 똑같은 방향·파장·위상의 광자를 하나 더 내놓는다. 빛이 빛을 복제하는 것이다. 둘째, <b>공진기</b>: 결정의 양 끝을 쪼개 만든 거울(또는 주기적 격자)이 빛을 왔다 갔다 하게 해서 복제를 거듭하게 한다. 전류가 적을 때는 손실(거울로 새는 빛, 흡수)이 이득보다 커서 LED처럼 약한 빛만 나오다가, 이득이 손실을 넘는 순간 빛이 폭발적으로 늘어 레이저 발진이 시작된다. 그 전류가 <span class="term">문턱 전류</span><span class="en">(threshold current)</span>다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 860 270" style="min-width:620px" role="img" aria-label="모서리 발광 레이저와 VCSEL 구조">
+        <text x="210" y="22" text-anchor="middle" class="t" style="font-weight:700">모서리 발광 레이저 (FP · DFB)</text>
+        <text x="650" y="22" text-anchor="middle" class="t" style="font-weight:700">VCSEL (수직 공진기 면발광)</text>
+        <rect x="40" y="60" width="300" height="50" class="f-surface" stroke="var(--border)"/><text x="190" y="90" text-anchor="middle" class="t" style="font-size:12px">p형 InP 클래딩</text>
+        <rect x="40" y="110" width="300" height="16" fill="color-mix(in srgb, var(--warn) 35%, transparent)" stroke="var(--warn)"/>
+        <text x="190" y="122" text-anchor="middle" class="t" style="font-size:11px">활성층 (InGaAsP 양자우물)</text>
+        <path d="M40 132 l10 -4 l10 4 l10 -4 l10 4 l10 -4 l10 4 l10 -4 l10 4 l10 -4 l10 4 l10 -4 l10 4 l10 -4 l10 4 l10 -4 l10 4 l10 -4 l10 4 l10 -4 l10 4 l10 -4 l10 4 l10 -4 l10 4 l10 -4 l10 4 l10 -4 l10 4 l10 -4 l10 4" stroke="var(--accent-2)" stroke-width="1.5" fill="none"/>
+        <rect x="40" y="136" width="300" height="50" class="f-surface" stroke="var(--border)"/><text x="190" y="166" text-anchor="middle" class="t" style="font-size:12px">n형 InP 기판</text>
+        <text x="190" y="204" text-anchor="middle" class="t-dim" style="font-size:11px">보라 물결 = DFB 격자(한 파장만 되먹임)</text>
+        <rect x="160" y="46" width="60" height="14" fill="var(--text-dim)"/><text x="190" y="40" text-anchor="middle" class="t-dim" style="font-size:11px">전류 ↓</text>
+        <path d="M340 118 H420" stroke="var(--warn)" stroke-width="4" marker-end="url(#ph-a2)"/><text x="380" y="106" text-anchor="middle" class="t" style="font-size:11px">빛</text>
+        <text x="40" y="228" class="t-dim" style="font-size:11.5px">쪼갠 결정면이 거울, 길이 수백 µm, 옆으로 빛이 나온다</text>
+        <text x="40" y="246" class="t-dim" style="font-size:11.5px">→ 1310·1550 nm 장거리용 (InP)</text>
+        <!-- VCSEL -->
+        <g>
+          <rect x="560" y="70" width="180" height="70" fill="color-mix(in srgb, var(--accent-2) 14%, transparent)" stroke="var(--accent-2)"/>
+          <g stroke="var(--accent-2)" stroke-width="1"><path d="M560 80 H740 M560 90 H740 M560 100 H740 M560 110 H740 M560 120 H740 M560 130 H740"/></g>
+          <text x="760" y="108" class="t" style="font-size:11px">위 DBR 거울</text>
+          <rect x="560" y="140" width="180" height="12" fill="color-mix(in srgb, var(--warn) 35%, transparent)" stroke="var(--warn)"/><text x="760" y="150" class="t" style="font-size:11px">활성층</text>
+          <rect x="560" y="152" width="180" height="70" fill="color-mix(in srgb, var(--accent-2) 14%, transparent)" stroke="var(--accent-2)"/>
+          <g stroke="var(--accent-2)" stroke-width="1"><path d="M560 162 H740 M560 172 H740 M560 182 H740 M560 192 H740 M560 202 H740 M560 212 H740"/></g>
+          <text x="760" y="190" class="t" style="font-size:11px">아래 DBR 거울</text>
+          <rect x="540" y="222" width="220" height="20" class="f-surface" stroke="var(--border)"/><text x="650" y="237" text-anchor="middle" class="t-dim" style="font-size:11px">GaAs 기판</text>
+          <path d="M650 68 V36" stroke="var(--warn)" stroke-width="5" marker-end="url(#ph-a2)"/><text x="664" y="50" class="t" style="font-size:11px">빛 (850 nm)</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 19-2.</b> 두 가지 반도체 레이저. 모서리 발광 레이저는 활성층을 따라 수백 µm 길이로 빛을 증폭해 칩 옆면으로 내보낸다. 활성층 위에 주기적 격자를 새긴 DFB는 한 파장만 골라 되먹임해 선폭이 좁다. VCSEL은 수십 층의 반사막(DBR) 사이에 얇은 활성층을 끼워 위로 빛을 쏘며, 웨이퍼 상태로 검사할 수 있어 값이 싸다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-li">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>L-I 곡선: 문턱을 넘으면 레이저가 된다</h3></div>
+      <div class="duo">
+        <div><canvas id="cv-li"></canvas></div>
+        <div><canvas id="cv-cav"></canvas></div>
+      </div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>구동 전류 <output id="li-i-out"></output></span><input type="range" id="li-i" min="0" max="100" step="0.5" value="6"></label>
+        <label class="ctrl"><span>칩 온도 <output id="li-t-out"></output></span><input type="range" id="li-t" min="20" max="95" step="1" value="25"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">문턱 전류</span><span class="v" id="li-o-th">—</span></div>
+        <div class="stat"><span class="k">광 출력</span><span class="v" id="li-o-p">—</span></div>
+        <div class="stat"><span class="k">전력 변환 효율</span><span class="v" id="li-o-wpe">—</span></div>
+        <div class="stat"><span class="k">상태</span><span class="v" id="li-o-st">—</span></div>
+      </div>
+      <div class="sim-note">왼쪽: 전류(L)와 광 출력(I)의 관계. 흐린 선은 25 °C 기준. 오른쪽: 공진기 안의 광자. 해볼 것: ① 전류를 0에서 천천히 올려 문턱 근처에서 출력이 갑자기 꺾여 오르는 것을 보자. ② 온도를 85 °C로 올리면 문턱이 오르고 기울기(효율)가 줄어, 같은 전류에서 출력이 크게 준다. 그래서 장거리 레이저는 열전 냉각기(TEC)로 온도를 고정하거나, 데이터센터용은 “냉각 없는(uncooled)” 설계로 온도 여유를 둔다. ③ 고온·대전류에서는 자체 발열로 곡선이 꺾여 내려온다. 단순화: 1310 nm DFB 대표값(문턱 10 mA @25 °C, 특성 온도 T₀ = 55 K, 기울기 효율 0.3 W/A, 열저항 80 K/W, 순방향 전압 1.2 V).</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="bandgap">
+    <h2>밴드갭이 색을 정한다: 왜 실리콘은 빛을 못 낼까</h2>
+    <p>광자의 에너지는 E = hc/λ이므로, 전자볼트(eV)와 나노미터(nm)로 쓰면 아주 간단한 식이 된다.</p>
+    <div class="formula">λ(nm) ≈ 1240 / E<sub>g</sub>(eV)<div class="where">예: GaAs 1.42 eV → 873 nm, InP 위의 InGaAsP 0.95 eV → 1310 nm, 0.80 eV → 1550 nm.</div></div>
+    <p>광섬유 통신은 유리가 투명한 850 nm(짧은 거리), 1310 nm(O 대역, 분산이 0), 1550 nm(C 대역, 손실이 최소) 근처를 쓴다(5장). 그래서 레이저 재료는 밴드갭이 0.8~1.45 eV인 GaAs와 InP 계열의 화합물 반도체다. 인듐·갈륨·비소·인의 비율을 바꾸면 밴드갭을 원하는 대로 맞출 수 있다.</p>
+    <p>그런데 컴퓨터 칩의 재료인 실리콘은 밴드갭이 1.12 eV(1107 nm)인데도 빛을 거의 내지 못한다. 실리콘은 <span class="term">간접 밴드갭</span><span class="en">(indirect bandgap)</span> 반도체이기 때문이다. 전도대의 가장 낮은 곳이 가전자대의 가장 높은 곳과 <b>운동량(k)이 다른 위치</b>에 있어서, 전자가 떨어지려면 에너지뿐 아니라 운동량도 버려야 한다. 광자는 운동량을 거의 갖지 못하므로 격자 진동(포논)이 동시에 끼어들어야 하고, 그런 삼자 만남은 드물다. 그 사이 전자는 빛 대신 열로 에너지를 잃는다. GaAs·InP처럼 두 극값이 같은 위치에 있는 <span class="term">직접 밴드갭</span><span class="en">(direct bandgap)</span> 반도체는 수 나노초 안에 빛으로 재결합하지만, 실리콘은 그 확률이 약 10만~100만 분의 1 수준이다.</p>
+    <div class="sim" id="sim-bg">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>밴드갭 ↔ 파장 변환기</h3></div>
+      <div class="duo">
+        <div><canvas id="cv-ek"></canvas></div>
+        <div><canvas id="cv-wl"></canvas></div>
+      </div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>재료</span><div class="seg" id="bg-mat"><button data-value="Si">Si</button><button data-value="Ge">Ge</button><button data-value="GaAs" class="on">GaAs</button><button data-value="InP">InP</button><button data-value="InGaAsP">InGaAsP</button><button data-value="InGaAs">InGaAs</button><button data-value="GaN">GaN</button></div></div>
+        <label class="ctrl"><span>InGaAsP의 비소 비율 y (InP에 격자 정합) <output id="bg-y-out"></output></span><input type="range" id="bg-y" min="0" max="1" step="0.01" value="0.6"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">밴드갭</span><span class="v" id="bg-o-eg">—</span></div>
+        <div class="stat"><span class="k">파장 λ = 1240/E<sub>g</sub></span><span class="v" id="bg-o-wl">—</span></div>
+        <div class="stat"><span class="k">밴드갭 종류</span><span class="v" id="bg-o-type">—</span></div>
+        <div class="stat"><span class="k">통신에서의 역할</span><span class="v" id="bg-o-use" style="font-size:14px">—</span></div>
+      </div>
+      <div class="sim-note">왼쪽: 에너지-운동량(E-k) 그림. 위는 전도대, 아래는 가전자대. 직접 밴드갭은 수직 화살표 하나로 빛이 나오고, 간접 밴드갭은 옆으로 비껴 있어 포논의 도움이 필요하다. 오른쪽: 재료가 내거나 흡수하는 경계 파장과 통신 대역. 해볼 것: ① InGaAsP의 y를 움직여 1310 nm(약 0.95 eV)와 1550 nm(약 0.80 eV)에 맞춰 보자. ② Ge는 간접이지만 직접 갭(0.80 eV)이 바로 위에 있어 1550 nm까지 잘 <b>흡수</b>한다. 그래서 실리콘 포토닉스의 광검출기가 된다. ③ 실리콘은 1310·1550 nm 빛을 흡수하지 않으므로 이 파장에서 투명한 도파관이 된다. 단순화: 실온 값, InGaAsP는 E<sub>g</sub> ≈ 1.35 − 0.72y + 0.12y² 근사.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">실리콘(밴드갭 1.12 eV)으로 만든 광검출기에 1550 nm 빛을 비추면 어떻게 될까?</p><p class="wi-hint">밴드갭 변환기에서 Si를 고르고, 1550 nm 광자의 에너지(1240/1550 ≈ 0.8 eV)와 비교해 보자.</p><div class="opts">
+      <button class="opt">아주 잘 흡수해 큰 전류가 흐른다</button>
+      <button class="opt" data-correct>광자 에너지가 밴드갭보다 작아 거의 그대로 통과한다</button>
+      <button class="opt">빛이 증폭되어 나온다</button>
+      <button class="opt">파장이 1107 nm로 바뀌어 나온다</button>
+    </div><div class="quiz-exp">0.8 eV 광자는 1.12 eV 밴드갭을 넘을 만큼 전자를 들어 올리지 못한다. 그래서 실리콘은 1550 nm에서 투명하다. 검출기에는 밴드갭이 작은 Ge나 InGaAs를 쓰고, 실리콘은 이 투명함을 살려 도파관으로 쓴다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="lasers">
+    <h2>레이저의 종류: 짧은 거리, 긴 거리, 코히어런트</h2>
+    <p>어떤 레이저를 쓰느냐는 거리와 속도, 값이 정한다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>종류</th><th>재료 · 파장</th><th>특징</th><th>주 용도</th></tr></thead>
+      <tbody>
+        <tr><td><span class="term">VCSEL</span></td><td>GaAs · 850 nm</td><td>위로 빛을 쏨, 웨이퍼 검사 가능, 저전력·저가, 여러 모드</td><td>다중 모드 광섬유로 수십~100 m (랙 사이, AOC)</td></tr>
+        <tr><td>FP 레이저</td><td>InP · 1310 nm</td><td>쪼갠 면 거울만 사용, 여러 파장이 동시에 발진</td><td>저가 단거리, 가입자망 일부</td></tr>
+        <tr><td><span class="term">DFB 레이저</span></td><td>InP · 1310/1550 nm</td><td>내장 격자로 한 파장만, 선폭 좁음, 직접 변조 가능</td><td>단일 모드 광섬유 2~40 km, 실리콘 포토닉스의 광원(CW)</td></tr>
+        <tr><td><span class="term">EML</span></td><td>InP · 1310 nm 등</td><td>DFB + 전계흡수 변조기(EAM)를 한 칩에, 고속에서도 파장 흔들림 작음</td><td>데이터센터 100~200 Gb/s/레인 PAM4, 수 km</td></tr>
+        <tr><td>튜너블 레이저</td><td>InP · C 대역 1530~1565 nm</td><td>파장을 수십 nm 바꿈, 선폭 100 kHz 이하</td><td>코히어런트 DWDM(5장), 장거리·해저·데이터센터 간 연결</td></tr>
+      </tbody>
+    </table></div>
+    <p>VCSEL은 GaAs 기판 위에 AlGaAs/GaAs 층을 쌓아 만든 850 nm 레이저다. 굵은 코어의 다중 모드 광섬유와 짝을 이뤄 짧은 거리에서 가장 싸다. 거리가 수백 m를 넘으면 모드 분산(5장) 때문에 단일 모드 광섬유와 InP 계열의 1310 nm 레이저로 넘어간다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="modulation">
+    <h2>빛에 비트 싣기: 직접 변조와 마하-젠더 변조기</h2>
+    <p>가장 간단한 방법은 레이저 전류 자체를 켜고 끄는 <b>직접 변조</b>다. 값싸지만 전류가 바뀔 때 레이저 파장이 함께 흔들리고(처프), 레이저가 반응하는 속도에 한계가 있어 대략 레인당 수십 Gb/s, 짧은 거리까지만 쓴다. 더 빠르고 멀리 가려면 레이저는 일정한 빛(CW)만 내고, 그 뒤의 <b>외부 변조기</b>가 빛을 조절한다. 전압을 걸면 흡수가 늘어나는 <b>전계흡수 변조기</b>(EAM, EML 안에 있는 것), 그리고 간섭을 이용하는 <span class="term">마하-젠더 변조기</span><span class="en">(Mach-Zehnder modulator, MZM)</span>가 대표적이다.</p>
+    <p>MZM은 빛을 두 갈래로 나눴다가 다시 합친다. 한쪽 팔에 전압을 걸어 굴절률을 바꾸면 그 팔을 지나는 빛이 늦거나 빨라져 위상이 바뀐다. 두 빛의 위상이 같으면 보강 간섭으로 밝고, 180° 어긋나면 상쇄 간섭으로 어둡다. 출력 세기는 위상차 Δφ에 대해 cos²(Δφ/2)를 따른다. 위상을 180° 바꾸는 데 필요한 전압을 V<sub>π</sub>라 한다. 니오브산리튬(LiNbO<sub>3</sub>)은 전압에 따라 굴절률이 바뀌는 성질(포켈스 효과)이 강해 오래전부터 장거리 변조기의 표준이었고, 최근에는 얇은 막으로 만든 박막 니오브산리튬(TFLN)과 실리콘 MZM이 쓰인다.</p>
+    <div class="sim" id="sim-mzm">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>마하-젠더 변조기: 간섭으로 빛을 켜고 끄기</h3></div>
+      <div class="duo">
+        <div><canvas id="cv-mzm"></canvas></div>
+        <div><canvas id="cv-mzt"></canvas></div>
+      </div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>바이어스 위상차 <output id="mz-b-out"></output></span><input type="range" id="mz-b" min="0" max="360" step="1" value="90"></label>
+        <label class="ctrl"><span>구동 신호 진폭 (위상, 첨두-첨두) <output id="mz-d-out"></output></span><input type="range" id="mz-d" min="0" max="180" step="1" value="90"></label>
+        <div class="ctrl"><span>변조 방식</span><div class="seg" id="mz-fmt"><button data-value="nrz">NRZ (2단계)</button><button data-value="pam4" class="on">PAM4 (4단계)</button></div></div>
+        <div class="ctrl"><span>바이어스 바로가기</span><div class="btn-row"><button class="btn" id="mz-q">직교점 90°</button><button class="btn" id="mz-null">소광점 180°</button><button class="btn" id="mz-pk">최대점 0°</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">지금 출력 세기</span><span class="v" id="mz-o-now">—</span></div>
+        <div class="stat"><span class="k">소광비 (최대/최소 레벨)</span><span class="v" id="mz-o-er">—</span></div>
+        <div class="stat"><span class="k">레벨 간격 균일도</span><span class="v" id="mz-o-lin">—</span></div>
+      </div>
+      <div class="sim-note">왼쪽: 두 팔을 지나는 빛(물결)과 합쳐진 출력, 아래는 지금까지 보낸 심볼의 출력 세기. 오른쪽: 전달 곡선 cos²(Δφ/2) 위에 바이어스 점(◆)과 구동 레벨들. 해볼 것: ① 바이어스를 직교점(90°)에 두면 곡선이 가장 곧아 PAM4 네 레벨이 고르게 벌어진다. ② 구동 진폭을 180°까지 키우면 소광비는 커지지만 곡선 끝이 휘어 바깥 레벨 간격이 좁아진다(PAM4 눈이 짓눌림). DSP가 이를 미리 보정하기도 한다. ③ 소광점(180°)에 바이어스하면 세기 변조가 아니라 위상 부호가 바뀌는 변조가 되는데, 코히어런트 통신이 이 방식을 쓴다. 단순화: 손실 없는 이상적 MZM, 푸시-풀 구동.</div>
+    </div>
+    <p>MZM은 길이가 수 mm로 크고 V<sub>π</sub>가 수 V에 달해 구동 전력이 크다는 단점이 있다. 실리콘 포토닉스에서는 크기가 수십 µm인 <b>링 변조기</b>가 대안으로 쓰인다(아래 실리콘 포토닉스 절).</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="detector">
+    <h2>광검출기: 빛을 다시 전류로</h2>
+    <p>수신 쪽의 <span class="term">광검출기</span><span class="en">(photodetector, PD)</span>는 레이저를 거꾸로 돌린 것이다. 밴드갭보다 에너지가 큰 광자가 흡수되면 전자-정공 쌍이 생기고, 역방향 전압이 이들을 양 전극으로 끌어가 전류가 흐른다. 성능은 <b>양자 효율</b> η(광자 몇 개당 전자 몇 개가 나오나)와 <span class="term">응답도</span><span class="en">(responsivity)</span> R(빛 1 W당 몇 A)로 나타낸다.</p>
+    <div class="formula">R (A/W) = η × λ(µm) / 1.24<div class="where">예: η = 0.8, λ = 1.31 µm → R ≈ 0.85 A/W. 수신 광 0.1 mW(−10 dBm)면 광전류는 약 85 µA.</div></div>
+    <ul>
+      <li><b>PIN 포토다이오드</b>: p층과 n층 사이에 도핑하지 않은 두꺼운 흡수층(I)을 둬서 흡수를 늘리고 빠르게 만든 구조. 1310/1550 nm에는 InGaAs(밴드갭 0.75 eV)를, 850 nm에는 GaAs를 흡수층으로 쓴다.</li>
+      <li><span class="term">애벌랜치 포토다이오드</span><span class="en">(APD)</span>: 높은 역전압(수십 V)으로 전자를 가속해 원자와 부딪혀 새 전자를 연쇄로 만들게 한다. 내부에서 약 10배 증폭되므로 약한 빛을 잘 받지만(감도 5~10 dB 향상), 증폭 과정의 잡음이 붙고 고전압이 필요하다. 가입자망(PON)과 장거리 직접 검출 수신기에 쓴다.</li>
+      <li><b>Ge-on-Si 광검출기</b>: 실리콘 위에 게르마늄을 키워 만든다. Ge는 1310 nm는 물론 1550 nm 근처까지 흡수하고 CMOS 공정과 섞을 수 있어, 실리콘 포토닉스의 표준 검출기다.</li>
+    </ul>
+    <p>광전류는 마이크로암페어 수준이라 바로 쓸 수 없다. TIA가 이를 수십~수백 mV의 전압으로 바꾼다. TIA의 잡음이 수신 감도를 정하므로, 고속에서는 SiGe BiCMOS나 첨단 CMOS로 만든다(18장의 LNA와 같은 원리다).</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="siph">
+    <h2>실리콘 포토닉스: CMOS 공장에서 광 회로를</h2>
+    <p>지금까지의 광 부품은 InP나 GaAs 같은 화합물 반도체 칩을 하나씩 만들어 렌즈로 정렬하는 방식이었다. 웨이퍼가 작고(InP는 주로 3~6인치) 조립이 손이 많이 가서 비싸다. <span class="term">실리콘 포토닉스</span><span class="en">(silicon photonics)</span>는 반대로, 이미 있는 거대한 CMOS 공장의 200·300 mm 웨이퍼에서 광 회로를 대량으로 찍어 내자는 생각이다.</p>
+    <ul>
+      <li><b>도파관</b>: 실리콘은 1310/1550 nm에서 투명하고 굴절률이 약 3.5로 산화막(1.45)보다 훨씬 높다. 폭 약 0.5 µm, 두께 0.22 µm의 실리콘 선이 빛을 강하게 가둬, 수 µm 반지름으로 꺾어도 빛이 새지 않는다. SOI 웨이퍼의 산화막이 그대로 아래 클래딩이 된다.</li>
+      <li><b>변조기</b>: 실리콘 도파관에 pn 접합을 만들고 역전압으로 자유 전자·정공의 양을 바꾸면 굴절률이 조금 바뀐다(플라스마 분산 효과). 이것으로 MZM이나 링 변조기를 만든다.</li>
+      <li><b>검출기</b>: 도파관 끝에 게르마늄을 키워 Ge PD를 만든다.</li>
+      <li><b>광원</b>: 실리콘은 레이저가 되지 않으므로 InP 레이저를 따로 붙인다. 레이저 칩을 옆에 붙이거나(하이브리드), InP 박막을 실리콘 웨이퍼에 접합한 뒤 함께 가공하거나(<span class="term">이종 집적</span><span class="en">(heterogeneous integration)</span>), 아예 모듈 밖의 레이저에서 광섬유로 빛을 공급한다(외부 광원, ELS).</li>
+    </ul>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 860 280" style="min-width:620px" role="img" aria-label="실리콘 포토닉스 칩 평면도">
+        <rect x="20" y="30" width="820" height="220" rx="12" class="f-surface" stroke="var(--border)"/>
+        <text x="30" y="22" class="t" style="font-weight:700">실리콘 포토닉스 칩 (위에서 본 모습, 수 mm)</text>
+        <rect x="40" y="70" width="90" height="44" rx="6" fill="color-mix(in srgb, var(--warn) 22%, transparent)" stroke="var(--warn)"/><text x="85" y="90" text-anchor="middle" class="t" style="font-size:12px;font-weight:700">InP 레이저</text><text x="85" y="106" text-anchor="middle" class="t-dim" style="font-size:10.5px">접합·부착</text>
+        <path d="M130 92 H760" stroke="var(--accent)" stroke-width="3" fill="none"/>
+        <g fill="none" stroke="var(--accent-2)" stroke-width="3"><circle cx="240" cy="70" r="16"/><circle cx="350" cy="70" r="16"/><circle cx="460" cy="70" r="16"/><circle cx="570" cy="70" r="16"/></g>
+        <g class="t-mono" style="font-size:10.5px"><text x="240" y="44" text-anchor="middle">λ1</text><text x="350" y="44" text-anchor="middle">λ2</text><text x="460" y="44" text-anchor="middle">λ3</text><text x="570" y="44" text-anchor="middle">λ4</text></g>
+        <text x="405" y="124" text-anchor="middle" class="t" style="font-size:12px">링 변조기 (반지름 ≈ 5~10 µm) — 버스 도파관 하나에 여러 파장</text>
+        <path d="M760 92 l18 -10 v20 z" class="f-acc-soft" stroke="var(--accent)"/>
+        <text x="790" y="80" class="t" style="font-size:11px">격자</text><text x="790" y="94" class="t" style="font-size:11px">커플러</text><text x="790" y="108" class="t-dim" style="font-size:10.5px">→ 광섬유</text>
+        <path d="M760 190 H560" stroke="var(--accent)" stroke-width="3" fill="none"/>
+        <path d="M760 190 l18 -10 v20 z" class="f-acc-soft" stroke="var(--accent)"/><text x="790" y="194" class="t-dim" style="font-size:10.5px">← 수신</text>
+        <rect x="490" y="174" width="70" height="32" rx="5" fill="color-mix(in srgb, var(--ok) 20%, transparent)" stroke="var(--ok)"/><text x="525" y="195" text-anchor="middle" class="t" style="font-size:12px;font-weight:700">Ge PD</text>
+        <rect x="320" y="150" width="140" height="80" rx="8" class="f-elev" stroke="var(--border)"/><text x="390" y="180" text-anchor="middle" class="t" style="font-size:12px;font-weight:700">CMOS 칩 (적층)</text><text x="390" y="198" text-anchor="middle" class="t-dim" style="font-size:10.5px">드라이버 · TIA</text><text x="390" y="214" text-anchor="middle" class="t-dim" style="font-size:10.5px">히터 제어</text>
+        <path d="M460 190 H486" class="s-line"/>
+        <g stroke="var(--bad)" stroke-width="2"><path d="M226 54 h28 M336 54 h28 M446 54 h28 M556 54 h28"/></g>
+        <text x="60" y="160" class="t-dim" style="font-size:11px">빨간 선 = 히터</text><text x="60" y="176" class="t-dim" style="font-size:11px">(공진 파장 미세 조정)</text>
+        <text x="60" y="210" class="t-dim" style="font-size:11px">파랑 = 실리콘 도파관</text><text x="60" y="226" class="t-dim" style="font-size:11px">0.5 × 0.22 µm</text>
+      </svg></div>
+      <figcaption><b>그림 19-3.</b> 실리콘 포토닉스 칩의 예(단순화). InP 레이저의 빛이 실리콘 도파관을 따라가며 각자 다른 파장에 맞춘 링 변조기들을 지나 데이터가 실리고, 격자 커플러로 광섬유에 나간다. 수신 빛은 Ge 광검출기로 들어간다. 드라이버와 TIA는 CMOS 칩으로 위에 쌓는다.</figcaption>
+    </figure>
+    <p><span class="term">링 공진기</span><span class="en">(ring resonator)</span>는 곧은 도파관 옆에 둥근 고리 도파관을 붙여 둔 것이다. 고리의 둘레가 파장의 정수배가 되는 파장의 빛만 고리로 넘어가 맴돌다 사라지므로, 곧은 도파관의 투과 스펙트럼에 날카로운 골(딥)이 생긴다. pn 접합으로 고리의 굴절률을 바꾸면 이 골이 옆으로 움직이고, 레이저 파장에서의 투과가 켜졌다 꺼졌다 한다. 크기가 작고 구동 전압이 낮아 전력이 적고, 파장마다 다른 링을 한 도파관에 줄줄이 달면 WDM이 된다. 대신 실리콘의 굴절률은 온도에 민감해 1 °C마다 공진이 약 0.08 nm씩 움직이므로, 링마다 히터와 제어 회로로 붙잡아 둬야 한다.</p>
+    <div class="sim" id="sim-ring">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>링 공진기 변조기: 파장을 훑고, 전압으로 공진 옮기기</h3></div>
+      <div class="sim-view"><canvas id="cv-ring"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>역방향 전압 <output id="rg-v-out"></output></span><input type="range" id="rg-v" min="0" max="3" step="0.05" value="0"></label>
+        <label class="ctrl"><span>링 반지름 <output id="rg-r-out"></output></span><input type="range" id="rg-r" min="4" max="20" step="0.5" value="8"></label>
+        <label class="ctrl"><span>주변 온도 변화 <output id="rg-t-out"></output></span><input type="range" id="rg-t" min="-2" max="2" step="0.05" value="0"></label>
+        <label class="check"><input type="checkbox" id="rg-heat"> 히터 제어로 온도 변화 보정</label>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn primary" id="rg-play">비트 보내기 (0V ↔ 2V)</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">자유 스펙트럼 범위 (FSR)</span><span class="v" id="rg-o-fsr">—</span></div>
+        <div class="stat"><span class="k">공진 이동</span><span class="v" id="rg-o-shift">—</span></div>
+        <div class="stat"><span class="k">레이저 파장 투과</span><span class="v" id="rg-o-t">—</span></div>
+        <div class="stat"><span class="k">소광비 (0 V 대비)</span><span class="v" id="rg-o-er">—</span></div>
+      </div>
+      <div class="sim-note">위: 넓게 본 투과 스펙트럼. 공진 골이 FSR 간격으로 되풀이된다. 아래: 레이저 파장(세로 주황선) 근처를 확대한 것. 흐린 선은 0 V, 진한 선은 지금 전압. 해볼 것: ① 전압을 0에서 2 V로 올리면 골이 오른쪽(긴 파장)으로 움직여 레이저 파장을 덮고 빛이 꺼진다. ② 반지름을 줄이면 FSR이 넓어져 한 도파관에 더 많은 파장 채널을 둘 수 있다. ③ 온도가 1 °C만 바뀌어도 골이 0.08 nm 움직여 변조가 망가진다. 히터 보정을 켜 보자. 단순화: 군 굴절률 4.2, Q ≈ 2만, 전압 효율 25 pm/V, 열광학 계수 0.08 nm/K로 가정한 전달 함수.</div>
+    </div>
+    <div class="callout deep"><strong>실리콘 포토닉스의 숙제</strong><p>실리콘 도파관과 광섬유는 크기가 수십 배 달라(0.5 µm 대 코어 9 µm) 빛을 넣고 빼는 결합 손실이 크고, 레이저를 붙이는 공정이 여전히 까다롭다. 링은 온도 제어에 전력이 들고, 실리콘 변조기의 효율은 InP나 니오브산리튬보다 떨어진다. 그럼에도 대량 생산과 전자 칩과의 집적이라는 장점 때문에, 데이터센터용 고속 모듈과 CPO에서 점유율을 넓히고 있다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="cpo">
+    <h2>전력 문제와 공동 패키징 광학(CPO)</h2>
+    <p>스위치 칩 하나의 용량이 51.2 Tb/s, 다음 세대는 102.4 Tb/s다(17장). 51.2T 스위치를 800G 모듈로 채우면 모듈이 64개, 모듈 하나가 약 15 W라면 광 모듈만 약 1 kW다. 스위치 칩 자체보다 광 모듈이 더 많은 전기를 먹을 수 있다. 전력이 어디로 가는지 따라가 보면, 스위치 칩의 SerDes가 신호를 기판 위 수십 cm 떨어진 앞면 모듈까지 밀어내고, 모듈 안의 DSP가 망가진 신호를 다시 정리하고, 드라이버와 레이저가 빛을 만든다. 대부분은 <b>전기 신호를 멀리 끌고 가는 데</b> 드는 비용이다.</p>
+    <ul>
+      <li><b>플러그형 + DSP</b>(오늘의 표준): 호환성과 교체가 쉽지만 전력이 크다.</li>
+      <li><span class="term">LPO</span><span class="en">(linear pluggable optics)</span>: 모듈의 DSP를 빼고 스위치 칩의 SerDes가 광 부품을 직접 선형으로 구동한다. 모듈 전력이 대략 절반 가까이 준다. 대신 호스트 SerDes 부담이 늘고 링크 품질 여유가 줄어든다.</li>
+      <li><span class="term">공동 패키징 광학</span><span class="en">(co-packaged optics, CPO)</span>: 광 엔진(실리콘 포토닉스 칩)을 스위치 칩과 <b>같은 패키지</b> 안 수 mm 거리에 붙인다. 전기 경로가 짧아 SerDes가 작고 단순해지고 DSP가 사라진다. 레이저는 열에 약하고 고장이 잦으므로 앞면에 꽂는 외부 광원(ELS)으로 뺀다. 고장 난 광 엔진을 바꾸기 어렵다는 것이 숙제다.</li>
+    </ul>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 860 250" style="min-width:620px" role="img" aria-label="플러그형, LPO, CPO 비교">
+        <g class="t" style="font-size:12px">
+          <text x="140" y="22" text-anchor="middle" style="font-weight:700">① 플러그형 + DSP</text>
+          <text x="430" y="22" text-anchor="middle" style="font-weight:700">② LPO (DSP 없음)</text>
+          <text x="720" y="22" text-anchor="middle" style="font-weight:700">③ CPO</text>
+        </g>
+        <g>
+          <rect x="20" y="150" width="240" height="14" class="f-surface" stroke="var(--border)"/><text x="140" y="182" text-anchor="middle" class="t-dim" style="font-size:11px">기판 배선 15~30 cm</text>
+          <rect x="30" y="100" width="60" height="50" rx="6" class="f-acc"/><text x="60" y="130" text-anchor="middle" class="t" style="fill:#fff;font-size:11px;font-weight:700">스위치</text>
+          <rect x="180" y="96" width="70" height="54" rx="6" class="f-elev" stroke="var(--border)"/><text x="215" y="114" text-anchor="middle" class="t" style="font-size:10.5px">DSP</text><text x="215" y="130" text-anchor="middle" class="t" style="font-size:10.5px">드라이버</text><text x="215" y="144" text-anchor="middle" class="t" style="font-size:10.5px">광소자</text>
+          <path d="M90 125 H178" stroke="var(--accent)" stroke-width="2.5"/>
+          <text x="140" y="214" text-anchor="middle" class="t-mono" style="font-size:11px">≈ 15~20 pJ/bit</text>
+        </g>
+        <g>
+          <rect x="310" y="150" width="240" height="14" class="f-surface" stroke="var(--border)"/>
+          <rect x="320" y="100" width="60" height="50" rx="6" class="f-acc"/><text x="350" y="130" text-anchor="middle" class="t" style="fill:#fff;font-size:11px;font-weight:700">스위치</text>
+          <rect x="470" y="104" width="70" height="46" rx="6" class="f-elev" stroke="var(--border)"/><text x="505" y="124" text-anchor="middle" class="t" style="font-size:10.5px">선형 드라이버</text><text x="505" y="140" text-anchor="middle" class="t" style="font-size:10.5px">광소자</text>
+          <path d="M380 125 H468" stroke="var(--accent)" stroke-width="2.5"/>
+          <text x="430" y="182" text-anchor="middle" class="t-dim" style="font-size:11px">호스트 SerDes가 직접 구동</text>
+          <text x="430" y="214" text-anchor="middle" class="t-mono" style="font-size:11px">≈ 8~10 pJ/bit</text>
+        </g>
+        <g>
+          <rect x="600" y="150" width="240" height="14" class="f-surface" stroke="var(--border)"/>
+          <rect x="650" y="90" width="140" height="60" rx="8" fill="none" stroke="var(--accent-2)" stroke-dasharray="4 3"/>
+          <rect x="690" y="100" width="60" height="44" rx="6" class="f-acc"/><text x="720" y="126" text-anchor="middle" class="t" style="fill:#fff;font-size:11px;font-weight:700">스위치</text>
+          <rect x="658" y="104" width="26" height="36" rx="4" class="f-acc2-soft"/><rect x="756" y="104" width="26" height="36" rx="4" class="f-acc2-soft"/>
+          <text x="720" y="84" text-anchor="middle" class="t-dim" style="font-size:10.5px">한 패키지 안 광 엔진</text>
+          <rect x="800" y="110" width="34" height="30" rx="4" fill="color-mix(in srgb, var(--warn) 22%, transparent)" stroke="var(--warn)"/><text x="817" y="104" text-anchor="middle" class="t-dim" style="font-size:10px">ELS</text>
+          <path d="M800 125 H784" stroke="var(--warn)" stroke-width="2"/>
+          <text x="720" y="182" text-anchor="middle" class="t-dim" style="font-size:11px">전기 경로 수 mm, 레이저는 밖</text>
+          <text x="720" y="214" text-anchor="middle" class="t-mono" style="font-size:11px">≈ 5 pJ/bit 수준</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 19-4.</b> 광 연결 방식 세 가지. 스위치 칩과 광소자 사이의 전기 경로가 짧아질수록 그것을 메우는 SerDes와 DSP의 전력이 준다. 아래 숫자는 광 연결 부분 전체의 대략적인 비트당 에너지 수준이다(세대·제품에 따라 다르다).</figcaption>
+    </figure>
+    <div class="sim" id="sim-cpo">
+      <div class="sim-head"><span class="sim-tag">CALCULATOR</span><h3>스위치 한 대의 광 연결 전력: 플러그형 vs LPO vs CPO</h3></div>
+      <div class="sim-view"><canvas id="cv-cpo"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>스위치 칩 용량</span><div class="seg" id="cp-cap"><button data-value="25.6">25.6T</button><button data-value="51.2" class="on">51.2T</button><button data-value="102.4">102.4T</button></div></div>
+        <div class="ctrl"><span>포트 속도</span><div class="seg" id="cp-port"><button data-value="400">400G</button><button data-value="800" class="on">800G</button><button data-value="1600">1.6T</button></div></div>
+        <label class="ctrl"><span>클러스터의 스위치 수 <output id="cp-n-out"></output></span><input type="range" id="cp-n" min="1" max="2000" step="1" value="500"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">포트(모듈) 수</span><span class="v" id="cp-o-ports">—</span></div>
+        <div class="stat"><span class="k">플러그형 모듈 1개</span><span class="v" id="cp-o-mod">—</span></div>
+        <div class="stat"><span class="k">CPO로 줄이는 전력 (스위치 1대)</span><span class="v" id="cp-o-save">—</span></div>
+        <div class="stat"><span class="k">클러스터 전체 절감</span><span class="v" id="cp-o-tot">—</span></div>
+      </div>
+      <div class="sim-note">막대 = 스위치 한 대의 광 연결 전력(광 부분 + 그것을 구동하는 호스트 SerDes). 해볼 것: ① 51.2T, 800G에서 세 방식을 비교하자. ② 102.4T로 올리면 플러그형은 광 연결만 2 kW를 넘는다. ③ 스위치 수를 늘려 클러스터 전체 절감이 MW 단위가 되는 것을 확인하자. 단순화(대표 수준의 가정): 모듈 비트당 에너지 400G 30, 800G 19, 1.6T 16 pJ/bit(플러그형), LPO는 그 약 절반, CPO 광 엔진 8/6/5 pJ/bit(외부 레이저 포함). 호스트 SerDes는 장거리형 5 pJ/bit(LPO 6), CPO용 초단거리형 1.5 pJ/bit. 냉각 전력은 넣지 않았다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="ai">
+    <h2>AI 클러스터의 빛, 그리고 광 회로 스위치</h2>
+    <p>AI 학습 클러스터는 수만~수십만 개의 GPU·가속기를 한 덩어리처럼 묶는다. 가속기마다 400~800G급 네트워크 포트가 여러 개 붙고, 그 사이를 3단 Clos 네트워크(20장)로 이으면 가속기 수의 몇 배에 달하는 광 모듈이 필요하다. 10만 개 가속기 규모라면 광 모듈이 수십만 개, 그 전력만 수 MW 수준이 된다. AI 수요 덕분에 광 모듈 시장은 몇 년 사이 크게 커졌고, 이제는 랙 안 가속기끼리의 연결(스케일업)까지 구리에서 빛으로 옮기려는 시도가 이어진다. 구리 케이블은 200 Gb/s/레인에서 약 1~2 m밖에 가지 못하기 때문이다(4장).</p>
+    <p>또 하나의 흐름은 <span class="term">광 회로 스위치</span><span class="en">(optical circuit switch, OCS)</span>다. 패킷을 전기로 바꿔 주소를 읽는 대신, 빛을 그대로 다른 광섬유로 꺾어 보낸다. 대표적인 방식은 <b>MEMS 거울</b>이다. 실리콘으로 만든 머리카락 굵기의 작은 거울 수백 개를 전압으로 기울여, 들어온 광섬유의 빛을 원하는 나가는 광섬유로 반사한다. 속도·프로토콜과 상관없이 빛을 통과시키고 전력이 매우 적지만, 방향을 바꾸는 데 밀리초가 걸려 패킷 단위가 아니라 “어느 랙과 어느 랙을 이을지” 같은 큰 연결 구성을 바꾸는 데 쓴다. 구글이 데이터센터 네트워크와 TPU 클러스터에 이런 OCS를 쓰는 것으로 알려져 있다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 230" style="min-width:600px" role="img" aria-label="MEMS 거울 광 회로 스위치">
+        <text x="20" y="22" class="t" style="font-weight:700">MEMS 광 회로 스위치 (위에서 본 단순화)</text>
+        <g class="t-mono" style="font-size:11px">
+          <text x="40" y="66">입력 1</text><text x="40" y="116">입력 2</text><text x="40" y="166">입력 3</text>
+          <text x="740" y="66">출력 A</text><text x="740" y="116">출력 B</text><text x="740" y="166">출력 C</text>
+        </g>
+        <g fill="var(--border)"><rect x="90" y="56" width="30" height="14"/><rect x="90" y="106" width="30" height="14"/><rect x="90" y="156" width="30" height="14"/><rect x="700" y="56" width="30" height="14"/><rect x="700" y="106" width="30" height="14"/><rect x="700" y="156" width="30" height="14"/></g>
+        <g stroke="var(--accent-2)" stroke-width="4"><path d="M260 50 l14 26 M260 100 l14 26 M260 150 l14 26"/><path d="M560 76 l14 -26 M560 126 l14 -26 M560 176 l14 -26"/></g>
+        <text x="267" y="205" text-anchor="middle" class="t-dim" style="font-size:11px">기울어지는 거울 배열</text>
+        <text x="567" y="205" text-anchor="middle" class="t-dim" style="font-size:11px">기울어지는 거울 배열</text>
+        <g fill="none" stroke-width="2.2">
+          <path d="M120 63 H267 L567 163 H700" stroke="var(--warn)"/>
+          <path d="M120 113 H267 L567 63 H700" stroke="var(--accent)"/>
+          <path d="M120 163 H267 L567 113 H700" stroke="var(--ok)"/>
+        </g>
+        <text x="410" y="40" text-anchor="middle" class="t-dim" style="font-size:11px">빛은 전기로 바뀌지 않고 거울 두 번에 꺾여 간다</text>
+      </svg></div>
+      <figcaption><b>그림 19-5.</b> MEMS 거울 광 회로 스위치. 입력마다 거울이 하나씩 있어 빛을 원하는 출력 쪽 거울로 겨누고, 그 거울이 다시 출력 광섬유로 맞춘다. 연결을 바꾸려면 거울 각도만 바꾸면 된다. 데이터센터 네트워크에서의 쓰임은 20장에서 다룬다.</figcaption>
+    </figure>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">51.2T 스위치 500대를 800G 플러그형 모듈에서 CPO로 바꾸면, 광 연결 전력은 대략 얼마나 줄어들까?</p><p class="wi-hint">CPO 계산기에서 51.2T, 800G, 스위치 500대로 맞춰 보자.</p><div class="opts">
+      <button class="opt">수 kW</button>
+      <button class="opt">수십 kW</button>
+      <button class="opt" data-correct>수백 kW (1 MW에 가까운)</button>
+      <button class="opt">수십 MW</button>
+    </div><div class="quiz-exp">플러그형은 스위치 한 대당 광 연결이 약 1.2 kW, CPO는 약 0.38 kW다. 한 대에서 약 0.85 kW, 500대면 약 0.42 MW가 준다. 여기에 냉각 전력까지 더하면 절감은 더 커진다. AI 데이터센터가 CPO에 관심을 두는 이유다.</div></div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>광 트랜시버는 <b>레이저 → 변조기 → 광섬유 → 광검출기 → TIA → CDR/DSP</b>로 이루어진다. 모듈은 SFP·QSFP-DD·OSFP 같은 표준 크기의 플러그형이며 800G 모듈은 약 15 W 수준이다.</li>
+      <li>반도체 레이저는 pn 접합에서 전자-정공이 재결합하며 내는 빛을 <b>유도 방출</b>과 <b>공진기</b>로 키운다. <b>문턱 전류</b> 아래는 LED처럼 약하고, 위에서는 출력이 전류에 비례해 늘며, 온도가 오르면 문턱이 오른다.</li>
+      <li>파장은 밴드갭이 정한다: <b>λ(nm) ≈ 1240/E<sub>g</sub>(eV)</b>. 통신 레이저는 직접 밴드갭인 GaAs(850 nm)·InP 계열(1310/1550 nm)로 만들고, <b>간접 밴드갭</b>인 실리콘은 빛을 거의 내지 못한다.</li>
+      <li>VCSEL(850 nm 단거리), DFB(단일 파장), EML(DFB+EAM), 튜너블(코히어런트)로 거리·속도에 맞춰 고른다. 외부 변조기 <b>MZM</b>은 두 팔의 간섭으로 cos² 곡선을 따라 빛을 조절한다.</li>
+      <li>광검출기의 응답도는 <b>R = η·λ(µm)/1.24 A/W</b>다. PIN, 내부 증폭하는 APD, 실리콘 포토닉스용 Ge-on-Si가 있다.</li>
+      <li><b>실리콘 포토닉스</b>는 CMOS 공장에서 도파관·변조기(Si)·검출기(Ge)를 만들고 InP 레이저를 붙인다. <b>링 변조기</b>는 작고 전력이 적지만 온도에 민감해 히터 제어가 필요하다.</li>
+      <li>스위치 용량이 커지며 광 연결 전력이 문제가 되었다. DSP를 뺀 <b>LPO</b>, 광 엔진을 스위치 패키지에 넣은 <b>CPO</b>가 비트당 에너지를 줄이고, AI 클러스터에서는 <b>OCS</b>(MEMS 거울)도 쓰인다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>밴드갭이 0.95 eV인 InGaAsP로 만든 레이저의 파장은 대략?</p><div class="opts">
+        <button class="opt">850 nm</button>
+        <button class="opt" data-correct>1310 nm</button>
+        <button class="opt">1550 nm</button>
+        <button class="opt">365 nm</button>
+      </div><div class="quiz-exp">λ ≈ 1240/0.95 ≈ 1305 nm. 데이터센터 단일 모드 링크의 O 대역(1310 nm)에 해당한다.</div></div>
+      <div class="quiz-q"><p>실리콘이 효율적인 레이저가 되지 못하는 가장 근본적인 이유는?</p><div class="opts">
+        <button class="opt">밴드갭이 너무 넓어서</button>
+        <button class="opt">결정이 너무 단단해서</button>
+        <button class="opt" data-correct>간접 밴드갭이라 재결합에 포논의 도움이 필요해 빛 대신 열이 나기 쉬워서</button>
+        <button class="opt">전기가 통하지 않아서</button>
+      </div><div class="quiz-exp">실리콘은 전도대 최저점과 가전자대 최고점의 운동량이 달라, 빛을 내는 재결합이 매우 드물다. 그래서 실리콘 포토닉스는 InP 레이저를 따로 붙인다.</div></div>
+      <div class="quiz-q"><p>반도체 레이저의 칩 온도가 오를 때 일어나는 일로 옳은 것은?</p><div class="opts">
+        <button class="opt" data-correct>문턱 전류가 오르고 기울기 효율이 떨어져, 같은 전류에서 출력이 준다</button>
+        <button class="opt">문턱 전류가 내려가 출력이 늘어난다</button>
+        <button class="opt">파장이 짧아지고 출력은 그대로다</button>
+        <button class="opt">온도와 무관하다</button>
+      </div><div class="quiz-exp">온도가 오르면 전자가 활성층 밖으로 새고 비발광 재결합이 늘어 이득이 줄어든다. 문턱 전류는 대략 exp(T/T₀)로 오른다.</div></div>
+      <div class="quiz-q"><p>마하-젠더 변조기에서 두 팔의 위상차가 180°일 때 출력은?</p><div class="opts">
+        <button class="opt">최대 (보강 간섭)</button>
+        <button class="opt">절반</button>
+        <button class="opt">입력의 두 배</button>
+        <button class="opt" data-correct>거의 0 (상쇄 간섭)</button>
+      </div><div class="quiz-exp">출력 세기는 cos²(Δφ/2)를 따른다. Δφ = 180°면 cos²(90°) = 0이다.</div></div>
+      <div class="quiz-q"><p>양자 효율 0.8인 광검출기에 1550 nm 빛 1 mW가 들어오면 광전류는 대략?</p><div class="opts">
+        <button class="opt">0.1 mA</button>
+        <button class="opt" data-correct>1 mA</button>
+        <button class="opt">10 mA</button>
+        <button class="opt">1 A</button>
+      </div><div class="quiz-exp">R = 0.8 × 1.55/1.24 ≈ 1.0 A/W. 1 mW × 1.0 A/W ≈ 1 mA.</div></div>
+      <div class="quiz-q"><p>CPO(공동 패키징 광학)가 플러그형 모듈보다 전력을 줄이는 주된 이유는?</p><div class="opts">
+        <button class="opt">레이저를 쓰지 않아서</button>
+        <button class="opt">광섬유를 더 짧게 써서</button>
+        <button class="opt" data-correct>스위치 칩과 광 엔진 사이 전기 경로가 수 mm로 짧아져 SerDes·DSP 부담이 크게 줄어서</button>
+        <button class="opt">더 느린 속도로 보내서</button>
+      </div><div class="quiz-exp">플러그형은 기판 위 긴 전기 배선을 메우려 강한 SerDes와 모듈 DSP가 필요하다. CPO는 이 경로를 패키지 안으로 줄여 비트당 에너지를 낮춘다. 레이저는 외부 광원으로 따로 둔다.</div></div>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const dB = (x) => 10 * Math.log10(x);
+  const narrow = (w) => w < 500;
+  const alpha = (c, a) => { c = (c || "").trim(); if (c[0] === "#") { if (c.length === 4) c = "#" + [...c.slice(1)].map((x) => x + x).join(""); const n = parseInt(c.slice(1, 7), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; } const m = c.match(/[\d.]+/g); return m ? `rgba(${m[0]},${m[1]},${m[2]},${a})` : c; };
+
+  /* =============== 1. L-I curve =============== */
+  const ITH0 = 10, T0 = 55, ETA0 = 0.3, T1 = 220, RTH = 0.08, VF = 1.2, SPON = 0.004; // mA, K, W/A(=mW/mA), K, K/mW, V, mW/mA
+  function laserP(I, Tamb) {
+    let T = Tamb, P = 0;
+    for (let k = 0; k < 8; k++) {
+      const ith = ITH0 * Math.exp((T - 25) / T0), eta = ETA0 * Math.exp(-(T - 25) / T1);
+      P = I <= ith ? SPON * I : SPON * ith + eta * (I - ith);
+      T = Tamb + RTH * Math.max(0, VF * I - P);
+    }
+    return { P: Math.max(0, P), T, ith: ITH0 * Math.exp((Tamb - 25) / T0) };
+  }
+  const liI = NB.range("li-i", (v) => v.toFixed(1) + " mA", liUpdate);
+  const liT = NB.range("li-t", (v) => v + " °C", liUpdate);
+  let liNow = laserP(liI(), liT());
+  function liUpdate() {
+    liNow = laserP(liI(), liT());
+    const I = liI(), P = liNow.P, ith = liNow.ith;
+    NB.stat("li-o-th", ith.toFixed(1) + " mA");
+    NB.stat("li-o-p", P.toFixed(P < 1 ? 3 : 2) + " mW<small>" + (P > 0 ? dB(P).toFixed(1) + " dBm" : "") + "</small>");
+    NB.stat("li-o-wpe", I > 0 ? ((P / (VF * I)) * 100).toFixed(1) + " %" : "—");
+    NB.stat("li-o-st", I < ith ? '<span class="verdict-warn">LED 영역</span>' : '<span class="verdict-ok">레이저 발진</span>');
+    liCv.redraw();
+  }
+  const liCv = NB.canvas($("cv-li"), (ctx, w, h) => {
+    const P = NB.palette();
+    NB.text(ctx, "L-I 곡선", 10, 12, { size: 12, bold: true, color: P.dim });
+    const ref = [], cur = [];
+    for (let i = 0; i <= 100; i += 0.5) { ref.push([i, laserP(i, 25).P]); cur.push([i, laserP(i, liT()).P]); }
+    const ch = NB.chart(ctx, { x: 46, y: 26, w: w - 58, h: h - 66 }, { x: [0, 100], y: [0, 28], xLabel: "구동 전류 (mA)", series: [{ data: ref, color: P.faint, width: 1.5, dash: [5, 4] }, { data: cur, color: P.warn, width: 2.6 }], vlines: [{ x: liNow.ith, label: "문턱", color: P.dim }], points: [{ x: liI(), y: liNow.P, color: P.accent, r: 5 }] });
+    NB.text(ctx, "mW", ch.box.x + 4, ch.box.y + 8, { size: 10.5, color: P.faint });
+  }, { aspect: 0.75, minHeight: 240, maxHeight: 300 });
+  // 공진기 애니메이션
+  const photons = []; const prng = NB.rng(3);
+  const cavCv = NB.canvas($("cv-cav"), (ctx, w, h) => {
+    const P = NB.palette();
+    NB.text(ctx, "공진기 안의 빛", 10, 12, { size: 12, bold: true, color: P.dim });
+    const x0 = 24, x1 = w - 70, yc = h / 2 + 6, hh = Math.min(70, h * 0.28);
+    ctx.fillStyle = P.surface; ctx.fillRect(x0, yc - hh, x1 - x0, hh * 2);
+    ctx.fillStyle = alpha(P.warn, 0.18); ctx.fillRect(x0, yc - 9, x1 - x0, 18);
+    ctx.strokeStyle = P.border; ctx.strokeRect(x0, yc - hh, x1 - x0, hh * 2);
+    ctx.fillStyle = P.dim; ctx.fillRect(x0 - 5, yc - hh, 5, hh * 2); ctx.fillRect(x1, yc - hh, 4, hh * 2);
+    NB.text(ctx, "p", x0 + 8, yc - hh + 12, { size: 11, color: P.faint }); NB.text(ctx, "n", x0 + 8, yc + hh - 12, { size: 11, color: P.faint });
+    NB.text(ctx, "거울(반사 ~90%)", x0, yc + hh + 14, { size: 10.5, color: P.faint });
+    NB.text(ctx, "출력 거울", x1 + 6, yc + hh + 14, { size: 10.5, color: P.faint, align: "right" });
+    photons.forEach((p) => { ctx.globalAlpha = Math.max(0, Math.min(1, p.life)); ctx.fillStyle = p.coh ? P.warn : P.accent2; ctx.beginPath(); ctx.arc(x0 + p.x * (x1 - x0), yc + p.y * hh, p.coh ? 2.6 : 2, 0, 7); ctx.fill(); });
+    ctx.globalAlpha = 1;
+    const pw = liNow.P;
+    if (pw > 0.05) {
+      const a = Math.min(0.85, 0.15 + pw / 25);
+      ctx.fillStyle = alpha(P.warn, a); ctx.beginPath(); ctx.moveTo(x1 + 4, yc - 6); ctx.lineTo(w - 6, yc - 6 - pw * 0.6); ctx.lineTo(w - 6, yc + 6 + pw * 0.6); ctx.lineTo(x1 + 4, yc + 6); ctx.closePath(); ctx.fill();
+    }
+  }, { aspect: 0.75, minHeight: 240, maxHeight: 300 });
+  NB.loop($("cv-cav"), (dt) => {
+    const I = liI(), above = I > liNow.ith;
+    const nSp = Math.min(6, (I < liNow.ith ? I : liNow.ith) * 0.06 * 60 * dt + prng() * 0.2);
+    for (let k = 0; k < nSp; k++) { const a = prng() * Math.PI * 2; photons.push({ x: 0.05 + prng() * 0.9, y: (prng() - 0.5) * 0.25, vx: Math.cos(a) * 0.5, vy: Math.sin(a) * 1.5, life: 0.5, coh: false }); }
+    if (above) { const target = Math.min(160, 10 + liNow.P * 6); let coh = photons.filter((p) => p.coh).length; while (coh < target) { photons.push({ x: prng(), y: (prng() - 0.5) * 0.18, vx: prng() < 0.5 ? 0.9 : -0.9, vy: 0, life: 1.5 + prng(), coh: true }); coh++; } }
+    for (let i = photons.length - 1; i >= 0; i--) {
+      const p = photons[i]; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * (p.coh ? 0.4 : 1);
+      if (p.coh) { if (p.x > 1) { p.x = 1; p.vx = -Math.abs(p.vx); } if (p.x < 0) { p.x = 0; p.vx = Math.abs(p.vx); } if (!above) p.life -= dt * 3; }
+      if (p.life <= 0 || Math.abs(p.y) > 1 || p.x < -0.05 || p.x > 1.05) photons.splice(i, 1);
+    }
+    cavCv.redraw();
+  });
+  liUpdate();
+
+  /* =============== 2. Bandgap =============== */
+  const MATS = {
+    Si: { eg: 1.12, direct: false, kmin: 0.85, use: "도파관(1310/1550 nm 투명), 850 nm 이하 검출기" },
+    Ge: { eg: 0.66, direct: false, kmin: 1.0, eg2: 0.8, use: "광검출기 (Ge-on-Si, 1310·1550 nm 흡수)" },
+    GaAs: { eg: 1.42, direct: true, use: "VCSEL·850 nm 레이저와 검출기 기판" },
+    InP: { eg: 1.34, direct: true, use: "1310/1550 nm 레이저·변조기의 기판" },
+    InGaAsP: { direct: true, use: "" },
+    InGaAs: { eg: 0.75, direct: true, use: "1310·1550 nm PIN/APD 흡수층" },
+    GaN: { eg: 3.4, direct: true, use: "청색·백색 LED, 통신 대역 밖 (18장 RF 소자)" },
+  };
+  const bgMat = NB.seg("bg-mat", bgUpdate);
+  const bgY = NB.range("bg-y", (v) => v.toFixed(2), bgUpdate);
+  function curMat() {
+    const k = bgMat(), m = Object.assign({ name: k }, MATS[k]);
+    if (k === "InGaAsP") { const y = bgY(); m.eg = 1.35 - 0.72 * y + 0.12 * y * y; const l = 1240 / m.eg; m.use = l > 1260 && l < 1360 ? "1310 nm(O 대역) 레이저 활성층" : l > 1500 && l < 1580 ? "1550 nm(C 대역) 레이저 활성층" : "조성을 바꿔 파장을 맞춘다"; }
+    return m;
+  }
+  function bgUpdate() {
+    const m = curMat(); const l = 1240 / m.eg;
+    bgY.el.disabled = m.name !== "InGaAsP";
+    NB.stat("bg-o-eg", m.eg.toFixed(2) + " eV");
+    NB.stat("bg-o-wl", Math.round(l) + " nm");
+    NB.stat("bg-o-type", m.direct ? '<span class="verdict-ok">직접</span>' : '<span class="verdict-bad">간접</span>' + (m.eg2 ? "<small>직접 갭 " + m.eg2 + " eV</small>" : ""));
+    NB.stat("bg-o-use", m.use);
+    ekCv.redraw(); wlCv.redraw();
+  }
+  const ekCv = NB.canvas($("cv-ek"), (ctx, w, h) => {
+    const P = NB.palette(), m = curMat();
+    NB.text(ctx, "E-k 그림: " + m.name, 10, 12, { size: 12, bold: true, color: P.dim });
+    const cx = w / 2, sx = (w - 40) / 2.6, top = 30, bot = h - 24;
+    const Emax = 4, Emin = -1.6, Y = (E) => bot - ((E - Emin) / (Emax - Emin)) * (bot - top);
+    const egv = Math.min(m.eg, 3.4) * 0.7 + 0.55; // 보기 좋게 압축한 그림용 간격
+    const k0 = m.direct ? 0 : m.kmin;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, top - 6, w, bot - top + 30); ctx.clip();
+    ctx.strokeStyle = P.grid; ctx.beginPath(); ctx.moveTo(cx, top); ctx.lineTo(cx, bot); ctx.stroke();
+    NB.text(ctx, "k (운동량)", w - 12, bot + 10, { size: 10.5, color: P.faint, align: "right" });
+    // valence
+    ctx.strokeStyle = P.accent; ctx.lineWidth = 2.4; ctx.beginPath();
+    for (let k = -1.25; k <= 1.25; k += 0.02) { const E = -1.1 * k * k; const x = cx + k * sx, y = Y(E); k === -1.25 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+    ctx.stroke();
+    // conduction
+    ctx.strokeStyle = P.warn; ctx.beginPath();
+    const cb = (k) => { if (m.direct) return egv + 1.6 * k * k; const ind = egv + 1.4 * (Math.abs(k) - k0) ** 2; const dir = (m.eg2 ? egv + (m.eg2 - m.eg) * 0.65 + 0.12 : egv + 0.9) + 1.8 * k * k; return Math.min(ind, dir); };
+    for (let k = -1.25; k <= 1.25; k += 0.02) { const x = cx + k * sx, y = Y(cb(k)); k === -1.25 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+    ctx.stroke(); ctx.lineWidth = 1;
+    NB.text(ctx, "전도대", cx - 1.2 * sx, Y(cb(-1.2)) - 4, { size: 11, color: P.warn, base: "bottom" });
+    NB.text(ctx, "가전자대", cx - 1.2 * sx, Y(-1.1 * 1.44) + 14, { size: 11, color: P.accent });
+    // electron & hole
+    ctx.fillStyle = P.warn; ctx.beginPath(); ctx.arc(cx + k0 * sx, Y(egv) - 6, 5, 0, 7); ctx.fill();
+    ctx.strokeStyle = P.accent; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, Y(0) + 6, 5, 0, 7); ctx.stroke(); ctx.lineWidth = 1;
+    if (m.direct) {
+      NB.arrow(ctx, cx, Y(egv) - 1, cx, Y(0) + 12, { color: P.ok, lw: 2.2 });
+      ctx.strokeStyle = P.ok; ctx.lineWidth = 2; ctx.beginPath();
+      for (let i = 0; i <= 40; i++) { const x = cx + 10 + i * 1.6, y = Y(egv / 2) + Math.sin(i * 0.8) * 5; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke(); ctx.lineWidth = 1;
+      NB.text(ctx, "빛 hν = Eg", cx + 12, Y(egv / 2) - 14, { size: 11.5, color: P.ok, bold: true });
+    } else {
+      NB.arrow(ctx, cx + k0 * sx - 4, Y(egv) - 2, cx + 6, Y(0) + 10, { color: P.bad, lw: 1.8, dash: [4, 3] });
+      NB.text(ctx, "최저점의 운동량이 달라", w - 10, top + 8, { size: 11, color: P.bad, align: "right" });
+      NB.text(ctx, "포논 필요 → 빛 내기 드묾", w - 10, top + 24, { size: 11, color: P.bad, align: "right" });
+    }
+    ctx.restore();
+    NB.text(ctx, "Eg = " + m.eg.toFixed(2) + " eV", 12, Y(egv / 2), { size: 12, bold: true, color: P.text });
+  }, { aspect: 0.8, minHeight: 250, maxHeight: 310 });
+  const wlCv = NB.canvas($("cv-wl"), (ctx, w, h) => {
+    const P = NB.palette(), m = curMat(); const lam = 1240 / m.eg;
+    NB.text(ctx, "파장 지도", 10, 12, { size: 12, bold: true, color: P.dim });
+    const x0 = 20, x1 = w - 20, L0 = 300, L1 = 1800, X = (l) => x0 + ((l - L0) / (L1 - L0)) * (x1 - x0);
+    const y = h * 0.5;
+    const bands = [[380, 750, "가시광", P.faint, 0.18], [820, 880, "850", P.accent2, 0.3], [1260, 1360, "O 대역", P.accent, 0.3], [1530, 1565, "C", P.accent, 0.3]];
+    bands.forEach(([a, b, lab, c, al], i) => { ctx.fillStyle = alpha(c, al); ctx.fillRect(X(a), y - 40, X(b) - X(a), 80); NB.text(ctx, lab, (X(a) + X(b)) / 2, y + 52 + (i % 2) * 14, { size: 10.5, align: "center", color: P.dim }); });
+    ctx.strokeStyle = P.axis; ctx.beginPath(); ctx.moveTo(x0, y + 40); ctx.lineTo(x1, y + 40); ctx.stroke();
+    [400, 800, 1200, 1600].forEach((l) => { ctx.beginPath(); ctx.moveTo(X(l), y + 40); ctx.lineTo(X(l), y + 45); ctx.stroke(); NB.text(ctx, l + "", X(l), y + 90, { size: 10, align: "center", color: P.faint, mono: true }); });
+    NB.text(ctx, "nm", x1, y + 90, { size: 10, align: "right", color: P.faint });
+    // 흡수 영역: λ < λg
+    ctx.fillStyle = alpha(m.direct ? P.warn : P.bad, 0.12); ctx.fillRect(x0, y - 70, Math.max(0, Math.min(X(lam), x1) - x0), 18);
+    NB.text(ctx, "← 이보다 짧은 파장은 흡수", x0 + 4, y - 61, { size: 10.5, color: P.dim });
+    const lx = X(Math.min(lam, L1));
+    ctx.strokeStyle = m.direct ? P.warn : P.bad; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(lx, y - 46); ctx.lineTo(lx, y + 40); ctx.stroke(); ctx.lineWidth = 1;
+    NB.text(ctx, (lam > L1 ? "> " : "") + Math.round(lam) + " nm", NB.clamp(lx, x0 + 30, x1 - 30), y - 30, { size: 12.5, bold: true, align: "center", color: m.direct ? P.warn : P.bad });
+    const fits = [[820, 880, "850 nm"], [1260, 1360, "1310 nm"], [1500, 1580, "1550 nm"]].find(([a, b]) => lam >= a && lam <= b);
+    const msg = !m.direct ? "간접 → 빛을 거의 못 냄" : fits ? fits[2] + " 대역과 일치 → 레이저 가능" : "통신 대역과 맞지 않음";
+    NB.text(ctx, msg, w / 2, h - 12, { size: 12, bold: true, align: "center", color: !m.direct ? P.bad : fits ? P.ok : P.dim });
+  }, { aspect: 0.8, minHeight: 250, maxHeight: 310 });
+  bgUpdate();
+
+  /* =============== 3. MZM =============== */
+  const mzB = NB.range("mz-b", (v) => v + "°", mzUpdate);
+  const mzD = NB.range("mz-d", (v) => v + "°", mzUpdate);
+  const mzF = NB.seg("mz-fmt", mzUpdate);
+  $("mz-q").onclick = () => mzB.set(90); $("mz-null").onclick = () => mzB.set(180); $("mz-pk").onclick = () => mzB.set(0);
+  const Tf = (deg) => Math.cos((deg * Math.PI) / 360) ** 2;
+  let mzSym = 0, mzT = 0, mzPhase = 0, mzHist = [];
+  const symRng = NB.rng(11);
+  function mzLevels() { const b = mzB(), d = mzD(); return mzF() === "nrz" ? [b + d / 2, b - d / 2] : [b + d / 2, b + d / 6, b - d / 6, b - d / 2]; }
+  function mzUpdate() {
+    const lv = mzLevels().map(Tf); const mx = Math.max(...lv), mn = Math.min(...lv);
+    NB.stat("mz-o-er", mn > 1e-4 ? dB(mx / mn).toFixed(1) + " dB" : "> 40 dB");
+    if (lv.length === 4) { const s = [...lv].sort((a, b) => a - b); const g = [s[1] - s[0], s[2] - s[1], s[3] - s[2]]; const r = Math.max(...g) > 1e-6 ? Math.min(...g) / Math.max(...g) : 0; NB.stat("mz-o-lin", `<span class="${r > 0.8 ? "verdict-ok" : r > 0.5 ? "verdict-warn" : "verdict-bad"}">${(r * 100).toFixed(0)} %</span><small>최소/최대 간격</small>`); }
+    else NB.stat("mz-o-lin", "<small>NRZ는 해당 없음</small>");
+    mzT0.redraw();
+  }
+  const mzCv = NB.canvas($("cv-mzm"), (ctx, w, h) => {
+    const P = NB.palette(); const lv = mzLevels(); const ph = lv[mzSym % lv.length];
+    NB.text(ctx, "두 팔의 간섭", 10, 12, { size: 12, bold: true, color: P.dim });
+    const xs = 18, xe = w - 50, ym = h * 0.36, dy = Math.min(46, h * 0.16), xa = xs + 40, xb = xe - 40;
+    ctx.strokeStyle = P.border; ctx.lineWidth = 6; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(xs, ym); ctx.lineTo(xa - 20, ym); ctx.lineTo(xa + 10, ym - dy); ctx.lineTo(xb - 10, ym - dy); ctx.lineTo(xb + 20, ym); ctx.lineTo(xe, ym);
+    ctx.moveTo(xa - 20, ym); ctx.lineTo(xa + 10, ym + dy); ctx.lineTo(xb - 10, ym + dy); ctx.lineTo(xb + 20, ym); ctx.stroke(); ctx.lineCap = "butt";
+    ctx.fillStyle = alpha(P.accent2, 0.35); ctx.fillRect(xa + 30, ym - dy - 14, xb - xa - 80, 6);
+    NB.text(ctx, "전극: 위상 " + Math.round(ph) + "°", (xa + xb) / 2 - 10, ym - dy - 22, { size: 10.5, align: "center", color: P.accent2 });
+    const wave = (yy, off) => { ctx.strokeStyle = P.warn; ctx.lineWidth = 1.6; ctx.beginPath(); for (let x = xa + 12; x <= xb - 12; x += 2) { const y = yy + 5 * Math.sin((x - xa) * 0.18 - mzPhase + off); x === xa + 12 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); };
+    const extra = (ph * Math.PI) / 180;
+    wave(ym - dy, 0); wave(ym + dy, 0);
+    // 위 팔에서 위상 지연이 점점 늘어나도록 표현: 끝부분 파동의 위상만 보여 주기
+    const T = Tf(ph);
+    ctx.fillStyle = alpha(P.warn, 0.15 + 0.75 * T); ctx.beginPath(); ctx.arc(xe + 18, ym, 6 + 12 * T, 0, 7); ctx.fill();
+    NB.text(ctx, Math.round(T * 100) + "%", xe + 18, ym + 30, { size: 11, align: "center", color: P.text, mono: true });
+    NB.text(ctx, "입력", xs, ym + 16, { size: 10.5, color: P.faint });
+    // 끝 지점 두 파동 위상 비교 화살표(페이저)
+    const pcx = (xa + xb) / 2, pcy = ym, pr = Math.min(16, dy * 0.45);
+    ctx.strokeStyle = P.faint; ctx.beginPath(); ctx.arc(pcx, pcy, pr, 0, 7); ctx.stroke();
+    NB.arrow(ctx, pcx, pcy, pcx + pr * Math.cos(-mzPhase), pcy + pr * Math.sin(-mzPhase), { color: P.dim, head: 5, lw: 1.5 });
+    NB.arrow(ctx, pcx, pcy, pcx + pr * Math.cos(-mzPhase + extra), pcy + pr * Math.sin(-mzPhase + extra), { color: P.accent2, head: 5, lw: 1.5 });
+    // 출력 기록
+    const hy0 = h - 14, hy1 = h * 0.66; const n = mzHist.length, sw = (w - 36) / 24;
+    ctx.strokeStyle = P.grid; ctx.strokeRect(18, hy1, w - 36, hy0 - hy1);
+    ctx.strokeStyle = P.warn; ctx.lineWidth = 2; ctx.beginPath();
+    mzHist.forEach((v, i) => { const x = 18 + i * sw, y = hy0 - v * (hy0 - hy1); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); ctx.lineTo(x + sw, y); });
+    ctx.stroke(); ctx.lineWidth = 1;
+    NB.text(ctx, "출력 세기 (지난 심볼들)", 20, hy1 - 8, { size: 10.5, color: P.faint });
+    if (!n) NB.text(ctx, "…", w / 2, (hy0 + hy1) / 2, { align: "center", color: P.faint });
+  }, { aspect: 0.8, minHeight: 260, maxHeight: 320 });
+  const mzT0 = NB.canvas($("cv-mzt"), (ctx, w, h) => {
+    const P = NB.palette(); const lv = mzLevels();
+    NB.text(ctx, "전달 곡선 cos²(Δφ/2)", 10, 12, { size: 12, bold: true, color: P.dim });
+    const data = []; for (let d = 0; d <= 360; d += 2) data.push([d, Tf(d)]);
+    const ch = NB.chart(ctx, { x: 46, y: 26, w: w - 58, h: h - 66 }, { x: [0, 360], y: [0, 1.05], xLabel: "위상차 Δφ (°)", xTicks: [0, 90, 180, 270, 360], yTicks: [0, 0.25, 0.5, 0.75, 1], series: [{ data, color: P.accent, width: 2.2 }] });
+    ctx.save(); ctx.beginPath(); ctx.rect(ch.box.x, ch.box.y - 4, ch.box.w, ch.box.h + 8); ctx.clip();
+    lv.forEach((p, i) => { const pp = ((p % 360) + 360) % 360; const x = ch.X(pp), y = ch.Y(Tf(p)); ctx.strokeStyle = alpha(P.warn, 0.7); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x, ch.box.y + ch.box.h); ctx.lineTo(x, y); ctx.lineTo(ch.box.x, y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = i === mzSym % lv.length ? P.bad : P.warn; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, 7); ctx.fill(); });
+    const b = mzB(), bx = ch.X(b), by = ch.Y(Tf(b));
+    ctx.fillStyle = P.accent2; ctx.beginPath(); ctx.moveTo(bx, by - 7); ctx.lineTo(bx + 7, by); ctx.lineTo(bx, by + 7); ctx.lineTo(bx - 7, by); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }, { aspect: 0.8, minHeight: 260, maxHeight: 320 });
+  NB.loop($("cv-mzm"), (dt) => {
+    mzPhase += dt * 6; mzT += dt;
+    if (mzT > 0.5) { mzT = 0; const lv = mzLevels(); mzSym = Math.floor(symRng() * lv.length); mzHist.push(Tf(lv[mzSym])); if (mzHist.length > 24) mzHist.shift(); mzT0.redraw(); NB.stat("mz-o-now", (Tf(lv[mzSym]) * 100).toFixed(0) + " %"); }
+    mzCv.redraw();
+  });
+  NB.stat("mz-o-now", (Tf(mzLevels()[0]) * 100).toFixed(0) + " %");
+  mzUpdate();
+
+  /* =============== 4. Ring resonator =============== */
+  const LAS = 1310.0, NG = 4.2, RA = 0.987, RR = 0.983, VEFF = 0.025, TEFF = 0.08, BASE = -0.05; // nm
+  const rgV = NB.range("rg-v", (v) => v.toFixed(2) + " V", () => ringCv.redraw());
+  const rgR = NB.range("rg-r", (v) => v + " µm", () => ringCv.redraw());
+  const rgT = NB.range("rg-t", (v) => (v > 0 ? "+" : "") + v.toFixed(2) + " °C", () => ringCv.redraw());
+  $("rg-heat").addEventListener("change", () => ringCv.redraw());
+  let rgPlay = null;
+  $("rg-play").onclick = () => { if (rgPlay) { rgPlay = null; $("rg-play").textContent = "비트 보내기 (0V ↔ 2V)"; } else { rgPlay = { t: 0, bit: 0 }; $("rg-play").textContent = "멈추기"; } };
+  const fsrOf = (R) => (LAS * LAS) / (NG * 2 * Math.PI * R * 1000); // nm
+  function ringT(lam, res, fsr) { const phi = (2 * Math.PI * (lam - res)) / fsr; const c = Math.cos(phi); return (RA * RA - 2 * RA * RR * c + RR * RR) / (1 - 2 * RA * RR * c + (RA * RR) ** 2); }
+  const ringCv = NB.canvas($("cv-ring"), (ctx, w, h) => {
+    const P = NB.palette();
+    const V = rgV(), fsr = fsrOf(rgR()), dT = $("rg-heat").checked ? 0 : rgT();
+    const res0 = LAS + BASE + TEFF * dT, res = res0 + VEFF * V;
+    const L = narrow(w) ? 44 : 56, hh = (h - 80) / 2;
+    const span = Math.max(2.4 * fsr, 3), wide = [], wide0 = [];
+    for (let l = LAS - span / 2; l <= LAS + span / 2; l += span / 900) { wide.push([l, dB(ringT(l, res, fsr))]); }
+    NB.text(ctx, "넓게 본 투과 스펙트럼", L, 10, { size: 12, bold: true, color: P.dim });
+    NB.chart(ctx, { x: L, y: 20, w: w - L - 14, h: hh - 14 }, { x: [LAS - span / 2, LAS + span / 2], y: [-25, 1], xFmt: (v) => v.toFixed(0), yTicks: [-20, -10, 0], series: [{ data: wide, color: P.accent, width: 1.6 }], vlines: [{ x: LAS, color: P.warn, dash: [] }] });
+    const z = 0.4, zoom = [];
+    for (let l = LAS - z; l <= LAS + z; l += 0.002) { zoom.push([l, dB(ringT(l, res, fsr))]); wide0.push([l, dB(ringT(l, res0, fsr))]); }
+    const y2 = 20 + hh + 34;
+    NB.text(ctx, "레이저 파장 근처 확대 (±0.4 nm)", L, y2 - 10, { size: 12, bold: true, color: P.dim });
+    const ch = NB.chart(ctx, { x: L, y: y2, w: w - L - 14, h: hh - 14 }, { x: [LAS - z, LAS + z], y: [-25, 1], xLabel: "파장 (nm)", xFmt: (v) => v.toFixed(1), xTicks: [1309.7, 1309.9, 1310.1, 1310.3], yTicks: [-20, -10, 0], series: [{ data: wide0, color: P.faint, width: 1.4, dash: [4, 3] }, { data: zoom, color: P.accent, width: 2.4 }], vlines: [{ x: LAS, color: P.warn, dash: [], width: 2, label: "레이저" }] });
+    const tl = ringT(LAS, res, fsr), t0 = ringT(LAS, res0, fsr);
+    ctx.fillStyle = P.warn; ctx.beginPath(); ctx.arc(ch.X(LAS), ch.Y(Math.max(-25, dB(tl))), 5, 0, 7); ctx.fill();
+    NB.text(ctx, "dB", 6, 30, { size: 10.5, color: P.faint });
+    NB.stat("rg-o-fsr", fsr.toFixed(2) + " nm");
+    NB.stat("rg-o-shift", (res - LAS - BASE >= 0 ? "+" : "") + ((res - (LAS + BASE)) * 1000).toFixed(0) + " pm");
+    NB.stat("rg-o-t", `<span class="${tl > 0.5 ? "verdict-ok" : "verdict-bad"}">${(tl * 100).toFixed(0)} %</span><small>${tl > 0.5 ? "켜짐(1)" : "꺼짐(0)"}</small>`);
+    NB.stat("rg-o-er", Math.abs(dB(t0 / tl)).toFixed(1) + " dB");
+  }, { aspect: 0.62, minHeight: 360, maxHeight: 460 });
+  NB.loop($("cv-ring"), (dt) => { if (!rgPlay) return; rgPlay.t += dt; if (rgPlay.t > 0.6) { rgPlay.t = 0; rgPlay.bit ^= 1; rgV.set(rgPlay.bit ? 2 : 0); } });
+
+  /* =============== 5. CPO power =============== */
+  const cpCap = NB.seg("cp-cap", () => cpCv.redraw());
+  const cpPort = NB.seg("cp-port", () => cpCv.redraw());
+  const cpN = NB.range("cp-n", (v) => v + "대", () => cpCv.redraw());
+  const PJ = { 400: { plug: 30, lpo: 15, cpo: 8 }, 800: { plug: 19, lpo: 9.5, cpo: 6 }, 1600: { plug: 16, lpo: 8, cpo: 5 } };
+  const HOST = { plug: 5, lpo: 6, cpo: 1.5 };
+  const fmtW = (wt) => (wt >= 1e6 ? (wt / 1e6).toFixed(2) + " MW" : wt >= 1e3 ? (wt / 1e3).toFixed(wt >= 1e4 ? 0 : 2) + " kW" : wt.toFixed(0) + " W");
+  const cpCv = NB.canvas($("cv-cpo"), (ctx, w, h) => {
+    const P = NB.palette();
+    const cap = Number(cpCap()) * 1e12, port = Number(cpPort()), pj = PJ[port];
+    const ports = Math.round(cap / (port * 1e9));
+    const rows = [["plug", "플러그형 + DSP", P.bad], ["lpo", "LPO", P.warn], ["cpo", "CPO", P.ok]].map(([k, name, col]) => ({ k, name, col, opt: (pj[k] * 1e-12) * cap, host: (HOST[k] * 1e-12) * cap }));
+    const maxW = Math.max(...rows.map((r) => r.opt + r.host)) * 1.08;
+    const nar = narrow(w), lw = nar ? 82 : 120, x0 = lw + 10, bw = w - x0 - (nar ? 60 : 90), bh = Math.min(38, (h - 70) / 3 - 14);
+    NB.text(ctx, `스위치 1대 · ${ports}포트 × ${port >= 1000 ? port / 1000 + "T" : port + "G"}`, 12, 14, { size: 12, bold: true, color: P.dim });
+    rows.forEach((r, i) => {
+      const y = 34 + i * (bh + 16);
+      NB.text(ctx, r.name, lw, y + bh / 2, { size: nar ? 11 : 12.5, align: "right", bold: true, color: P.text });
+      const wo = (r.opt / maxW) * bw, wh = (r.host / maxW) * bw;
+      ctx.fillStyle = r.col; ctx.fillRect(x0, y, wo, bh);
+      ctx.fillStyle = alpha(r.col, 0.4); ctx.fillRect(x0 + wo, y, wh, bh);
+      NB.text(ctx, fmtW(r.opt + r.host), x0 + wo + wh + 6, y + bh / 2, { size: nar ? 11 : 12.5, bold: true, mono: true, color: P.text });
+      if (wo > 70) NB.text(ctx, (pj[r.k] + HOST[r.k]).toFixed(1) + " pJ/b", x0 + 6, y + bh / 2, { size: 11, color: P.bg, bold: true });
+    });
+    const ly = 34 + 3 * (bh + 16) + 4;
+    ctx.fillStyle = P.dim; ctx.fillRect(x0, ly - 5, 12, 10); NB.text(ctx, "광 모듈/엔진", x0 + 16, ly, { size: 11, color: P.dim });
+    ctx.fillStyle = alpha(P.dim, 0.4); ctx.fillRect(x0 + 110, ly - 5, 12, 10); NB.text(ctx, "호스트 SerDes", x0 + 126, ly, { size: 11, color: P.dim });
+    const save = rows[0].opt + rows[0].host - (rows[2].opt + rows[2].host);
+    NB.stat("cp-o-ports", ports + "개");
+    NB.stat("cp-o-mod", (pj.plug * 1e-12 * port * 1e9).toFixed(1) + " W");
+    NB.stat("cp-o-save", fmtW(save) + "<small>" + Math.round((save / (rows[0].opt + rows[0].host)) * 100) + "% ↓</small>");
+    NB.stat("cp-o-tot", fmtW(save * cpN()));
+  }, { aspect: 0.26, minHeight: 200, maxHeight: 220 });
+})();
+</script>
+</body>
+</html>

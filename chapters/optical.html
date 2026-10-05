@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>광통신과 해저 케이블 · NetworkBook</title>
+<meta name="description" content="머리카락 굵기의 유리실이 어떻게 빛을 가두고 수천 km를 보내는가. 전반사와 임계각, 모드 분산과 색 분산, 감쇠 스펙트럼, 광 링크 예산과 EDFA, 파장 분할 다중화(WDM)와 코히어런트 광, FTTH와 PON, 대륙을 잇는 해저 케이블.">
+<link rel="canonical" href="https://networkbook.euiyun.com/chapters/optical.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="NetworkBook">
+<meta property="og:title" content="광통신과 해저 케이블 · NetworkBook">
+<meta property="og:description" content="머리카락 굵기의 유리실이 어떻게 빛을 가두고 수천 km를 보내는가. 전반사와 임계각, 모드 분산과 색 분산, 감쇠 스펙트럼, 광 링크 예산과 EDFA, 파장 분할 다중화(WDM)와 코히어런트 광, FTTH와 PON, 대륙을 잇는 해저 케이블.">
+<meta property="og:url" content="https://networkbook.euiyun.com/chapters/optical.html">
+<meta property="og:image" content="https://networkbook.euiyun.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"광통신과 해저 케이블","name":"광통신과 해저 케이블 · NetworkBook","url":"https://networkbook.euiyun.com/chapters/optical.html","mainEntityOfPage":"https://networkbook.euiyun.com/chapters/optical.html","inLanguage":"ko","isAccessibleForFree":true,"learningResourceType":"interactive textbook chapter","position":5,"image":"https://networkbook.euiyun.com/og.png","dateModified":"2026-10-05","isPartOf":{"@type":"Book","@id":"https://networkbook.euiyun.com/#book","name":"NetworkBook — 인터랙티브 네트워크 교과서","url":"https://networkbook.euiyun.com/"},"publisher":{"@type":"Organization","name":"NetworkBook","url":"https://networkbook.euiyun.com/"},"description":"머리카락 굵기의 유리실이 어떻게 빛을 가두고 수천 km를 보내는가. 전반사와 임계각, 모드 분산과 색 분산, 감쇠 스펙트럼, 광 링크 예산과 EDFA, 파장 분할 다중화(WDM)와 코히어런트 광, FTTH와 PON, 대륙을 잇는 해저 케이블."},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"NetworkBook","item":"https://networkbook.euiyun.com/"},{"@type":"ListItem","position":2,"name":"05 광통신과 해저 케이블","item":"https://networkbook.euiyun.com/chapters/optical.html"}]}]}</script>
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .op-tbl td:first-child { white-space: nowrap; font-weight: 700; }
+  .op-num { font-family: var(--mono); white-space: nowrap; }
+</style>
+</head>
+<body data-chapter="optical">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 05</div>
+    <h1>광통신과 해저 케이블</h1>
+    <p class="lead">휴대폰으로 미국 서버의 영상을 볼 때, 데이터는 마지막 몇 미터만 전파를 탈 뿐 나머지 거의 전부를 <strong>빛</strong>으로 여행한다. 머리카락만 한 유리실 하나가 수십 Tbps를 나르고, 정원 호스 굵기의 케이블이 태평양 바닥을 1만 km 가로지른다. 구리선(4장)으로는 몇백 미터도 버거운 속도를 빛은 어떻게 대양 너머까지 보낼까? 이 장에서는 빛을 가두는 물리, 빛이 흐려지고 퍼지는 이유, 한 가닥에 색을 수십 개 겹쳐 싣는 기술, 그리고 바다 밑 인터넷의 실체를 따라간다.</p>
+    <ul class="objectives">
+      <li>통신에 빛을 쓰면 왜 유리한지(대역, 감쇠, 간섭)를 숫자로 설명한다.</li>
+      <li>스넬의 법칙과 임계각으로 광섬유가 빛을 가두는 전반사 원리를 시뮬레이터로 확인한다.</li>
+      <li>단일 모드와 다중 모드의 차이, 모드 분산과 색 분산이 속도×거리를 제한하는 이유를 안다.</li>
+      <li>감쇠 스펙트럼에서 850/1310/1550 nm 창과 O·C·L 밴드가 생긴 이유를 읽는다.</li>
+      <li>광 링크 예산을 직접 계산하고, 언제 광증폭기(EDFA)가 필요한지 판단한다.</li>
+      <li>WDM과 코히어런트 광으로 한 가닥이 수십 Tbps를 나르는 원리를 이해한다.</li>
+      <li>FTTH의 PON 구조와 해저 케이블의 구조·전력·고장을 설명한다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="why-light">
+    <h2>왜 빛인가</h2>
+    <p>2장에서 본 것처럼 신호에 실을 수 있는 정보의 양은 쓸 수 있는 <b>주파수 폭(대역)</b>에 비례한다. 구리선 위의 전기 신호는 수백 MHz~수 GHz, Wi-Fi 전파는 수 GHz 대역을 쓴다. 그런데 광통신에 쓰는 1550 nm 빛의 주파수는 약 <b>193 THz</b>(초당 193조 번 진동)다. 그 주변의 몇 THz만 떼어 써도 구리선 전체 대역의 수천 배다.</p>
+    <p>두 번째 이유는 <b>감쇠</b>다. 고급 랜선(Cat 6)으로 100 MHz 신호를 보내면 100 m에서 약 20 dB, 즉 신호가 1/100로 줄어든다. 1 km라면 200 dB, 10<sup>20</sup>분의 1이다. 반면 현대 광섬유는 1550 nm에서 1 km에 <b>약 0.2 dB</b>(4.5%)만 잃는다. 100 km를 가도 20 dB, 1/100이다. 세 번째는 <b>간섭이 없다</b>는 점이다. 유리 속 빛은 번개, 모터, 옆 케이블의 전류에 흔들리지 않고, 밖으로 새지도 않아 도청도 어렵다. 가볍고 녹슬지 않는 것도 덤이다.</p>
+    <div class="table-wrap"><table class="op-tbl">
+      <thead><tr><th>매체</th><th>대표 손실</th><th>한 구간 거리(증폭 없이)</th><th>한 가닥 용량(대표)</th></tr></thead>
+      <tbody>
+        <tr><td>꼬임쌍선 (Cat 6A)</td><td class="op-num">≈ 20~30 dB / 100 m</td><td>100 m</td><td>10 Gbps</td></tr>
+        <tr><td>동축 케이블</td><td class="op-num">≈ 수십 dB / km (고주파)</td><td>수백 m~수 km(증폭기 연쇄)</td><td>수 Gbps (케이블 인터넷)</td></tr>
+        <tr><td>다중 모드 광섬유 @850 nm</td><td class="op-num">≈ 2.5~3 dB / km</td><td>수백 m (데이터센터)</td><td>100~400 Gbps (여러 가닥)</td></tr>
+        <tr><td>단일 모드 광섬유 @1550 nm</td><td class="op-num">≈ 0.16~0.2 dB / km</td><td>80~120 km (증폭기로 수천 km)</td><td>수십 Tbps (WDM)</td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout analogy"><strong>시골길과 유리 터널</strong><p>구리선은 비포장 시골길이다. 짐(신호)을 실은 트럭이 달릴수록 짐이 흘러내리고(감쇠), 옆 도로의 소음과 먼지(간섭)가 들이친다. 광섬유는 매끈한 유리 터널이다. 트럭(빛)은 벽에 부딪혀도 튕겨 나올 뿐 밖으로 나가지 않고, 수십 km를 가도 짐이 거의 줄지 않는다. 게다가 이 터널에는 색깔별로 다른 차선을 수십 개 깔 수 있다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="fiber">
+    <h2>빛을 가두는 유리실: 전반사</h2>
+    <p>광섬유는 두 겹의 유리로 되어 있다. 가운데의 <span class="term">코어</span><span class="en">(core)</span>로 빛이 지나가고, 그것을 <span class="term">클래딩</span><span class="en">(cladding)</span>이 감싼다. 둘 다 순도 높은 석영 유리지만, 코어에 저마늄 같은 불순물을 아주 조금 넣어 <span class="term">굴절률</span><span class="en">(refractive index)</span>을 클래딩보다 약간(0.3~1%) 높게 만든다. 굴절률 n은 “빛이 그 물질에서 진공보다 몇 배 느려지는가”이다. 석영은 n ≈ 1.47이라 빛이 초속 약 20만 km, <b>1 km에 약 5 µs</b>로 달린다. 바깥에는 유리를 보호하는 플라스틱 코팅을 입혀 지름 250 µm가 된다.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 280" role="img" aria-label="광섬유의 단면과 길이 방향 구조">
+        <defs><marker id="op-a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <text x="140" y="22" text-anchor="middle" class="t" style="font-weight:700">단면 (실제 비율)</text>
+        <circle cx="140" cy="140" r="100" fill="var(--surface-2)" stroke="var(--border)"/>
+        <circle cx="140" cy="140" r="50" class="f-acc2-soft"/>
+        <circle cx="140" cy="140" r="20" fill="none" stroke="var(--warn)" stroke-dasharray="3 3"/>
+        <circle cx="140" cy="140" r="3.6" fill="var(--accent)"/>
+        <g class="t-mono" style="font-size:11px">
+          <path d="M143 137 L250 52" class="s-line"/><text x="252" y="50">코어 9 µm (단일 모드)</text>
+          <path d="M156 128 L250 78" stroke="var(--warn)" fill="none"/><text x="252" y="80" style="fill:var(--warn)">50 µm (다중 모드)</text>
+          <path d="M180 170 L250 205" class="s-line"/><text x="252" y="210">클래딩 125 µm</text>
+          <path d="M215 210 L250 238" class="s-line"/><text x="252" y="243">코팅 250 µm</text>
+        </g>
+        <g transform="translate(420,0)">
+          <text x="180" y="22" text-anchor="middle" class="t" style="font-weight:700">길이 방향 (두께 과장)</text>
+          <rect x="0" y="60" width="370" height="40" fill="var(--surface-2)"/>
+          <rect x="0" y="180" width="370" height="40" fill="var(--surface-2)"/>
+          <rect x="0" y="100" width="370" height="80" class="f-acc-soft" stroke="none"/>
+          <path d="M0 100 H370 M0 180 H370" stroke="var(--accent-2)" stroke-width="1.5"/>
+          <text x="8" y="84" class="t-dim">클래딩 n₂ = 1.463</text>
+          <text x="8" y="206" class="t-dim">클래딩 n₂ = 1.463</text>
+          <text x="280" y="124" text-anchor="middle" class="t-mono" style="fill:var(--accent)">코어 n₁ = 1.468</text>
+          <path d="M0 160 L70 100 L140 180 L210 100 L280 180 L350 100" fill="none" stroke="var(--accent)" stroke-width="2.5" marker-end="url(#op-a1)"/>
+          <path d="M70 100 V130" stroke="var(--text-dim)" stroke-dasharray="3 3"/>
+          <text x="80" y="128" class="t-mono">θ &gt; θc</text>
+          <text x="180" y="252" text-anchor="middle" class="t-dim">경계에 비스듬히 닿은 빛은 100% 되튕긴다(전반사).</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 5-1.</b> 광섬유의 구조. 표준 단일 모드 광섬유는 지름 125 µm 유리(머리카락 굵기) 가운데 약 9 µm 코어로 빛을 보낸다. 굴절률 차이는 0.3% 정도에 불과하지만 이것만으로 빛을 가둘 수 있다.</figcaption>
+    </figure>
+    <p>빛이 굴절률이 높은 곳(코어)에서 낮은 곳(클래딩)으로 갈 때는 경계에서 꺾이며(굴절) 일부는 반사된다. 꺾이는 정도는 <b>스넬의 법칙</b> n₁ sin θ₁ = n₂ sin θ₂를 따른다(θ는 경계면의 수직선에서 잰 각도). 입사각을 키우면 굴절각이 더 빨리 커지다가 90°에 닿는데, 이때의 입사각이 <span class="term">임계각</span><span class="en">(critical angle)</span> θc = arcsin(n₂/n₁)이다. 그보다 비스듬히 닿은 빛은 빠져나갈 길이 없어 <b>전부</b> 되돌아온다. 이것이 <span class="term">전반사</span><span class="en">(total internal reflection)</span>다. 거울 반사는 매번 몇 %씩 잃지만 전반사는 손실이 0이라, 1 m에 수천 번 튕겨도 빛이 줄지 않는다.</p>
+    <div class="sim" id="sim-snell">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>스넬의 법칙과 전반사: 광선 추적</h3></div>
+      <div class="sim-view"><canvas id="cv-snell"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>재료 조합</span><div class="seg" id="sn-pre"><button data-value="fiber" class="on">실제 광섬유</button><button data-value="glass">유리–공기</button><button data-value="water">물–공기</button></div></div>
+        <label class="ctrl"><span>입사각 θ (경계 수직선 기준) <output id="sn-th-out"></output></span><input type="range" id="sn-th" min="30" max="89.5" step="0.1" value="87"></label>
+        <label class="ctrl"><span>코어 굴절률 n₁ <output id="sn-n1-out"></output></span><input type="range" id="sn-n1" min="1.30" max="1.70" step="0.001" value="1.468"></label>
+        <label class="ctrl"><span>클래딩 굴절률 n₂ <output id="sn-n2-out"></output></span><input type="range" id="sn-n2" min="1.00" max="1.70" step="0.001" value="1.463"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">임계각 θc</span><span class="v" id="sn-o-c">—</span></div>
+        <div class="stat"><span class="k">이 각도의 결과</span><span class="v" id="sn-o-res" style="font-size:15px">—</span></div>
+        <div class="stat"><span class="k">반사 한 번에 남는 빛</span><span class="v" id="sn-o-r">—</span></div>
+        <div class="stat"><span class="k">1 m 뒤 남은 빛 (코어 50 µm)</span><span class="v" id="sn-o-1m">—</span></div>
+        <div class="stat"><span class="k">수광각 (공기 중, ±)</span><span class="v" id="sn-o-na">—</span></div>
+      </div>
+      <div class="sim-note">왼쪽(좁은 화면에서는 위)은 경계 한 점을 확대한 그림, 오른쪽은 코어 속을 지그재그로 나아가는 광선이다. 선의 진하기가 남은 빛의 세기다. 해볼 것: ‘실제 광섬유’에서 입사각을 85° 아래로 내리면 반사 때마다 빛이 클래딩으로 새어 금방 사라진다. ‘물–공기’는 수영장 바닥에서 수면을 올려다볼 때 보이는 원형 창의 원리다. 반사율은 편광을 평균한 프레넬 식으로 계산했다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">코어 굴절률 n₁을 클래딩 n₂보다 <b>낮게</b> 만들면(예: n₁ = 1.45, n₂ = 1.50) 어떻게 될까?</p><p class="wi-hint">광선 추적 시뮬레이터에서 n₁ 슬라이더를 n₂ 아래로 내리고 입사각을 89°까지 올려 보자.</p><div class="opts">
+      <button class="opt">임계각이 더 작아져 빛이 더 잘 갇힌다</button><button class="opt">아무 차이가 없다</button><button class="opt" data-correct>어떤 각도에서도 전반사가 일어나지 않아 빛이 계속 샌다</button><button class="opt">빛이 코어 안에서 멈춘다</button>
+    </div><div class="quiz-exp">전반사는 빛이 굴절률이 <b>높은</b> 곳에서 <b>낮은</b> 곳으로 갈 때만 일어난다(sin θc = n₂/n₁ &lt; 1이어야 한다). 반대로 만들면 임계각 자체가 없어서 매번 일부가 클래딩으로 빠져나가고, 수십 번 튕기면 빛이 거의 남지 않는다. 그래서 코어에는 굴절률을 높이는 저마늄을 넣는다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="dispersion">
+    <h2>모드와 분산: 빛이 퍼지는 이유</h2>
+    <p>코어가 굵으면(50~62.5 µm) 빛이 여러 각도의 길로 동시에 갈 수 있다. 이 길 하나하나를 <span class="term">모드</span><span class="en">(mode)</span>라 하고, 이런 광섬유를 <span class="term">다중 모드 광섬유</span><span class="en">(multimode fiber, MMF)</span>라 한다. 문제는 축을 따라 곧게 가는 빛과 지그재그로 가는 빛의 이동 거리가 다르다는 것이다. 같은 순간 출발한 빛 펄스가 도착할 때는 앞뒤로 늘어진다. 이것이 <span class="term">모드 분산</span><span class="en">(modal dispersion)</span>이다. 굴절률이 1% 차이 나는 계단형 코어라면 1 km에 약 50 ns나 퍼진다.</p>
+    <p>해결책은 두 가지다. 코어의 굴절률을 가운데는 높고 바깥으로 갈수록 낮게 만들면(<b>경사형</b>, graded-index) 바깥으로 도는 빛이 더 빨리 달려 도착 시간이 거의 맞춰진다. 아예 코어를 9 µm로 가늘게 만들어 길이 하나만 남기면 모드 분산 자체가 사라진다. 이것이 <span class="term">단일 모드 광섬유</span><span class="en">(single-mode fiber, SMF)</span>로, 장거리 통신망은 모두 이것을 쓴다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 300" style="min-width:600px" role="img" aria-label="계단형 다중 모드, 경사형 다중 모드, 단일 모드 광섬유의 빛 경로와 출력 펄스 비교">
+        <g class="t" style="font-size:13px;font-weight:700"><text x="10" y="40">계단형 다중 모드</text><text x="10" y="140">경사형 다중 모드</text><text x="10" y="240">단일 모드</text></g>
+        <g class="t-mono"><text x="10" y="58">코어 50~62.5 µm</text><text x="10" y="158">코어 50 µm</text><text x="10" y="258">코어 9 µm</text></g>
+        <g transform="translate(150,0)">
+          <rect x="0" y="20" width="440" height="60" class="f-acc-soft" stroke="none"/>
+          <path d="M0 20 H440 M0 80 H440" stroke="var(--accent-2)"/>
+          <path d="M0 50 H440" stroke="var(--accent)" stroke-width="2"/>
+          <path d="M0 50 L40 22 L120 78 L200 22 L280 78 L360 22 L440 78" fill="none" stroke="var(--warn)" stroke-width="1.8"/>
+          <path d="M0 50 L80 22 L240 78 L400 22 L440 36" fill="none" stroke="var(--ok)" stroke-width="1.8"/>
+          <rect x="0" y="120" width="440" height="60" class="f-acc-soft" stroke="none"/>
+          <path d="M0 120 H440 M0 180 H440" stroke="var(--accent-2)"/>
+          <path d="M0 150 H440" stroke="var(--accent)" stroke-width="2"/>
+          <path d="M0 150 Q 55 100 110 150 T 220 150 T 330 150 T 440 150" fill="none" stroke="var(--warn)" stroke-width="1.8"/>
+          <path d="M0 150 Q 73 120 146 150 T 292 150 T 440 150" fill="none" stroke="var(--ok)" stroke-width="1.8"/>
+          <rect x="0" y="244" width="440" height="12" class="f-acc-soft" stroke="none"/>
+          <path d="M0 244 H440 M0 256 H440" stroke="var(--accent-2)"/>
+          <path d="M0 250 H440" stroke="var(--accent)" stroke-width="2.5"/>
+        </g>
+        <g transform="translate(610,0)" class="s-line">
+          <text x="0" y="14" class="t-dim">도착한 펄스</text>
+          <path d="M0 78 H170" class="s-axis"/><path d="M10 78 C 40 78, 50 40, 85 38 C 120 40, 130 78, 160 78" stroke="var(--bad)" stroke-width="2"/>
+          <path d="M0 178 H170" class="s-axis"/><path d="M40 178 C 60 178, 70 128, 85 126 C 100 128, 110 178, 130 178" stroke="var(--warn)" stroke-width="2"/>
+          <path d="M0 278 H170" class="s-axis"/><path d="M62 278 C 72 278, 78 222, 85 220 C 92 222, 98 278, 108 278" stroke="var(--ok)" stroke-width="2"/>
+          <text x="85" y="96" text-anchor="middle" class="t-mono" style="stroke:none">많이 퍼짐</text>
+          <text x="85" y="196" text-anchor="middle" class="t-mono" style="stroke:none">조금 퍼짐</text>
+          <text x="85" y="296" text-anchor="middle" class="t-mono" style="stroke:none">색 분산만 남음</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 5-2.</b> 세 종류의 광섬유. 계단형 다중 모드는 경로마다 길이가 달라 펄스가 크게 퍼진다. 경사형은 바깥 경로의 빛이 더 빨라 도착 시간이 맞춰진다. 단일 모드는 길이 하나뿐이다. 다중 모드는 싼 광원(VCSEL)과 쉬운 연결 덕분에 데이터센터 안 짧은 구간에 쓰인다.</figcaption>
+    </figure>
+    <p>단일 모드에도 퍼짐이 남는다. 레이저 빛도 완벽한 한 색이 아니라 아주 좁은 파장 폭을 가지고, 신호를 실으면 그 폭이 더 넓어진다. 유리 속에서는 파장마다 속도가 조금씩 달라(프리즘이 무지개를 만드는 이유) 펄스가 퍼진다. 이것이 <span class="term">색 분산</span><span class="en">(chromatic dispersion)</span>이다. 표준 단일 모드 광섬유는 1310 nm 근처에서 색 분산이 거의 0이고, 1550 nm에서는 약 17 ps/(nm·km)다. 속도가 빠를수록 비트 간격이 짧아 같은 퍼짐도 더 치명적이다.</p>
+    <div class="sim" id="sim-disp">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>분산: 퍼진 펄스가 이웃 비트를 덮는다</h3></div>
+      <div class="sim-view"><canvas id="cv-disp"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>광섬유</span><div class="seg" id="dp-fib"><button data-value="si">다중 모드·계단형</button><button data-value="gi">다중 모드·경사형</button><button data-value="s13">단일 모드 1310</button><button data-value="s15" class="on">단일 모드 1550</button></div></div>
+        <div class="ctrl"><span>비트율</span><div class="seg" id="dp-rate"><button data-value="0.1">100 Mbps</button><button data-value="1">1 Gbps</button><button data-value="10" class="on">10 Gbps</button><button data-value="25">25 Gbps</button></div></div>
+        <label class="ctrl"><span>거리 <output id="dp-km-out"></output></span><input type="range" id="dp-km" min="0" max="100" step="1" value="77"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">펄스 퍼짐 Δt</span><span class="v" id="dp-o-dt">—</span></div>
+        <div class="stat"><span class="k">비트 간격 T</span><span class="v" id="dp-o-t">—</span></div>
+        <div class="stat"><span class="k">판독 상태</span><span class="v" id="dp-o-st" style="font-size:15px">—</span></div>
+        <div class="stat"><span class="k">대략 최대 거리 (Δt ≈ T)</span><span class="v" id="dp-o-max">—</span></div>
+      </div>
+      <div class="sim-note">위는 보낸 신호(1 0 1 1 0 1 0 0 1 1), 아래는 도착한 신호다. 점선 위치에서 밝기를 재어 가운데 문턱보다 높으면 1로 읽는다(틀린 비트는 빨간색). 해볼 것: 단일 모드 1550·10 Gbps에서 거리를 늘려 80 km 근처를 넘겨 보자. 같은 거리에서 25 Gbps로 올리면? 모델: 계단형 50 ns/km, 경사형(OM3급) 0.25 ns/km, 단일 모드는 분산계수 × 거리 × 신호 스펙트럼 폭(비트율에 비례). 실제 장거리 장비는 분산 보상 광섬유나 수신기의 디지털 신호 처리(DSP)로 이 퍼짐을 되돌린다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="loss">
+    <h2>감쇠 스펙트럼: 유리가 가장 투명한 색</h2>
+    <p>유리가 아무리 맑아도 빛은 조금씩 줄어든다. 가장 큰 원인은 <b>레일리 산란</b>이다. 유리 속 원자 수준의 밀도 요동에 빛이 부딪혀 사방으로 흩어지는데, 그 세기가 파장의 네제곱에 반비례해(1/λ⁴) 짧은 파장일수록 훨씬 심하다. 하늘이 파란 것과 같은 이유다. 반대로 1600 nm를 넘으면 유리 분자 자체가 적외선을 흡수하기 시작한다. 그 사이, 1550 nm 근처가 손실이 가장 작은 골짜기다. 옛 광섬유에는 제조 중 섞인 물(OH 이온)이 1383 nm 근처에서 빛을 강하게 흡수하는 봉우리도 있었다.</p>
+    <p>이 모양 때문에 광통신은 세 개의 <b>창</b>(window)을 써 왔다. 1970년대에는 싼 광원과 실리콘 검출기를 쓸 수 있는 <b>850 nm</b>, 1980년대에는 색 분산이 0인 <b>1310 nm</b>, 그리고 1990년대부터는 손실이 가장 작고 광증폭기가 일하는 <b>1550 nm</b>다. 오늘날에는 이 영역을 O(1260~1360), E, S, C(1530~1565), L(1565~1625), U 밴드로 나눠 부른다. 장거리 WDM의 주무대는 C와 L 밴드다.</p>
+    <div class="sim" id="sim-att">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>광섬유 감쇠 스펙트럼</h3></div>
+      <div class="sim-view"><canvas id="cv-att"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>파장 <output id="at-wl-out"></output></span><input type="range" id="at-wl" min="800" max="1700" step="5" value="1550"></label>
+        <label class="ctrl"><span>거리 <output id="at-km-out"></output></span><input type="range" id="at-km" min="1" max="200" step="1" value="50"></label>
+        <label class="check"><input type="checkbox" id="at-low"> 저수분 광섬유 (물 흡수 봉우리 제거, G.652.D급)</label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">이 파장의 손실</span><span class="v" id="at-o-a">—</span></div>
+        <div class="stat"><span class="k">밴드</span><span class="v" id="at-o-b">—</span></div>
+        <div class="stat"><span class="k">이 거리의 총 손실</span><span class="v" id="at-o-t">—</span></div>
+        <div class="stat"><span class="k">남은 빛</span><span class="v" id="at-o-p">—</span></div>
+      </div>
+      <div class="sim-note">점선은 각 원인의 몫(레일리 산란, 적외선 흡수), 실선은 합계다. 해볼 것: 850 nm와 1550 nm에서 50 km 뒤 남은 빛을 비교해 보자. 같은 거리 비교로, Cat 6 구리선은 100 MHz에서 1 km에 약 200 dB를 잃는다. 모델은 레일리 산란(0.8/λ⁴ dB/km, λ는 µm) + 적외선 흡수 + 불완전성 0.03 dB/km + OH 봉우리로 근사한 대략적인 곡선이다.</div>
+    </div>
+    <div class="callout tip"><strong>데시벨로 더하기</strong><p>손실을 dB로 쓰면 곱셈이 덧셈이 된다(2장). 3 dB는 절반, 10 dB는 1/10, 20 dB는 1/100이다. 광 출력은 1 mW를 기준으로 한 <b>dBm</b>을 쓴다. 0 dBm = 1 mW, −10 dBm = 0.1 mW, −30 dBm = 1 µW. 그래서 “송신 0 dBm − 손실 20 dB = 수신 −20 dBm”처럼 뺄셈만으로 링크를 설계한다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="budget">
+    <h2>광 링크 예산과 광증폭기</h2>
+    <p>광 링크를 설계할 때는 가계부를 쓰듯 <span class="term">광 링크 예산</span><span class="en">(optical link budget)</span>을 맞춘다. 수입은 송신기의 출력(dBm), 지출은 광섬유의 거리별 손실, 커넥터(한 쌍에 약 0.3~0.75 dB), 광섬유를 녹여 붙인 융착 접속(<span class="en">splice</span>, 한 곳에 약 0.05~0.1 dB)이다. 남은 빛이 수신기의 <b>수신 감도</b>(이보다 약하면 비트 오류가 급증하는 최소 세기)보다 커야 하고, 노화·온도·수리용으로 보통 <b>3 dB 정도의 여유</b>(margin)를 남긴다.</p>
+    <p>예산이 모자라면 예전에는 빛을 전기로 바꿔 다시 빛으로 쏘는 재생 중계기를 썼다. 1990년대에 등장한 <span class="term">EDFA</span><span class="en">(Erbium-Doped Fiber Amplifier, 어븀 첨가 광섬유 증폭기)</span>는 판을 바꿨다. 희토류 원소 어븀을 섞은 광섬유 몇~수십 m에 980 nm 펌프 레이저를 쏘아 두면, 지나가는 1530~1565 nm 빛이 유도 방출로 <b>전기 변환 없이</b> 20~30 dB 증폭된다. C 밴드 안의 수십 개 파장을 한꺼번에 키워 주므로, 뒤에 나올 WDM과 짝을 이루어 장거리 광통신을 열었다. 다만 증폭기마다 잡음(ASE)이 조금씩 더해져, 수천 km를 가면 결국 신호 대 잡음비(OSNR)가 한계가 된다.</p>
+    <div class="sim" id="sim-bud">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>광 링크 예산 계산기</h3></div>
+      <div class="sim-view"><canvas id="cv-bud"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>송신 출력 <output id="bd-tx-out"></output></span><input type="range" id="bd-tx" min="-6" max="10" step="1" value="0"></label>
+        <label class="ctrl"><span>거리 <output id="bd-km-out"></output></span><input type="range" id="bd-km" min="1" max="400" step="1" value="60"></label>
+        <div class="ctrl"><span>파장 (손실)</span><div class="seg" id="bd-wl"><button data-value="0.35">1310 nm · 0.35 dB/km</button><button data-value="0.2" class="on">1550 nm · 0.2 dB/km</button></div></div>
+        <label class="ctrl"><span>커넥터 개수 (0.5 dB씩) <output id="bd-con-out"></output></span><input type="range" id="bd-con" min="0" max="10" step="1" value="4"></label>
+        <div class="ctrl"><span>수신기</span><div class="seg" id="bd-rx"><button data-value="-14">PIN · −14 dBm</button><button data-value="-24" class="on">APD · −24 dBm</button></div></div>
+        <label class="check"><input type="checkbox" id="bd-amp"> 필요하면 EDFA를 자동으로 넣기</label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">총 손실</span><span class="v" id="bd-o-loss">—</span></div>
+        <div class="stat"><span class="k">수신 전력</span><span class="v" id="bd-o-rx">—</span></div>
+        <div class="stat"><span class="k">여유 (margin)</span><span class="v" id="bd-o-m">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="bd-o-v" style="font-size:15px">—</span></div>
+      </div>
+      <div class="sim-note">그래프는 거리에 따른 빛의 세기(dBm)다. 양 끝의 계단은 커넥터, 기울기는 광섬유 손실(융착 접속 4 km마다 0.1 dB 포함), 위로 솟는 곳은 EDFA다. 해볼 것: 1550 nm·APD로 몇 km까지 증폭 없이 갈 수 있을까? 1310 nm로 바꾸면? 거리를 400 km로 늘리고 EDFA를 켜 보자. 단순화: EDFA는 출력을 송신 출력까지 되돌리고, 잡음 누적과 분산은 무시했다. PIN/APD 감도는 10 Gbps급의 대표값이다.</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">증폭기 없이 0.2 dB/km 광섬유로 서울에서 로스앤젤레스까지 약 10,000 km를 보낸다면, 도착하는 빛은 처음의 몇 분의 1일까?</p><p class="wi-hint">손실 dB = 0.2 × 거리. 10 dB가 1/10이다.</p><div class="opts">
+      <button class="opt">약 1/100</button><button class="opt">약 1/1만</button><button class="opt">약 1/100만</button><button class="opt" data-correct>1 뒤에 0이 200개 붙은 수분의 1 — 사실상 0</button>
+    </div><div class="quiz-exp">0.2 × 10,000 = 2,000 dB, 즉 10<sup>−200</sup>이다. 우주 전체의 원자 수(약 10<sup>80</sup>)보다 훨씬 큰 수로 나눈 셈이라 광자 하나도 남지 않는다. 그래서 해저 케이블에는 50~100 km마다 EDFA 중계기가 들어 있다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="wdm">
+    <h2>한 가닥에 무지개를: WDM과 코히어런트 광</h2>
+    <p>서로 다른 색(파장)의 빛은 한 광섬유 안에서 서로 섞이지 않고 함께 갈 수 있다. 보내는 쪽에서 여러 파장을 프리즘처럼 합치고(다중화), 받는 쪽에서 다시 나누면(역다중화) 한 가닥이 수십 개의 독립된 채널이 된다. 이것이 <span class="term">파장 분할 다중화</span><span class="en">(WDM, Wavelength Division Multiplexing)</span>다. 채널 간격을 국제 표준(ITU-T G.694.1) 격자에 맞춰 촘촘히 깐 것을 <span class="term">DWDM</span><span class="en">(Dense WDM)</span>이라 하며, 100 GHz(약 0.8 nm) 간격이면 C 밴드에 40~48개, 50 GHz 간격이면 80~96개가 들어간다. 요즘은 채널마다 폭을 다르게 주는 유연 격자(flex grid)도 쓴다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 210" style="min-width:600px" role="img" aria-label="WDM 다중화기와 역다중화기">
+        <defs><marker id="op-a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-dim)"/></marker></defs>
+        <g class="t-mono" style="font-size:11px">
+          <rect x="10" y="20" width="96" height="26" rx="6" class="f-elev"/><text x="58" y="37" text-anchor="middle">λ1 1530.3 nm</text>
+          <rect x="10" y="60" width="96" height="26" rx="6" class="f-elev"/><text x="58" y="77" text-anchor="middle">λ2 1531.1 nm</text>
+          <rect x="10" y="100" width="96" height="26" rx="6" class="f-elev"/><text x="58" y="117" text-anchor="middle">λ3 1531.9 nm</text>
+          <text x="58" y="146" text-anchor="middle">⋮</text>
+          <rect x="10" y="160" width="96" height="26" rx="6" class="f-elev"/><text x="58" y="177" text-anchor="middle">λ80</text>
+        </g>
+        <g stroke-width="2.5" fill="none"><path d="M106 33 L170 95" stroke="var(--accent)"/><path d="M106 73 L170 100" stroke="var(--accent-2)"/><path d="M106 113 L170 105" stroke="var(--ok)"/><path d="M106 173 L170 110" stroke="var(--warn)"/></g>
+        <path d="M170 60 L230 85 L230 125 L170 150 Z" class="f-acc-soft"/><text x="200" y="174" text-anchor="middle" class="t-dim">MUX</text>
+        <rect x="230" y="98" width="340" height="14" rx="7" fill="var(--surface-2)" stroke="var(--border)"/>
+        <g stroke-width="1.6"><path d="M232 102 H568" stroke="var(--accent)"/><path d="M232 105 H568" stroke="var(--accent-2)"/><path d="M232 108 H568" stroke="var(--ok)"/></g>
+        <rect x="370" y="88" width="60" height="34" rx="8" class="f-elev"/><text x="400" y="110" text-anchor="middle" class="t" style="font-weight:700">EDFA</text>
+        <text x="400" y="76" text-anchor="middle" class="t-dim">광섬유 한 가닥 · 80파장 × 400 Gbps = 32 Tbps</text>
+        <path d="M630 60 L570 85 L570 125 L630 150 Z" class="f-acc-soft"/><text x="600" y="174" text-anchor="middle" class="t-dim">DEMUX</text>
+        <g stroke-width="2.5" fill="none"><path d="M630 95 L694 33" stroke="var(--accent)"/><path d="M630 100 L694 73" stroke="var(--accent-2)"/><path d="M630 105 L694 113" stroke="var(--ok)"/><path d="M630 110 L694 173" stroke="var(--warn)"/></g>
+        <g class="t-mono" style="font-size:11px">
+          <rect x="694" y="20" width="96" height="26" rx="6" class="f-elev"/><text x="742" y="37" text-anchor="middle">수신기 1</text>
+          <rect x="694" y="60" width="96" height="26" rx="6" class="f-elev"/><text x="742" y="77" text-anchor="middle">수신기 2</text>
+          <rect x="694" y="100" width="96" height="26" rx="6" class="f-elev"/><text x="742" y="117" text-anchor="middle">수신기 3</text>
+          <rect x="694" y="160" width="96" height="26" rx="6" class="f-elev"/><text x="742" y="177" text-anchor="middle">수신기 80</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 5-3.</b> 파장 분할 다중화. 각 파장은 독립된 채널이다. 하나의 EDFA가 모든 파장을 한꺼번에 증폭하므로, 채널을 늘려도 중계 장비는 그대로다.</figcaption>
+    </figure>
+    <p>파장 하나에 싣는 속도도 크게 늘었다. 2000년대까지는 빛을 켜고 끄는 방식(OOK, 1비트/심벌)으로 파장당 10 Gbps였다. 2010년 무렵부터는 <span class="term">코히어런트 광통신</span><span class="en">(coherent optical)</span>이 표준이 되었다. 수신기에 기준 레이저(국부 발진기)를 두고 빛의 <b>세기뿐 아니라 위상</b>까지 읽고, 서로 수직인 두 <b>편광</b>에 각각 다른 데이터를 싣는다. 무선에서 쓰는 QPSK·16QAM 같은 변조(12장)를 빛에 그대로 적용한 것이다. 강력한 DSP 칩이 색 분산과 편광 뒤섞임을 디지털로 되돌려 주므로 분산 보상 광섬유도 필요 없어졌다. 지금은 파장당 400 G~800 Gbps, 최신 장비는 1.2~1.6 Tbps까지 나온다.</p>
+    <div class="sim" id="sim-wdm">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>WDM 용량 계산기: 파장 수 × 파장당 속도</h3></div>
+      <div class="sim-view"><canvas id="cv-wdm"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>파장당 변조 방식</span><div class="seg" id="wd-fmt"><button data-value="0">10G OOK</button><button data-value="1">100G DP-QPSK</button><button data-value="2" class="on">400G DP-16QAM</button><button data-value="3">800G DP-16QAM</button></div></div>
+        <div class="ctrl"><span>사용 밴드</span><div class="seg" id="wd-band"><button data-value="C" class="on">C 밴드</button><button data-value="CL">C + L 밴드</button></div></div>
+        <label class="ctrl"><span>파장(채널) 수 <output id="wd-n-out"></output></span><input type="range" id="wd-n" min="1" max="64" step="1" value="64"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">채널 간격</span><span class="v" id="wd-o-sp">—</span></div>
+        <div class="stat"><span class="k">한 가닥 총 용량</span><span class="v" id="wd-o-cap">—</span></div>
+        <div class="stat"><span class="k">스펙트럼 효율</span><span class="v" id="wd-o-se">—</span></div>
+        <div class="stat"><span class="k">4K 영상(25 Mbps) 동시 시청</span><span class="v" id="wd-o-4k">—</span></div>
+      </div>
+      <div class="sim-note">위는 광섬유 속 스펙트럼(가로축 파장), 오른쪽 위 작은 그림은 한 편광의 성좌도(12장)다. 파장 하나의 신호 폭(보 레이트)이 클수록 채널 간격도 넓어야 한다. 대표값: 10G OOK·50 GHz, 100G DP-QPSK(32 Gbaud)·50 GHz, 400G DP-16QAM(약 60 Gbaud)·75 GHz, 800G(약 120 Gbaud)·150 GHz, 각 밴드 약 4.8 THz. 고차 변조일수록 잡음에 약해 갈 수 있는 거리가 줄어든다(400G 16QAM은 수백~1,000 km 수준, QPSK는 수천 km).</div>
+    </div>
+    <div class="callout deep"><strong>수백 Tbps 해저 케이블의 셈법</strong><p>최근 대서양·태평양 케이블은 광섬유 12~24쌍(한 쌍 = 오가는 두 가닥)을 넣고, 쌍마다 C 밴드에서 약 15~25 Tbps를 실어 케이블 하나가 200~500 Tbps 수준이 된다. 실험실에서는 코어를 여러 개 넣은 다중 코어 광섬유로 한 가닥에 Pbps(1,000 Tbps)를 넘긴 기록도 나왔다. 이런 광 부품을 칩 위에 만드는 기술은 19장(실리콘 포토닉스)에서 다룬다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="pon">
+    <h2>집까지 빛으로: FTTH와 PON</h2>
+    <p>한국은 집 안까지 광섬유가 들어오는 <span class="term">FTTH</span><span class="en">(Fiber To The Home)</span> 보급률이 세계 최상위권이다. 그런데 집집마다 통신국에서 광섬유를 한 가닥씩 끌어오면 너무 비싸다. 그래서 대부분의 FTTH는 <span class="term">PON</span><span class="en">(Passive Optical Network, 수동형 광 네트워크)</span>을 쓴다. 통신국의 OLT(광 회선 단말)에서 나온 광섬유 한 가닥을 아파트나 전봇대 근처의 <b>광 분배기</b>(splitter)가 32~64가닥으로 나눈다. 분배기는 전기가 필요 없는 유리 부품(수동 소자)이라 고장이 적고 관리가 쉽다. 각 집에는 ONT(광 단말)가 놓인다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 260" style="min-width:600px" role="img" aria-label="PON 구조: OLT, 광 분배기, 여러 ONT">
+        <defs><marker id="op-a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker><marker id="op-a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"/></marker></defs>
+        <rect x="16" y="90" width="120" height="70" rx="10" class="f-acc"/><text x="76" y="120" text-anchor="middle" class="t" style="fill:#fff;font-weight:700">OLT</text><text x="76" y="140" text-anchor="middle" class="t-mono" style="fill:#fff">통신국</text>
+        <path d="M136 125 H360" stroke="var(--accent-2)" stroke-width="3"/>
+        <text x="248" y="112" text-anchor="middle" class="t-dim">광섬유 1가닥 · 최대 20 km 안팎</text>
+        <path d="M160 145 H330" class="s-acc" marker-end="url(#op-a3)"/><text x="245" y="164" text-anchor="middle" class="t-mono" style="fill:var(--accent)">하향 1490 nm (GPON) · 방송</text>
+        <path d="M330 185 H160" stroke="var(--accent-2)" stroke-width="2" fill="none" marker-end="url(#op-a4)"/><text x="245" y="204" text-anchor="middle" class="t-mono" style="fill:var(--accent-2)">상향 1310 nm · 시간 나눠 쓰기</text>
+        <path d="M360 95 L420 125 L360 155 Z" class="f-acc2-soft"/><text x="380" y="80" text-anchor="middle" class="t" style="font-weight:700">분배기 1:32</text>
+        <text x="390" y="176" text-anchor="middle" class="t-mono">손실 ≈ 17 dB</text>
+        <g stroke="var(--accent-2)" stroke-width="1.6" fill="none">
+          <path d="M420 125 L600 30"/><path d="M420 125 L600 70"/><path d="M420 125 L600 110"/><path d="M420 125 L600 150"/><path d="M420 125 L600 230"/>
+        </g>
+        <g class="t-mono" style="font-size:11px">
+          <rect x="600" y="18" width="120" height="24" rx="6" class="f-elev"/><text x="660" y="34" text-anchor="middle">ONT 1 (101동)</text>
+          <rect x="600" y="58" width="120" height="24" rx="6" class="f-elev"/><text x="660" y="74" text-anchor="middle">ONT 2</text>
+          <rect x="600" y="98" width="120" height="24" rx="6" class="f-elev"/><text x="660" y="114" text-anchor="middle">ONT 3</text>
+          <rect x="600" y="138" width="120" height="24" rx="6" class="f-elev"/><text x="660" y="154" text-anchor="middle">ONT 4</text>
+          <text x="660" y="190" text-anchor="middle">⋮</text>
+          <rect x="600" y="218" width="120" height="24" rx="6" class="f-elev"/><text x="660" y="234" text-anchor="middle">ONT 32</text>
+        </g>
+        <text x="730" y="128" class="t-dim">각 집</text>
+      </svg></div>
+      <figcaption><b>그림 5-4.</b> PON. 하향 신호는 분배기에서 모든 집으로 똑같이 복사된다(각 ONT는 자기 몫만 꺼내고, 데이터는 암호화된다). 상향은 OLT가 집마다 보낼 시각을 정해 주어 빛이 분배기에서 겹치지 않게 한다(TDMA).</figcaption>
+    </figure>
+    <p>하향(통신국 → 집)은 분배기가 빛을 모든 집에 똑같이 나눠 주므로 일종의 <b>방송</b>이다. 상향(집 → 통신국)은 여러 집의 빛이 분배기에서 한 가닥으로 합쳐지므로, 동시에 보내면 섞여 버린다. 그래서 OLT가 집마다 “너는 몇 µs부터 몇 µs까지 보내라”라고 시간표를 나눠 주는 <b>TDMA</b>(시분할 다중 접속)를 쓴다. 집마다 거리가 달라 빛이 도착하는 시각도 다르므로, OLT는 처음에 각 ONT까지의 왕복 시간을 재어(레인징) 보정한다. 대표 규격은 GPON(하향 2.5/상향 1.25 Gbps)과 XGS-PON(대칭 10 Gbps)이고, 2020년대 들어 25G/50G-PON이 표준화되었다.</p>
+    <div class="sim" id="sim-pon">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>PON: 한 가닥을 몇 집이 나눠 쓰나</h3></div>
+      <div class="sim-view"><canvas id="cv-pon"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>규격</span><div class="seg" id="pn-tech"><button data-value="g">GPON</button><button data-value="x" class="on">XGS-PON</button><button data-value="f">50G-PON</button></div></div>
+        <div class="ctrl"><span>분배 비율</span><div class="seg" id="pn-split"><button data-value="16">1:16</button><button data-value="32" class="on">1:32</button><button data-value="64">1:64</button><button data-value="128">1:128</button></div></div>
+        <label class="ctrl"><span>동시에 쓰는 집의 비율 <output id="pn-act-out"></output></span><input type="range" id="pn-act" min="5" max="100" step="5" value="30"></label>
+        <div class="ctrl"><span>보기</span><div class="seg" id="pn-dir"><button data-value="down" class="on">하향 (방송)</button><button data-value="up">상향 (TDMA)</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">집당 하향 (평균)</span><span class="v" id="pn-o-d">—</span></div>
+        <div class="stat"><span class="k">집당 상향 (평균)</span><span class="v" id="pn-o-u">—</span></div>
+        <div class="stat"><span class="k">분배기 손실</span><span class="v" id="pn-o-l">—</span></div>
+        <div class="stat"><span class="k">광 예산으로 본 최대 거리</span><span class="v" id="pn-o-km">—</span></div>
+      </div>
+      <div class="sim-note">사람들이 모두 동시에 최대로 쓰지는 않으므로(통계적 다중화) 집당 계약 속도는 평균보다 훨씬 높게 판다. 분배기 손실은 이상적으로 10·log₁₀(N) dB에 제조 손실을 더한 값이다. 최대 거리는 광 예산(GPON 28 dB, XGS-PON·50G-PON 29 dB)에서 분배기와 커넥터 1 dB를 빼고 0.35 dB/km로 나눈 대략값이며, 실제 설계는 보통 20 km 이내로 한다. 해볼 것: 1:128로 나누면 거리와 속도가 어떻게 바뀌나?</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="submarine">
+    <h2>바다 밑의 인터넷: 해저 케이블</h2>
+    <p>대륙과 대륙 사이를 오가는 데이터의 95% 이상(흔히 99%로 인용)은 위성이 아니라 <span class="term">해저 케이블</span><span class="en">(submarine cable)</span>로 간다. 2025년 기준 운영 중이거나 건설 중인 해저 케이블은 500~600개, 총 길이는 140만 km가 넘는다. 위성(15장)보다 용량이 수천 배 크고, 지연도 짧다. 서울–로스앤젤레스 약 1만 km를 빛이 가는 데 편도 약 50 ms가 걸린다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 300" style="min-width:600px" role="img" aria-label="심해용 해저 케이블 단면과 중계기 배치">
+        <text x="150" y="22" text-anchor="middle" class="t" style="font-weight:700">심해용 케이블 단면 (지름 약 17~21 mm)</text>
+        <circle cx="150" cy="160" r="110" fill="var(--surface-2)" stroke="var(--border)"/>
+        <circle cx="150" cy="160" r="70" fill="var(--warn)" opacity=".55"/>
+        <circle cx="150" cy="160" r="62" fill="var(--bg-elev)" stroke="var(--border)"/>
+        <g fill="var(--text-dim)">
+          <circle cx="150" cy="108" r="9"/><circle cx="187" cy="123" r="9"/><circle cx="202" cy="160" r="9"/><circle cx="187" cy="197" r="9"/><circle cx="150" cy="212" r="9"/><circle cx="113" cy="197" r="9"/><circle cx="98" cy="160" r="9"/><circle cx="113" cy="123" r="9"/>
+        </g>
+        <circle cx="150" cy="160" r="30" fill="var(--surface)" stroke="var(--text-dim)" stroke-width="2"/>
+        <g fill="var(--accent)"><circle cx="140" cy="150" r="4"/><circle cx="152" cy="146" r="4"/><circle cx="162" cy="155" r="4"/><circle cx="160" cy="168" r="4"/><circle cx="148" cy="173" r="4"/><circle cx="138" cy="164" r="4"/><circle cx="150" cy="160" r="4"/><circle cx="168" cy="145" r="3"/></g>
+        <g class="t-mono" style="font-size:11px">
+          <path d="M150 160 L300 60" class="s-line"/><text x="304" y="58">광섬유 수~24쌍 (젤 채운 강철관 속)</text>
+          <path d="M195 125 L300 92" class="s-line"/><text x="304" y="96">강철 선: 장력을 견딤</text>
+          <path d="M215 160 L300 130" class="s-line"/><text x="304" y="134">구리관: 중계기 전력선</text>
+          <path d="M250 180 L300 170" class="s-line"/><text x="304" y="174">폴리에틸렌 절연 피복</text>
+          <text x="304" y="206" style="fill:var(--text-faint)">얕은 바다 구간은 강철 갑옷을 더 감아</text>
+          <text x="304" y="222" style="fill:var(--text-faint)">지름 40~50 mm로 굵어진다.</text>
+        </g>
+        <g transform="translate(560,40)">
+          <text x="110" y="0" text-anchor="middle" class="t" style="font-weight:700">한 구간의 모습</text>
+          <rect x="0" y="20" width="60" height="40" rx="6" class="f-acc"/><text x="30" y="45" text-anchor="middle" class="t-mono" style="fill:#fff">육양국</text>
+          <rect x="170" y="20" width="60" height="40" rx="6" class="f-acc"/><text x="200" y="45" text-anchor="middle" class="t-mono" style="fill:#fff">육양국</text>
+          <path d="M30 60 C 40 140, 70 200, 100 200 C 140 200, 180 140, 200 60" fill="none" stroke="var(--accent-2)" stroke-width="2.5"/>
+          <g class="f-acc2-soft"><rect x="52" y="160" width="18" height="10" rx="3"/><rect x="92" y="195" width="18" height="10" rx="3"/><rect x="138" y="180" width="18" height="10" rx="3"/></g>
+          <text x="115" y="232" text-anchor="middle" class="t-mono">중계기(EDFA) 50~100 km마다</text>
+          <text x="30" y="80" text-anchor="middle" class="t-mono" style="fill:var(--warn)">+ kV</text>
+          <text x="200" y="80" text-anchor="middle" class="t-mono" style="fill:var(--warn)">− kV</text>
+          <text x="115" y="252" text-anchor="middle" class="t-mono">양 끝에서 직류 수천~1만여 V 공급</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 5-5.</b> 해저 케이블의 단면과 구조. 깊은 바다에서는 정원 호스 굵기다. 섬유는 가운데 몇 가닥뿐이고 나머지는 압력과 장력을 견디고 전기를 보내는 부분이다. 중계기는 수십~100여 km마다 놓인 원통형 EDFA다.</figcaption>
+    </figure>
+    <ul>
+      <li><b>중계기와 전력</b>: 50~100 km마다 EDFA가 든 <b>중계기</b>가 있다. 태평양을 건너는 케이블에는 100개가 넘는다. 바다 밑에는 전원이 없으므로 양쪽 육지의 급전 장치(PFE)가 케이블의 구리관으로 직류 약 1 A를 흘려 보내고, 바닷물을 귀로 삼는다. 거리가 길면 전압은 1만 V를 넘는다.</li>
+      <li><b>수명</b>: 설계 수명은 약 <b>25년</b>이다. 수심 수천 m에서는 수리가 매우 비싸서 부품을 우주선급 신뢰성으로 만든다.</li>
+      <li><b>사고</b>: 세계적으로 매년 150~200건의 고장이 나는데, 대부분(약 70~80%)은 어선의 그물과 선박의 <b>닻</b>이 얕은 바다에서 끌고 가는 사고다. 1980년대에는 상어가 케이블을 문 기록도 있었지만 드물다. 고장이 나면 케이블 수리선이 가서 바닥에서 케이블을 끌어 올려 이어 붙이는 데 1~3주가 걸린다. 그동안 트래픽은 다른 케이블로 우회한다.</li>
+      <li><b>육양국</b>: 케이블이 바다에서 뭍으로 올라오는 건물을 <span class="term">육양국</span><span class="en">(landing station)</span>이라 한다. 한국은 <b>부산</b>, <b>거제</b>, <b>태안</b> 등의 육양국에서 일본·중국·동남아·미국으로 이어지는 여러 케이블이 올라온다. 국가 기간 시설이라 보안이 엄격하다.</li>
+    </ul>
+    <div class="callout analogy"><strong>바다 밑 고속도로와 휴게소</strong><p>해저 케이블은 대양을 가로지르는 고속도로, 중계기는 50~100 km마다 있는 휴게소다. 휴게소에서는 짐을 내려 다시 싸지 않고(전기 변환 없음) 트럭 전체에 기름만 넣어 준다(광증폭). 휴게소의 전기는 양쪽 해안의 발전소에서 도로 밑 전선으로 끌어온다. 차선(파장)을 늘려도 휴게소는 그대로라는 점이 핵심이다.</p></div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">해저 케이블에 광섬유를 수백 쌍씩 넣지 않고 수~24쌍만 넣는 가장 큰 이유는?</p><p class="wi-hint">중계기가 무엇으로 동작하는지 떠올려 보자.</p><div class="opts">
+      <button class="opt" data-correct>쌍마다 중계기 증폭기가 필요한데, 육지에서 케이블로 보낼 수 있는 전력이 한정되어 있어서</button><button class="opt">유리가 비싸서</button><button class="opt">광섬유끼리 빛이 섞여서</button><button class="opt">바닷물이 광섬유를 녹여서</button>
+    </div><div class="quiz-exp">광섬유 자체는 싸고 가늘다. 그러나 섬유 쌍마다 중계기 속 증폭기와 펌프 레이저가 필요하고, 이 전력은 수천 km 떨어진 해안에서 케이블의 구리 도체 하나로 보내야 한다. 그래서 최근 설계는 쌍당 출력을 조금 낮추고 쌍 수를 늘리는(SDM) 방식으로 같은 전력에서 총 용량을 키운다.</div></div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>빛은 주파수가 약 193 THz로 대역이 매우 넓고, 단일 모드 광섬유의 손실은 1550 nm에서 <b>약 0.2 dB/km</b>로 구리보다 수백 배 작으며, 전자기 간섭을 받지 않는다.</li>
+      <li>광섬유는 굴절률이 조금 높은 <b>코어</b>를 <b>클래딩</b>이 감싼 구조이고, <b>임계각</b>보다 비스듬히 닿은 빛이 <b>전반사</b>로 갇힌다.</li>
+      <li>다중 모드 광섬유는 경로마다 길이가 달라 <b>모드 분산</b>이 크고, 단일 모드도 파장마다 속도가 달라 <b>색 분산</b>이 남는다. 분산은 속도 × 거리를 제한한다.</li>
+      <li>레일리 산란과 적외선 흡수 사이의 골짜기 때문에 <b>850·1310·1550 nm</b> 창을 쓰고, 장거리는 C·L 밴드를 쓴다.</li>
+      <li><b>링크 예산</b>은 송신 출력 − 손실 ≥ 수신 감도 + 여유. 모자라면 <b>EDFA</b>가 빛을 전기 변환 없이 증폭한다.</li>
+      <li><b>WDM</b>은 한 가닥에 수십~100여 개 파장을, <b>코히어런트</b> 광은 위상과 두 편광까지 써서 파장당 수백 Gbps를 실어 한 가닥 수십 Tbps를 만든다.</li>
+      <li>FTTH의 <b>PON</b>은 수동 분배기로 한 가닥을 32~64집이 나눠 쓴다. 하향은 방송, 상향은 시간을 나눠 쓴다(TDMA).</li>
+      <li><b>해저 케이블</b>은 대륙 간 트래픽의 대부분을 나른다. 50~100 km마다 중계기, 해안에서 고전압 직류 급전, 수명 약 25년, 고장의 대부분은 어망과 닻 때문이다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>광섬유가 빛을 코어 안에 가두는 조건으로 옳은 것은?</p><div class="opts">
+        <button class="opt">클래딩의 굴절률이 코어보다 높고, 빛이 경계에 수직으로 닿아야 한다</button>
+        <button class="opt">코어 바깥을 은으로 도금해 거울로 만든다</button>
+        <button class="opt" data-correct>코어의 굴절률이 클래딩보다 높고, 빛이 임계각보다 비스듬히 닿아야 한다</button>
+        <button class="opt">빛의 파장이 코어 지름보다 커야 한다</button>
+      </div><div class="quiz-exp">전반사는 굴절률이 높은 곳에서 낮은 곳으로 갈 때, 임계각 θc = arcsin(n₂/n₁)보다 큰 입사각에서만 일어난다. 거울 반사와 달리 손실이 없다.</div></div>
+      <div class="quiz-q"><p>장거리 통신망이 다중 모드가 아니라 단일 모드 광섬유를 쓰는 주된 이유는?</p><div class="opts">
+        <button class="opt" data-correct>빛의 경로가 하나뿐이라 모드 분산이 없어서, 먼 거리에서도 펄스가 덜 퍼진다</button>
+        <button class="opt">코어가 굵어 빛을 넣기 쉬워서</button>
+        <button class="opt">850 nm 빛을 쓸 수 있어서</button>
+        <button class="opt">구부려도 빛이 새지 않아서</button>
+      </div><div class="quiz-exp">다중 모드는 경로마다 길이가 달라 1 km만 가도 펄스가 크게 퍼진다. 단일 모드는 코어를 9 µm로 가늘게 해 길을 하나만 남긴다. 대신 빛을 넣기 어려워 정밀한 레이저와 커넥터가 필요하다.</div></div>
+      <div class="quiz-q"><p>송신 +2 dBm, 1550 nm 광섬유 80 km(0.2 dB/km), 커넥터 손실 합계 2 dB, 수신 감도 −24 dBm이다. 여유(margin)는?</p><div class="opts">
+        <button class="opt">2 dB</button><button class="opt">−6 dB (부족)</button><button class="opt">18 dB</button><button class="opt" data-correct>8 dB</button>
+      </div><div class="quiz-exp">손실 = 16 + 2 = 18 dB, 수신 전력 = 2 − 18 = −16 dBm. 여유 = −16 − (−24) = 8 dB. 권장 여유 3 dB를 넉넉히 넘는다.</div></div>
+      <div class="quiz-q"><p>EDFA가 장거리 광통신에서 혁명적이었던 이유는?</p><div class="opts">
+        <button class="opt">빛을 전기로 바꿔 오류를 고친 뒤 다시 보내서</button>
+        <button class="opt" data-correct>빛을 전기로 바꾸지 않고 C 밴드의 여러 파장을 한꺼번에 증폭해서</button>
+        <button class="opt">광섬유의 색 분산을 없애서</button>
+        <button class="opt">전원 없이 동작해서</button>
+      </div><div class="quiz-exp">어븀 첨가 광섬유에 펌프 빛을 쏘아 두면 지나가는 1530~1565 nm 빛이 직접 증폭된다. 증폭기 하나가 WDM 채널 전체를 담당하므로 파장을 늘려도 중계기를 바꿀 필요가 없다. 펌프 레이저용 전원은 필요하다.</div></div>
+      <div class="quiz-q"><p>PON에서 상향(집 → 통신국) 전송에 TDMA를 쓰는 이유는?</p><div class="opts">
+        <button class="opt">하향보다 상향이 더 빨라서</button>
+        <button class="opt">분배기가 전기로 신호를 증폭해야 해서</button>
+        <button class="opt">각 집이 자기 전용 광섬유를 가지고 있어서</button>
+        <button class="opt" data-correct>여러 집의 빛이 분배기에서 한 가닥으로 합쳐지므로, 동시에 보내면 겹쳐 버려서</button>
+      </div><div class="quiz-exp">수동 분배기는 빛을 나누고 합치기만 한다. 상향 신호가 겹치지 않도록 OLT가 집마다 보낼 시간대를 정해 준다. 하향은 모든 집에 같은 신호가 가는 방송이다.</div></div>
+      <div class="quiz-q"><p>해저 케이블에 대한 설명으로 <b>틀린</b> 것은?</p><div class="opts">
+        <button class="opt">50~100 km마다 광증폭 중계기가 있다</button>
+        <button class="opt" data-correct>대륙 간 인터넷 트래픽의 대부분은 위성이 나르고, 해저 케이블은 예비용이다</button>
+        <button class="opt">중계기 전력은 해안의 육양국에서 고전압 직류로 공급한다</button>
+        <button class="opt">고장의 대부분은 어망과 닻 같은 사람의 활동 때문이다</button>
+      </div><div class="quiz-exp">대륙 간 트래픽의 95% 이상을 해저 케이블이 나른다. 위성은 용량이 훨씬 작아 케이블이 닿지 않는 곳이나 비상용에 주로 쓰인다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const DEG = Math.PI / 180;
+  // CSS 색 → rgba 문자열 (투명도 조절용)
+  function rgba(c, a) {
+    c = String(c).trim();
+    if (c[0] === "#") {
+      let h = c.slice(1);
+      if (h.length === 3) h = h.split("").map((x) => x + x).join("");
+      const n = parseInt(h.slice(0, 6), 16);
+      return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+    }
+    const m = c.match(/[\d.]+/g);
+    return m ? `rgba(${m[0]},${m[1]},${m[2]},${a})` : c;
+  }
+
+  /* ================================================================ 1. Snell / TIR */
+  let snCv = null;
+  const snRedraw = () => { if (snCv) snCv.redraw(); snStats(); };
+  const snTh = NB.range("sn-th", (v) => v.toFixed(1) + "°", snRedraw);
+  const snN1 = NB.range("sn-n1", (v) => v.toFixed(3), snRedraw);
+  const snN2 = NB.range("sn-n2", (v) => v.toFixed(3), snRedraw);
+  const PRE = { fiber: [1.468, 1.463, 87], glass: [1.5, 1.0, 50], water: [1.333, 1.0, 45] };
+  NB.seg("sn-pre", (v) => { const p = PRE[v]; snN1.set(p[0]); snN2.set(p[1]); snTh.set(p[2]); });
+  function snPhys() {
+    const n1 = snN1(), n2 = snN2(), th = snTh() * DEG;
+    const thc = n2 < n1 ? Math.asin(n2 / n1) : null;
+    const s = (n1 / n2) * Math.sin(th);
+    if (s >= 1) return { n1, n2, th, thc, tir: true, R: 1, tt: null };
+    const tt = Math.asin(s), ci = Math.cos(th), ct = Math.cos(tt);
+    const rs = (n1 * ci - n2 * ct) / (n1 * ci + n2 * ct), rp = (n2 * ci - n1 * ct) / (n2 * ci + n1 * ct);
+    return { n1, n2, th, thc, tir: false, R: (rs * rs + rp * rp) / 2, tt };
+  }
+  function snStats() {
+    const p = snPhys();
+    NB.stat("sn-o-c", p.thc == null ? "<span style='color:var(--bad)'>없음</span>" : (p.thc / DEG).toFixed(2) + "°");
+    NB.stat("sn-o-res", p.tir ? "<span style='color:var(--ok)'>전반사 (100% 되튕김)</span>" : `<span style='color:var(--warn)'>굴절, ${(p.tt / DEG).toFixed(1)}°로 빠져나감</span>`);
+    NB.stat("sn-o-r", (p.R * 100).toFixed(p.R > 0.999 ? 0 : 1) + "%");
+    // 50 µm 코어에서 1 m당 반사 횟수 = 1 / (d·tanθ)
+    const nb = 1 / (50e-6 * Math.tan(p.th));
+    const rem = p.tir ? 1 : Math.pow(p.R, nb);
+    NB.stat("sn-o-1m", p.tir ? "100% <small>(" + NB.kn(nb) + "번 반사)</small>" : (rem < 1e-6 ? "≈ 0%" : (rem * 100).toPrecision(2) + "%") + " <small>(" + NB.kn(nb) + "번)</small>");
+    const na2 = p.n1 * p.n1 - p.n2 * p.n2;
+    NB.stat("sn-o-na", na2 <= 0 ? "—" : na2 >= 1 ? "90° (전부)" : (Math.asin(Math.sqrt(na2)) / DEG).toFixed(1) + "°");
+  }
+  snCv = NB.canvas("#cv-snell", (ctx, w, h) => {
+    const P = NB.palette(), p = snPhys();
+    const wide = w >= 560;
+    const zb = wide ? { x: 0, y: 0, w: w * 0.4, h } : { x: 0, y: 0, w, h: h * 0.5 };
+    const fb = wide ? { x: w * 0.4, y: 0, w: w * 0.6, h } : { x: 0, y: h * 0.5, w, h: h * 0.5 };
+    // ---- zoom panel
+    {
+      const cx = zb.x + zb.w / 2, cy = zb.y + zb.h * 0.5, L = Math.min(zb.w, zb.h) * 0.42;
+      ctx.fillStyle = rgba(P.accent2, 0.1); ctx.fillRect(zb.x, zb.y, zb.w, cy - zb.y);
+      ctx.fillStyle = rgba(P.accent, 0.1); ctx.fillRect(zb.x, cy, zb.w, zb.y + zb.h - cy);
+      ctx.strokeStyle = P.accent2; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(zb.x, cy); ctx.lineTo(zb.x + zb.w, cy); ctx.stroke();
+      NB.text(ctx, "클래딩 n₂ = " + p.n2.toFixed(3), zb.x + 10, zb.y + 16, { size: 11.5, color: P.dim });
+      NB.text(ctx, "코어 n₁ = " + p.n1.toFixed(3), zb.x + 10, zb.y + zb.h - 14, { size: 11.5, color: P.dim });
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = P.faint; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx, cy - L); ctx.lineTo(cx, cy + L); ctx.stroke();
+      if (p.thc != null) { // critical-angle ghost
+        ctx.strokeStyle = rgba(P.warn, 0.7);
+        ctx.beginPath(); ctx.moveTo(cx - L * Math.sin(p.thc), cy + L * Math.cos(p.thc)); ctx.lineTo(cx, cy); ctx.stroke();
+        NB.text(ctx, "θc", cx - L * Math.sin(p.thc) - 4, cy + L * Math.cos(p.thc) + 2, { size: 11, color: P.warn, align: "right" });
+      }
+      ctx.setLineDash([]);
+      const ix = cx - L * Math.sin(p.th), iy = cy + L * Math.cos(p.th);
+      NB.arrow(ctx, ix, iy, cx, cy, { color: P.accent, lw: 3 });
+      // reflected
+      ctx.globalAlpha = Math.max(0.15, p.R);
+      NB.arrow(ctx, cx, cy, cx + L * Math.sin(p.th), cy + L * Math.cos(p.th), { color: P.accent, lw: 1 + 2 * p.R });
+      ctx.globalAlpha = 1;
+      if (!p.tir) {
+        ctx.globalAlpha = Math.max(0.2, 1 - p.R);
+        NB.arrow(ctx, cx, cy, cx + L * Math.sin(p.tt), cy - L * Math.cos(p.tt), { color: P.bad, lw: 1 + 2 * (1 - p.R) });
+        ctx.globalAlpha = 1;
+        NB.text(ctx, "굴절 " + (p.tt / DEG).toFixed(1) + "°", cx + 8, cy - L * 0.8, { size: 11.5, color: P.bad });
+      } else NB.text(ctx, "빠져나갈 수 없음", cx + 8, cy - L * 0.6, { size: 11.5, color: P.ok, bold: true });
+      ctx.strokeStyle = P.text; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, 26, Math.PI / 2, Math.PI / 2 + p.th); ctx.stroke();
+      NB.text(ctx, "θ " + (p.th / DEG).toFixed(1) + "°", cx - 34, cy + 38, { size: 11.5, align: "right", color: P.text });
+    }
+    // ---- fiber panel
+    {
+      const pad = 12, top = fb.y + fb.h * 0.34, bot = fb.y + fb.h * 0.66, x0 = fb.x + pad, x1 = fb.x + fb.w - pad;
+      ctx.fillStyle = rgba(P.accent2, 0.1); ctx.fillRect(x0, fb.y + 8, x1 - x0, top - fb.y - 8); ctx.fillRect(x0, bot, x1 - x0, fb.y + fb.h - 8 - bot);
+      ctx.fillStyle = rgba(P.accent, 0.1); ctx.fillRect(x0, top, x1 - x0, bot - top);
+      ctx.strokeStyle = P.accent2; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x0, top); ctx.lineTo(x1, top); ctx.moveTo(x0, bot); ctx.lineTo(x1, bot); ctx.stroke();
+      NB.text(ctx, "광섬유 속 광선 (가로 1/20로 압축)", x0 + 4, fb.y + 20, { size: 11.5, color: P.dim });
+      const KX = 20; // 가로 압축 배율
+      const ang = Math.atan(Math.tan(Math.PI / 2 - p.th) * KX); // 화면에서의 축 기준 각도
+      let x = x0, y = (top + bot) / 2, dir = -1, I = 1, bounces = 0;
+      const H = bot - top;
+      ctx.lineCap = "round";
+      for (let k = 0; k < 400 && x < x1; k++) {
+        const ty = dir < 0 ? top : bot;
+        const dx = Math.abs(ty - y) / Math.tan(ang);
+        let nx = x + dx, ny = ty, stop = false;
+        if (nx > x1) { ny = y + (dir * (x1 - x)) * Math.tan(ang); nx = x1; stop = true; }
+        ctx.strokeStyle = rgba(P.accent, Math.max(0.06, I)); ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(nx, ny); ctx.stroke();
+        if (stop) break;
+        bounces++;
+        if (!p.tir) { // leak stub
+          const lw = (1 - p.R) * I; const Ls = H * 0.6;
+          ctx.strokeStyle = rgba(P.bad, Math.max(0.05, Math.min(1, lw * 1.5))); ctx.lineWidth = 2;
+          const vx = Math.sin(p.tt) / KX, vy = Math.cos(p.tt), vn = Math.hypot(vx, vy);
+          ctx.beginPath(); ctx.moveTo(nx, ny); ctx.lineTo(nx + (Ls * vx) / vn, ny + (dir * Ls * vy) / vn); ctx.stroke();
+          I *= p.R;
+        }
+        x = nx; y = ny; dir = -dir;
+        if (I < 0.003) { NB.text(ctx, "빛이 거의 사라짐", Math.min(x + 6, x1 - 90), (top + bot) / 2, { size: 11.5, color: P.bad, bold: true }); break; }
+      }
+      NB.text(ctx, "반사 " + bounces + "번 · 남은 빛 " + (I * 100).toFixed(I > 0.01 ? 0 : 2) + "%", x1, fb.y + fb.h - 14, { size: 11.5, align: "right", color: p.tir ? P.ok : P.warn, bold: true });
+    }
+  }, { aspect: 0.48, minHeight: 360, maxHeight: 400 });
+  snStats();
+
+  /* ================================================================ 2. Dispersion */
+  const BITS = [1, 0, 1, 1, 0, 1, 0, 0, 1, 1];
+  let dpCv = null;
+  const dpKm = NB.range("dp-km", (v) => fmtKm(kmOf(v)), () => dpUpd());
+  const dpFib = NB.seg("dp-fib", () => dpUpd());
+  const dpRate = NB.seg("dp-rate", () => dpUpd());
+  function kmOf(v) { return Math.pow(10, -2 + (4.3 * v) / 100); }
+  function fmtKm(k) { return k < 1 ? Math.round(k * 1000) + " m" : (k < 10 ? k.toFixed(1) : Math.round(k)) + " km"; }
+  // ns per km of spread
+  function spreadPerKm(fib, gbps) {
+    if (fib === "si") return 50;
+    if (fib === "gi") return 0.25;
+    const dl = Math.max(0.02, 0.008 * gbps); // nm, signal spectral width
+    return ((fib === "s13" ? 1 : 17) * dl) / 1000; // ps→ns
+  }
+  function dpModel() {
+    const km = kmOf(dpKm()), gbps = Number(dpRate()), T = 1 / gbps; // ns
+    const per = spreadPerKm(dpFib(), gbps), dt = per * km;
+    return { km, gbps, T, per, dt };
+  }
+  function dpWave(m, t, out) {
+    const s0 = (0.5 * m.T) / 2.355, s = out ? Math.sqrt(s0 * s0 + Math.pow(m.dt / 2.355, 2)) : s0, a = s0 / s;
+    let y = 0;
+    for (let k = -3; k < BITS.length + 3; k++) { const b = BITS[(k + BITS.length * 3) % BITS.length]; if (!b) continue; const tk = (k + 0.5) * m.T; y += a * Math.exp(-((t - tk) * (t - tk)) / (2 * s * s)); }
+    return y;
+  }
+  function dpUpd() {
+    const m = dpModel();
+    const smp = BITS.map((_, k) => dpWave(m, (k + 0.5) * m.T, true));
+    const mx = Math.max(...smp), mn = Math.min(...smp), thr = (mx + mn) / 2;
+    const ones = smp.filter((_, k) => BITS[k]), zeros = smp.filter((_, k) => !BITS[k]);
+    const eye = (Math.min(...ones) - Math.max(...zeros)) / Math.max(...ones);
+    const dec = smp.map((v) => (mx - mn < 0.02 ? -1 : v > thr ? 1 : 0));
+    const errs = dec.filter((d, k) => d !== BITS[k]).length;
+    m.thr = thr; m.dec = dec; m.errs = errs; m.eye = eye;
+    NB.stat("dp-o-dt", NB.si(m.dt * 1e-9, "s"));
+    NB.stat("dp-o-t", NB.si(m.T * 1e-9, "s"));
+    NB.stat("dp-o-st", errs > 0 || eye < 0.15 ? `<span style="color:var(--bad)">판독 불가${errs ? " · 오류 " + errs + "비트" : ""}</span>` : eye < 0.5 ? "<span style='color:var(--warn)'>겹침 — 잡음에 취약</span>" : "<span style='color:var(--ok)'>깨끗함</span>");
+    NB.stat("dp-o-max", fmtKm(m.T / m.per));
+    dpCv.m = m; dpCv.redraw();
+  }
+  dpCv = NB.canvas("#cv-disp", (ctx, w, h) => {
+    const P = NB.palette(), m = dpCv && dpCv.m; if (!m) return;
+    const x0 = 16, x1 = w - 16, N = BITS.length, tot = N * m.T;
+    const X = (t) => x0 + (t / tot) * (x1 - x0);
+    const rows = [{ y0: 26, y1: h * 0.42, out: false, lab: "보낸 신호" }, { y0: h * 0.5 + 14, y1: h - 34, out: true, lab: "도착한 신호 · " + fmtKm(m.km) }];
+    rows.forEach((r) => {
+      NB.text(ctx, r.lab, x0, r.y0 - 12, { size: 12, bold: true, color: P.dim });
+      ctx.strokeStyle = P.border; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, r.y1); ctx.lineTo(x1, r.y1); ctx.stroke();
+      const H = r.y1 - r.y0;
+      for (let k = 0; k < N; k++) {
+        const cx = X((k + 0.5) * m.T);
+        ctx.setLineDash([3, 4]); ctx.strokeStyle = P.grid; ctx.beginPath(); ctx.moveTo(cx, r.y0); ctx.lineTo(cx, r.y1); ctx.stroke(); ctx.setLineDash([]);
+        if (!r.out) NB.text(ctx, String(BITS[k]), cx, r.y0 + 2, { align: "center", size: 11, mono: true, color: P.faint });
+      }
+      ctx.beginPath();
+      for (let i = 0; i <= 400; i++) { const t = (i / 400) * tot, v = dpWave(m, t, r.out); const px = X(t), py = r.y1 - Math.min(1.15, v) * H * 0.85; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+      ctx.strokeStyle = r.out ? P.accent2 : P.accent; ctx.lineWidth = 2; ctx.stroke();
+      ctx.lineTo(x1, r.y1); ctx.lineTo(x0, r.y1); ctx.closePath(); ctx.fillStyle = rgba(r.out ? P.accent2 : P.accent, 0.12); ctx.fill();
+      if (r.out) {
+        const ty = r.y1 - m.thr * H * 0.85;
+        ctx.setLineDash([6, 4]); ctx.strokeStyle = P.warn; ctx.beginPath(); ctx.moveTo(x0, ty); ctx.lineTo(x1, ty); ctx.stroke(); ctx.setLineDash([]);
+        m.dec.forEach((d, k) => { const cx = X((k + 0.5) * m.T); const ok = d === BITS[k]; NB.text(ctx, d < 0 ? "?" : String(d), cx, r.y1 + 14, { align: "center", size: 12, mono: true, bold: true, color: ok ? P.ok : P.bad }); });
+      }
+    });
+  }, { aspect: 0.42, minHeight: 280, maxHeight: 340 });
+  dpUpd();
+
+  /* ================================================================ 3. Attenuation spectrum */
+  let atCv = null;
+  const atWl = NB.range("at-wl", (v) => v + " nm", () => atUpd());
+  const atKm = NB.range("at-km", (v) => v + " km", () => atUpd());
+  $("at-low").addEventListener("change", () => atUpd());
+  const BANDS = [["O", 1260, 1360], ["E", 1360, 1460], ["S", 1460, 1530], ["C", 1530, 1565], ["L", 1565, 1625], ["U", 1625, 1675]];
+  const ray = (l) => 0.8 / Math.pow(l / 1000, 4);
+  const ir = (l) => 7.8e11 * Math.exp(-48.48 / (l / 1000));
+  const g = (l, c, s) => Math.exp(-((l - c) * (l - c)) / (2 * s * s));
+  function oh(l, low) { const k = low ? 0.03 : 1; return k * (0.9 * g(l, 1383, 13) + 0.08 * g(l, 1245, 12) + 0.12 * g(l, 950, 14)); }
+  const att = (l, low) => ray(l) + ir(l) + 0.03 + oh(l, low);
+  function bandOf(l) { const b = BANDS.find((b) => l >= b[1] && l < b[2]); if (b) return b[0] + " 밴드"; if (Math.abs(l - 850) < 30) return "850 nm 창"; return "—"; }
+  function atUpd() {
+    const l = atWl(), km = atKm(), low = $("at-low").checked, a = att(l, low), tot = a * km;
+    NB.stat("at-o-a", a.toFixed(3) + " <small>dB/km</small>");
+    NB.stat("at-o-b", bandOf(l));
+    NB.stat("at-o-t", tot.toFixed(1) + " dB");
+    const rem = Math.pow(10, -tot / 10);
+    NB.stat("at-o-p", rem >= 0.001 ? (rem * 100).toPrecision(3) + "%" : rem.toExponential(1).replace("e", "×10^") );
+    atCv.redraw();
+  }
+  atCv = NB.canvas("#cv-att", (ctx, w, h) => {
+    const P = NB.palette(), low = $("at-low").checked, l0 = atWl();
+    const pts = (f) => { const d = []; for (let l = 800; l <= 1700; l += 4) d.push([l, f(l)]); return d; };
+    const narrow = w < 500;
+    const box = { x: narrow ? 44 : 58, y: 26, w: w - (narrow ? 44 : 58) - 14, h: h - 26 - 46 };
+    const bands = BANDS.map((b, i) => ({ x0: b[1], x1: b[2], color: rgba(i % 2 ? P.accent2 : P.accent, 0.07) }));
+    bands[3].color = rgba(P.ok, 0.16); bands[4].color = rgba(P.ok, 0.1);
+    const ch = NB.chart(ctx, box, {
+      x: [800, 1700], y: [0, 2.0], xLabel: "파장 (nm)", yLabel: narrow ? "" : "손실 (dB/km)", bands,
+      series: [
+        { data: pts(ray), color: P.accent2, width: 1.3, dash: [5, 4] },
+        { data: pts(ir), color: P.warn, width: 1.3, dash: [5, 4] },
+        { data: pts((l) => att(l, low)), color: P.accent, width: 2.6 },
+      ],
+      vlines: [{ x: 850, color: P.faint }, { x: 1310, color: P.faint }, { x: 1550, color: P.faint }],
+      points: [{ x: l0, y: Math.min(1.98, att(l0, low)), color: P.bad, r: 5 }],
+    });
+    BANDS.forEach((b) => NB.text(ctx, b[0], ch.X((b[1] + b[2]) / 2), box.y - 10, { align: "center", size: 11, bold: true, color: b[0] === "C" || b[0] === "L" ? P.ok : P.dim }));
+    [[850, "850"], [1310, "1310"], [1550, "1550"]].forEach(([x, t]) => NB.text(ctx, t, ch.X(x) + 3, box.y + 10, { size: 10.5, mono: true, color: P.dim }));
+    if (!narrow) {
+      NB.text(ctx, "레일리 산란 ∝ 1/λ⁴", ch.X(1000), ch.Y(0.42), { size: 11, color: P.accent2 });
+      NB.text(ctx, "적외선 흡수", ch.X(1600), ch.Y(0.55), { size: 11, color: P.warn, align: "right" });
+      if (!low) NB.text(ctx, "물(OH) 흡수", ch.X(1395), ch.Y(1.15), { size: 11, color: P.dim });
+    }
+    const a = att(l0, low);
+    NB.text(ctx, a.toFixed(2) + " dB/km", ch.X(l0) + (l0 > 1500 ? -8 : 8), ch.Y(Math.min(1.9, a)) - 22, { size: 12, bold: true, mono: true, color: P.bad, align: l0 > 1500 ? "right" : "left" });
+  }, { aspect: 0.48, minHeight: 280, maxHeight: 380 });
+  atUpd();
+
+  /* ================================================================ 4. Link budget */
+  let bdCv = null;
+  const bdTx = NB.range("bd-tx", (v) => (v > 0 ? "+" : "") + v + " dBm", () => bdUpd());
+  const bdKm = NB.range("bd-km", (v) => v + " km", () => bdUpd());
+  const bdCon = NB.range("bd-con", (v) => v + "개", () => bdUpd());
+  const bdWl = NB.seg("bd-wl", () => bdUpd());
+  const bdRx = NB.seg("bd-rx", () => bdUpd());
+  $("bd-amp").addEventListener("change", () => bdUpd());
+  const MARGIN = 3;
+  function bdModel() {
+    const tx = bdTx(), km = bdKm(), a = Number(bdWl()) + 0.1 / 4, con = bdCon() * 0.5, sens = Number(bdRx());
+    const fiber = a * km, loss = fiber + con;
+    let amps = 0;
+    if ($("bd-amp").checked) {
+      const avail = tx - sens - MARGIN - con; // 구간마다 쓸 수 있는 광섬유 손실
+      if (avail > 0 && loss > tx - sens - MARGIN) amps = Math.max(0, Math.ceil(fiber / avail) - 1);
+    }
+    const span = km / (amps + 1);
+    // power profile
+    const pts = []; let p = tx - con / 2; pts.push([0, tx], [0, p]);
+    for (let s = 0; s <= amps; s++) {
+      const xs = s * span, xe = (s + 1) * span;
+      p = p - a * span; pts.push([xe, p]);
+      if (s < amps) { p = tx; pts.push([xe, p]); }
+    }
+    const rx = p - con / 2; pts.push([km, rx]);
+    return { tx, km, a, con, sens, loss, amps, rx, pts, span };
+  }
+  function bdUpd() {
+    const m = bdModel(), mg = m.rx - m.sens;
+    NB.stat("bd-o-loss", m.loss.toFixed(1) + " dB" + (m.amps ? " <small>(증폭 " + m.amps + "회)</small>" : ""));
+    NB.stat("bd-o-rx", m.rx.toFixed(1) + " dBm");
+    NB.stat("bd-o-m", `<span style="color:${mg >= MARGIN ? "var(--ok)" : mg >= 0 ? "var(--warn)" : "var(--bad)"}">${mg >= 0 ? "+" : ""}${mg.toFixed(1)} dB</span>`);
+    let v;
+    if (mg >= MARGIN) v = m.amps ? `<span style="color:var(--ok)">통과 · EDFA ${m.amps}대 (구간 ${Math.round(m.span)} km)</span>` : "<span style='color:var(--ok)'>통과 · 증폭기 불필요</span>";
+    else if (mg >= 0) v = "<span style='color:var(--warn)'>아슬아슬 · 여유 부족</span>";
+    else v = $("bd-amp").checked ? "<span style='color:var(--bad)'>실패 · 커넥터 손실이 너무 큼</span>" : "<span style='color:var(--bad)'>실패 · EDFA가 필요</span>";
+    NB.stat("bd-o-v", v);
+    bdCv.m = m; bdCv.redraw();
+  }
+  bdCv = NB.canvas("#cv-bud", (ctx, w, h) => {
+    const P = NB.palette(), m = bdCv && bdCv.m; if (!m) return;
+    const narrow = w < 500;
+    const ymin = Math.min(m.sens - 8, Math.floor(Math.min(...m.pts.map((p) => p[1])) / 5) * 5 - 2);
+    const box = { x: narrow ? 46 : 60, y: 16, w: w - (narrow ? 46 : 60) - 16, h: h - 16 - 46 };
+    const ok = m.rx - m.sens >= MARGIN;
+    const ch = NB.chart(ctx, box, {
+      x: [0, m.km], y: [Math.max(-60, ymin), m.tx + 4], xLabel: "거리 (km)", yLabel: narrow ? "" : "빛의 세기 (dBm)",
+      series: [{ data: m.pts, color: ok ? P.accent : P.bad, width: 2.6, fill: rgba(ok ? P.accent : P.bad, 0.1) }],
+      hlines: [{ y: m.sens, color: P.bad, label: "수신 감도 " + m.sens + " dBm", dash: [6, 4] }, { y: m.sens + MARGIN, color: P.warn, label: "여유 3 dB", dash: [3, 4] }],
+    });
+    for (let s = 1; s <= m.amps; s++) {
+      const x = ch.X(s * m.span), y = ch.Y(m.tx);
+      NB.box(ctx, x - 20, y - 24, 40, 17, { fill: P.ok, stroke: P.ok, text: "EDFA", color: "#fff", size: 10, bold: true, r: 4 });
+    }
+    NB.text(ctx, "송신 " + m.tx + " dBm", box.x + 6, ch.Y(m.tx) - 10, { size: 11, color: P.dim });
+    NB.text(ctx, "수신 " + m.rx.toFixed(1) + " dBm", box.x + box.w - 4, ch.Y(Math.max(m.rx, -59)) + (m.rx > m.sens + 8 ? 16 : -12), { size: 11.5, bold: true, color: ok ? P.accent : P.bad, align: "right" });
+  }, { aspect: 0.42, minHeight: 260, maxHeight: 340 });
+  bdUpd();
+
+  /* ================================================================ 5. WDM */
+  const FMT = [
+    { name: "10G OOK", rate: 10, sp: 50, baud: 10, pts: "ook" },
+    { name: "100G DP-QPSK", rate: 100, sp: 50, baud: 32, pts: 4 },
+    { name: "400G DP-16QAM", rate: 400, sp: 75, baud: 60, pts: 16 },
+    { name: "800G DP-16QAM", rate: 800, sp: 150, baud: 120, pts: 16 },
+  ];
+  const BANDW = { C: [[191.3, 196.1]], CL: [[191.3, 196.1], [186.0, 190.8]] };
+  let wdCv = null;
+  const wdN = NB.range("wd-n", (v) => v + "개", () => wdUpd());
+  const wdFmt = NB.seg("wd-fmt", () => wdLimit());
+  const wdBand = NB.seg("wd-band", () => wdLimit());
+  function wdMax() { const f = FMT[+wdFmt()]; return BANDW[wdBand()].reduce((s, b) => s + Math.floor(Math.round((b[1] - b[0]) * 1000) / f.sp), 0); }
+  function wdLimit() { const mx = wdMax(); const el = wdN.el; const wasMax = Number(el.value) >= Number(el.max); el.max = mx; if (wasMax || Number(el.value) > mx) el.value = mx; wdN.set(Number(el.value)); }
+  function wdChannels() {
+    const f = FMT[+wdFmt()], n = wdN(), out = [];
+    BANDW[wdBand()].forEach((b) => { const k = Math.floor(Math.round((b[1] - b[0]) * 1000) / f.sp); for (let i = 0; i < k; i++) out.push(b[0] + ((i + 0.5) * f.sp) / 1000); });
+    return out.slice(0, n);
+  }
+  function wdUpd() {
+    const f = FMT[+wdFmt()], n = wdN(), cap = n * f.rate;
+    NB.stat("wd-o-sp", f.sp + " GHz <small>(" + (f.sp * 0.008).toFixed(2) + " nm)</small>");
+    NB.stat("wd-o-cap", cap >= 1000 ? (cap / 1000).toFixed(cap >= 10000 ? 1 : 2) + " Tbps" : cap + " Gbps");
+    NB.stat("wd-o-se", (f.rate / f.sp).toFixed(2) + " <small>b/s/Hz</small>");
+    NB.stat("wd-o-4k", NB.kn((cap * 1e9) / 25e6) + "명");
+    wdCv.redraw();
+  }
+  wdCv = NB.canvas("#cv-wdm", (ctx, w, h) => {
+    const P = NB.palette(), f = FMT[+wdFmt()], cl = wdBand() === "CL";
+    const lam = (THz) => 299792.458 / THz; // nm
+    const l0 = 1527, l1 = cl ? 1615 : 1569;
+    const x0 = 14, x1 = w - 14, base = h - 44, top = 70;
+    const X = (l) => x0 + ((l - l0) / (l1 - l0)) * (x1 - x0);
+    ctx.strokeStyle = P.axis; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, base); ctx.lineTo(x1, base); ctx.stroke();
+    for (let l = Math.ceil(l0 / 10) * 10; l <= l1; l += 10) { NB.text(ctx, String(l), X(l), base + 14, { align: "center", size: 10.5, mono: true, color: P.dim }); }
+    NB.text(ctx, "파장 (nm)", (x0 + x1) / 2, base + 32, { align: "center", size: 11.5, color: P.dim });
+    BANDW[wdBand()].forEach((b, i) => { const xa = X(lam(b[1])), xb = X(lam(b[0])); ctx.fillStyle = rgba(P.ok, 0.07); ctx.fillRect(xa, top - 10, xb - xa, base - top + 10); NB.text(ctx, i === 0 ? "C 밴드" : "L 밴드", (xa + xb) / 2, top - 22, { align: "center", size: 11.5, bold: true, color: P.ok }); });
+    const chs = wdChannels();
+    const bw = (f.baud / 1000) * 1.1; // THz occupied
+    chs.forEach((c, i) => {
+      const xa = X(lam(c + bw / 2)), xb = X(lam(c - bw / 2)), xm = (xa + xb) / 2;
+      const col = i % 2 ? P.accent2 : P.accent;
+      ctx.beginPath(); ctx.moveTo(xa, base);
+      const hh = (base - top) * 0.9;
+      if (f.pts === "ook") { ctx.quadraticCurveTo(xm, base - hh * 2, xb, base); }
+      else { const e = Math.max(0.5, (xb - xa) * 0.12); ctx.lineTo(xa + e, base - hh); ctx.lineTo(xb - e, base - hh); ctx.lineTo(xb, base); }
+      ctx.closePath(); ctx.fillStyle = rgba(col, 0.55); ctx.fill();
+    });
+    // constellation inset
+    const s = 46, cx = x1 - s / 2 - 4, cy = 26;
+    NB.rrect(ctx, cx - s / 2 - 4, cy - s / 2 + 2, s + 8, s + 4, 6); ctx.fillStyle = P.bg; ctx.fill(); ctx.strokeStyle = P.border; ctx.stroke();
+    ctx.fillStyle = P.accent;
+    const dots = f.pts === "ook" ? [[-0.2, 0], [0.8, 0]] : f.pts === 4 ? [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => [a * 0.55, b * 0.55]) : [].concat(...[-3, -1, 1, 3].map((a) => [-3, -1, 1, 3].map((b) => [a / 4, b / 4])));
+    dots.forEach(([a, b]) => { ctx.beginPath(); ctx.arc(cx + a * s * 0.45, cy + 2 + b * s * 0.45, 2.6, 0, 7); ctx.fill(); });
+    NB.text(ctx, f.name, cx - s / 2 - 10, cy + 2, { align: "right", size: 11.5, bold: true, color: P.text });
+  }, { aspect: 0.36, minHeight: 230, maxHeight: 300 });
+  wdLimit();
+
+  /* ================================================================ 6. PON */
+  const TECH = { g: { n: "GPON", d: 2.488, u: 1.244, bud: 28 }, x: { n: "XGS-PON", d: 9.953, u: 9.953, bud: 29 }, f: { n: "50G-PON", d: 50, u: 25, bud: 29 } };
+  let pnCv = null, pnT = 0;
+  const pnAct = NB.range("pn-act", (v) => v + "%", () => pnUpd());
+  const pnTech = NB.seg("pn-tech", () => pnUpd());
+  const pnSplit = NB.seg("pn-split", () => pnUpd());
+  const pnDir = NB.seg("pn-dir", () => { pnT = 0; });
+  const rate = (g) => (g >= 1 ? (g >= 10 ? g.toFixed(0) : g.toFixed(2)) + " Gbps" : Math.round(g * 1000) + " Mbps");
+  function pnUpd() {
+    const t = TECH[pnTech()], N = Number(pnSplit()), act = Math.max(1, Math.round((N * pnAct()) / 100));
+    const loss = 10 * Math.log10(N) * 1.1 + 0.5;
+    NB.stat("pn-o-d", rate((t.d * 0.9) / act));
+    NB.stat("pn-o-u", rate((t.u * 0.9) / act));
+    NB.stat("pn-o-l", loss.toFixed(1) + " dB");
+    const km = (t.bud - loss - 1) / 0.35;
+    NB.stat("pn-o-km", km > 0 ? "약 " + Math.round(km) + " km" : "<span style='color:var(--bad)'>불가</span>");
+  }
+  pnCv = NB.canvas("#cv-pon", (ctx, w, h) => {
+    const P = NB.palette(), N = Number(pnSplit()), down = pnDir() === "down";
+    const ox = 12, ow = Math.min(80, w * 0.16), sx = w * 0.42, cy = h / 2;
+    NB.box(ctx, ox, cy - 22, ow, 44, { fill: P.accent, stroke: P.accent, text: "OLT", color: "#fff", bold: true, size: 13 });
+    ctx.strokeStyle = P.accent2; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(ox + ow, cy); ctx.lineTo(sx, cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx, cy - 14); ctx.lineTo(sx + 22, cy); ctx.lineTo(sx, cy + 14); ctx.closePath(); ctx.fillStyle = rgba(P.accent2, 0.3); ctx.fill(); ctx.strokeStyle = P.accent2; ctx.lineWidth = 1.5; ctx.stroke();
+    NB.text(ctx, "1:" + N, sx + 11, cy - 24, { align: "center", size: 11.5, bold: true, color: P.accent2 });
+    // ONTs grid
+    const cols = N <= 32 ? 1 : N <= 64 ? 2 : 4, rows = Math.ceil(N / cols);
+    const gx0 = w * 0.72, gx1 = w - 14, gy0 = 10, gy1 = h - 28;
+    const dy = (gy1 - gy0) / rows, dx = cols > 1 ? (gx1 - gx0) / (cols - 1) : 0, r = Math.max(2, Math.min(6, dy * 0.32));
+    const pos = (i) => [gx0 + (i % cols) * dx, gy0 + (Math.floor(i / cols) + 0.5) * dy];
+    const act = Math.max(1, Math.round((N * pnAct()) / 100));
+    ctx.lineWidth = 0.6; ctx.strokeStyle = rgba(P.accent2, 0.35);
+    for (let i = 0; i < N; i++) { const [x, y] = pos(i); ctx.beginPath(); ctx.moveTo(sx + 22, cy); ctx.lineTo(x, y); ctx.stroke(); }
+    const cyc = 2.4; const ph = (pnT % cyc) / cyc;
+    if (down) {
+      // feeder → splitter then broadcast to all
+      if (ph < 0.45) { const x = NB.lerp(ox + ow, sx, ph / 0.45); NB.box(ctx, x - 8, cy - 7, 16, 14, { fill: P.accent, stroke: P.accent, r: 3 }); }
+      else { const f = (ph - 0.45) / 0.55; for (let i = 0; i < N; i++) { const [x, y] = pos(i); ctx.fillStyle = P.accent; ctx.beginPath(); ctx.arc(NB.lerp(sx + 22, x, f), NB.lerp(cy, y, f), Math.max(1.6, r * 0.6), 0, 7); ctx.fill(); } }
+      NB.text(ctx, "하향: 같은 빛이 모든 집으로", (ox + sx) / 2, h - 12, { align: "center", size: 11, color: P.dim });
+    } else {
+      const slot = Math.floor((pnT / 0.5)) % act; const f = (pnT % 0.5) / 0.5; // 한 집씩 차례
+      const idx = Math.floor((slot * N) / act);
+      const [x, y] = pos(idx);
+      if (f < 0.55) { const g = f / 0.55; NB.box(ctx, NB.lerp(x, sx + 22, g) - 7, NB.lerp(y, cy, g) - 6, 14, 12, { fill: P.accent2, stroke: P.accent2, r: 3 }); }
+      else { const g = (f - 0.55) / 0.45; NB.box(ctx, NB.lerp(sx, ox + ow, g) - 7, cy - 6, 14, 12, { fill: P.accent2, stroke: P.accent2, r: 3 }); }
+      NB.text(ctx, "상향: 정해진 시간에 한 집씩", (ox + sx) / 2, h - 12, { align: "center", size: 11, color: P.dim });
+      pnCv.cur = idx;
+    }
+    for (let i = 0; i < N; i++) {
+      const [x, y] = pos(i); const on = Math.floor((i * act) / N) !== Math.floor(((i + 1) * act) / N) || act >= N;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = !down && pnCv.cur === i ? P.accent2 : on ? P.ok : P.surface; ctx.fill(); ctx.strokeStyle = P.border; ctx.lineWidth = 1; ctx.stroke();
+    }
+    NB.text(ctx, "집(ONT) " + N + " · 사용 중 " + act, w - 10, h - 12, { align: "right", size: 11, color: P.dim });
+  }, { aspect: 0.42, minHeight: 240, maxHeight: 320 });
+  NB.loop($("cv-pon"), (dt) => { pnT += dt; pnCv.redraw(); });
+  pnUpd();
+})();
+</script>
+</body>
+</html>

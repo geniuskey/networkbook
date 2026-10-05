@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>Wi-Fi와 근거리 무선 · NetworkBook</title>
+<meta name="description" content="공유기 안의 AP·라우터·스위치, Wi-Fi 연결 과정, 802.11 세대별 속도, 2.4/5/6 GHz 채널과 간섭, CSMA/CA 충돌 회피, 표시 속도와 실제 속도의 차이, 거리·벽에 따른 속도 계단, Wi-Fi 6/7의 OFDMA·MLO, 블루투스·NFC·UWB·Zigbee·LoRa 비교를 시뮬레이터로 익힌다.">
+<link rel="canonical" href="https://networkbook.euiyun.com/chapters/wifi.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="NetworkBook">
+<meta property="og:title" content="Wi-Fi와 근거리 무선 · NetworkBook">
+<meta property="og:description" content="공유기 안의 AP·라우터·스위치, Wi-Fi 연결 과정, 802.11 세대별 속도, 2.4/5/6 GHz 채널과 간섭, CSMA/CA 충돌 회피, 표시 속도와 실제 속도의 차이, 거리·벽에 따른 속도 계단, Wi-Fi 6/7의 OFDMA·MLO, 블루투스·NFC·UWB·Zigbee·LoRa 비교를 시뮬레이터로 익힌다.">
+<meta property="og:url" content="https://networkbook.euiyun.com/chapters/wifi.html">
+<meta property="og:image" content="https://networkbook.euiyun.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"Wi-Fi와 근거리 무선","name":"Wi-Fi와 근거리 무선 · NetworkBook","url":"https://networkbook.euiyun.com/chapters/wifi.html","mainEntityOfPage":"https://networkbook.euiyun.com/chapters/wifi.html","inLanguage":"ko","isAccessibleForFree":true,"learningResourceType":"interactive textbook chapter","position":13,"image":"https://networkbook.euiyun.com/og.png","dateModified":"2026-10-05","isPartOf":{"@type":"Book","@id":"https://networkbook.euiyun.com/#book","name":"NetworkBook — 인터랙티브 네트워크 교과서","url":"https://networkbook.euiyun.com/"},"publisher":{"@type":"Organization","name":"NetworkBook","url":"https://networkbook.euiyun.com/"},"description":"공유기 안의 AP·라우터·스위치, Wi-Fi 연결 과정, 802.11 세대별 속도, 2.4/5/6 GHz 채널과 간섭, CSMA/CA 충돌 회피, 표시 속도와 실제 속도의 차이, 거리·벽에 따른 속도 계단, Wi-Fi 6/7의 OFDMA·MLO, 블루투스·NFC·UWB·Zigbee·LoRa 비교를 시뮬레이터로 익힌다."},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"NetworkBook","item":"https://networkbook.euiyun.com/"},{"@type":"ListItem","position":2,"name":"13 Wi-Fi와 근거리 무선","item":"https://networkbook.euiyun.com/chapters/wifi.html"}]}]}</script>
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .wf-tbl td:first-child { white-space: nowrap; font-weight: 700; }
+  .wf-tbl td.num { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+  .wf-tbl tr.hl td { background: var(--accent-soft); }
+</style>
+</head>
+<body data-chapter="wifi">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 13</div>
+    <h1>Wi-Fi와 근거리 무선</h1>
+    <p class="lead">카페에서 노트북을 켜면 이름 모를 Wi-Fi가 수십 개 뜬다. 공유기 상자에는 “최대 5.7 Gbps”라고 적혀 있는데 속도 측정을 해 보면 그 절반도 안 나온다. 거실에서는 빠르던 인터넷이 방문 하나만 닫으면 느려진다. 한편 이어폰은 블루투스로, 지하철 개찰구는 교통카드로, 스마트 태그는 UWB로 각자 다른 전파를 쓴다. 이 장에서는 11장의 전파와 12장의 변조가 우리 집 공유기와 주머니 속 기기에서 실제로 어떻게 쓰이는지 따라간다.</p>
+    <ul class="objectives">
+      <li>공유기 안의 AP·라우터·스위치·모뎀의 역할을 구분하고, 휴대폰이 Wi-Fi에 붙는 과정(스캔 → 인증 → 연결 → 4-way 핸드셰이크 → DHCP)을 설명한다.</li>
+      <li>802.11b부터 Wi-Fi 7(802.11be)까지 대역·채널 폭·변조·속도가 어떻게 늘어났는지 안다.</li>
+      <li>2.4 GHz에서 1·6·11번 채널만 쓰라고 하는 이유를 스펙트럼 그림으로 이해하고, 이웃 AP와의 간섭을 줄이는 채널을 고른다.</li>
+      <li>CSMA/CA의 “듣고 말하기”, 백오프, ACK, 숨은 노드 문제와 RTS/CTS를 시뮬레이터로 체험한다.</li>
+      <li>표시된 링크 속도와 실제 처리율의 차이를 오버헤드·반이중·공유 매체로 계산한다.</li>
+      <li>거리와 벽이 RSSI → MCS → 속도를 계단처럼 떨어뜨리는 과정을 링크 버짓으로 따라간다.</li>
+      <li>블루투스·NFC·UWB·Zigbee/Thread·LoRa/NB-IoT를 거리·속도·전력으로 비교하고 쓰임새에 맞게 고른다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="router">
+    <h2>공유기 상자 안의 네 가지 장비</h2>
+    <p>집에 있는 “공유기”는 사실 한 장비가 아니라 서로 다른 일을 하는 네 장비를 한 상자에 넣은 것이다. 각자의 일을 구분해 두면 문제가 생겼을 때 어디를 의심해야 할지 알 수 있다.</p>
+    <ul>
+      <li><b>모뎀/ONT</b>: 통신사 선로의 신호(광신호, 케이블 신호)를 이더넷 신호로 바꾼다(4·5장). 한국 가정은 광랜이 대부분이라 벽의 광 단자나 통신사가 준 ONT가 이 역할을 한다.</li>
+      <li><b>라우터</b>: 집 안 사설망과 인터넷 사이의 관문이다. NAT로 공인 IP 하나를 나눠 쓰게 하고, DHCP로 기기마다 사설 IP를 나눠 준다(7장).</li>
+      <li><b>스위치</b>: 뒷면의 LAN 포트 4개 정도를 묶어, 유선 기기끼리 MAC 주소를 보고 프레임을 전달한다(6장).</li>
+      <li><b><span class="term">액세스 포인트</span><span class="en">(AP, access point)</span></b>: 무선 쪽 문지기다. 전파로 받은 Wi-Fi 프레임을 이더넷 프레임으로 바꿔 스위치·라우터로 넘기고, 그 반대도 한다. Wi-Fi는 이더넷의 “무선 버전 마지막 구간”인 셈이다.</li>
+    </ul>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 300" style="min-width:600px" role="img" aria-label="공유기 내부의 모뎀, 라우터, 스위치, AP">
+        <defs><marker id="wf-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <rect x="10" y="110" width="96" height="70" rx="10" class="f-surface"/><text x="58" y="138" text-anchor="middle" class="t" style="font-weight:700">광 단자</text><text x="58" y="158" text-anchor="middle" class="t-mono">ONT/모뎀</text>
+        <path d="M106 145 H150" class="s-acc" marker-end="url(#wf-a)"/><text x="128" y="134" text-anchor="middle" class="t-mono">WAN</text>
+        <rect x="150" y="24" width="440" height="256" rx="16" fill="none" stroke="var(--border)" stroke-dasharray="6 5" stroke-width="1.5"/>
+        <text x="370" y="46" text-anchor="middle" class="t-dim">공유기 한 상자 (가정용 “무선 라우터”)</text>
+        <rect x="170" y="100" width="130" height="90" rx="12" class="f-acc-soft"/><text x="235" y="128" text-anchor="middle" class="t" style="font-weight:700">라우터</text><text x="235" y="148" text-anchor="middle" class="t-mono">NAT · DHCP</text><text x="235" y="166" text-anchor="middle" class="t-mono">방화벽</text>
+        <path d="M300 145 H340" class="s-acc" marker-end="url(#wf-a)" marker-start="url(#wf-a)"/>
+        <rect x="340" y="100" width="110" height="90" rx="12" class="f-elev"/><text x="395" y="128" text-anchor="middle" class="t" style="font-weight:700">스위치</text><text x="395" y="148" text-anchor="middle" class="t-mono">MAC 학습</text><text x="395" y="166" text-anchor="middle" class="t-mono">LAN 1~4</text>
+        <path d="M450 130 H480" class="s-acc" marker-end="url(#wf-a)" marker-start="url(#wf-a)"/>
+        <rect x="480" y="66" width="96" height="100" rx="12" class="f-acc2-soft"/><text x="528" y="98" text-anchor="middle" class="t" style="font-weight:700">AP</text><text x="528" y="118" text-anchor="middle" class="t-mono">무선 ↔ 이더넷</text><text x="528" y="136" text-anchor="middle" class="t-mono">2.4/5/6 GHz</text>
+        <path d="M512 66 V40 M544 66 V40" stroke="var(--accent-2)" stroke-width="3" stroke-linecap="round"/>
+        <path d="M395 190 V236 H300" class="s-acc" marker-end="url(#wf-a)"/>
+        <rect x="200" y="216" width="100" height="44" rx="10" class="f-surface"/><text x="250" y="243" text-anchor="middle" class="t">데스크톱 (유선)</text>
+        <g fill="none" stroke="var(--accent-2)" stroke-width="2" opacity=".75"><path d="M600 92 q14 24 0 48"/><path d="M614 80 q22 36 0 72"/><path d="M628 68 q30 48 0 96"/></g>
+        <rect x="660" y="50" width="120" height="44" rx="10" class="f-surface"/><text x="720" y="77" text-anchor="middle" class="t">휴대폰</text>
+        <rect x="660" y="110" width="120" height="44" rx="10" class="f-surface"/><text x="720" y="137" text-anchor="middle" class="t">노트북</text>
+        <rect x="660" y="170" width="120" height="44" rx="10" class="f-surface"/><text x="720" y="197" text-anchor="middle" class="t">TV · 스피커</text>
+        <text x="720" y="240" text-anchor="middle" class="t-dim">SSID “Home_5G”</text>
+        <text x="720" y="258" text-anchor="middle" class="t-dim">비컨 약 0.1초마다</text>
+      </svg></div>
+      <figcaption><b>그림 13-1.</b> 공유기 한 상자 안의 역할 분담. 휴대폰 → AP(무선) → 스위치 → 라우터(NAT) → 모뎀/ONT → 통신사. 메시 Wi-Fi의 “노드”나 회사 천장의 AP는 이 중 AP 역할만 따로 떼어 낸 장비다.</figcaption>
+    </figure>
+    <h3>휴대폰이 Wi-Fi에 붙기까지</h3>
+    <p>AP는 약 0.1초(102.4 ms)마다 “나 여기 있어요”라는 <span class="term">비컨</span><span class="en">(beacon)</span> 프레임을 방송한다. 비컨에는 네트워크 이름인 <span class="term">SSID</span><span class="en">(Service Set Identifier)</span>, 지원 속도, 보안 방식, 채널 정보가 들어 있다. 휴대폰의 Wi-Fi 목록은 주변 채널을 돌며 들은 비컨(또는 직접 “누구 있어요?”라고 묻는 프로브 요청에 대한 응답)을 모은 것이다. 이름을 고른 뒤에는 다음 순서로 연결된다.</p>
+    <div class="flow">
+      <div><b>스캔</b>채널을 돌며 비컨을 듣거나 프로브 요청을 보내 AP 목록을 만든다.</div>
+      <div><b>인증</b>예전엔 형식적인 “개방형 인증”, WPA3에서는 비밀번호를 직접 보내지 않고 증명하는 SAE 교환.</div>
+      <div><b>연결</b>연결 요청(association)으로 지원 기능을 맞추고 AP가 기기 번호(AID)를 준다.</div>
+      <div><b>4-way 핸드셰이크</b>난수 2개를 주고받아 이번 연결에만 쓸 암호 키를 양쪽이 각자 계산한다.</div>
+      <div><b>DHCP</b>라우터에게 IP 주소·게이트웨이·DNS를 받는다(7장). 이제 인터넷이 된다.</div>
+    </div>
+    <p><span class="term">4-way 핸드셰이크</span><span class="en">(4-way handshake)</span>의 요점은 <b>비밀번호가 전파로 나가지 않는다</b>는 것이다. AP와 휴대폰은 같은 비밀번호에서 만든 마스터 키를 이미 갖고 있고, 서로 보낸 난수(ANonce, SNonce)를 섞어 이번 세션 키를 계산한다. 메시지 끝에 붙은 검증 코드(MIC)로 “나도 같은 키를 가졌다”만 증명한다. 엿듣는 사람은 난수만 보게 된다. 다만 WPA2에서는 이 교환을 녹음해 두고 비밀번호를 집에서 무한히 대입해 볼 수 있었기 때문에, WPA3은 SAE로 이를 막았다(22장).</p>
+    <div class="callout analogy"><strong>아파트 단지의 경비실</strong><p>AP는 단지 입구의 경비실이다. 경비실은 0.1초마다 “여기는 ○○아파트입니다”라는 안내 방송(비컨)을 한다. 방문자(휴대폰)는 방송을 듣고 들어갈 단지를 고르고, 출입 확인(인증·4-way)을 거쳐 출입증(암호 키)을 받고, 관리사무소(라우터의 DHCP)에서 동·호수(IP 주소)를 배정받는다. 그 뒤의 택배 상자는 경비실을 거쳐 우편실(스위치)과 물류 허브(라우터)로 나간다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="standards">
+    <h2>802.11의 세대: b에서 Wi-Fi 7까지</h2>
+    <p>Wi-Fi의 공식 이름은 IEEE <b>802.11</b> 표준이다. 1999년 11 Mbps에서 시작해 25년 만에 수천 배 빨라졌다. 속도를 올린 방법은 12장에서 본 세 가지 손잡이를 돌린 것뿐이다. <b>채널 폭</b>(도로 폭)을 넓히고, <b>변조</b>를 촘촘하게(한 심볼에 더 많은 비트) 하고, <b>공간 스트림</b>(MIMO로 같은 주파수에 여러 줄)을 늘렸다. 2018년부터 Wi-Fi Alliance는 외우기 어려운 이름 대신 Wi-Fi 4·5·6·7이라는 세대 번호를 붙였다.</p>
+    <div class="table-wrap"><table class="wf-tbl">
+      <thead><tr><th>이름</th><th>표준</th><th>등장</th><th>대역</th><th>최대 채널 폭</th><th>최대 변조</th><th>최대 스트림</th><th>이론 최대</th><th>흔한 2×2 기기</th></tr></thead>
+      <tbody>
+        <tr><td>—</td><td>802.11b</td><td class="num">1999</td><td>2.4 GHz</td><td class="num">22 MHz</td><td>CCK(DSSS)</td><td class="num">1</td><td class="num">11 Mbps</td><td class="num">11 Mbps</td></tr>
+        <tr><td>—</td><td>802.11a</td><td class="num">1999</td><td>5 GHz</td><td class="num">20 MHz</td><td>64-QAM (OFDM)</td><td class="num">1</td><td class="num">54 Mbps</td><td class="num">54 Mbps</td></tr>
+        <tr><td>—</td><td>802.11g</td><td class="num">2003</td><td>2.4 GHz</td><td class="num">20 MHz</td><td>64-QAM (OFDM)</td><td class="num">1</td><td class="num">54 Mbps</td><td class="num">54 Mbps</td></tr>
+        <tr><td>Wi-Fi 4</td><td>802.11n</td><td class="num">2009</td><td>2.4 / 5 GHz</td><td class="num">40 MHz</td><td>64-QAM</td><td class="num">4</td><td class="num">600 Mbps</td><td class="num">300 Mbps</td></tr>
+        <tr><td>Wi-Fi 5</td><td>802.11ac</td><td class="num">2013</td><td>5 GHz</td><td class="num">160 MHz</td><td>256-QAM</td><td class="num">8</td><td class="num">6.9 Gbps</td><td class="num">867 Mbps (80 MHz)</td></tr>
+        <tr><td>Wi-Fi 6</td><td>802.11ax</td><td class="num">2019~</td><td>2.4 / 5 GHz</td><td class="num">160 MHz</td><td>1024-QAM</td><td class="num">8</td><td class="num">9.6 Gbps</td><td class="num">1.2~2.4 Gbps</td></tr>
+        <tr><td>Wi-Fi 6E</td><td>802.11ax</td><td class="num">2020~</td><td>+ 6 GHz</td><td class="num">160 MHz</td><td>1024-QAM</td><td class="num">8</td><td class="num">9.6 Gbps</td><td class="num">2.4 Gbps</td></tr>
+        <tr class="hl"><td>Wi-Fi 7</td><td>802.11be</td><td class="num">2024~</td><td>2.4 / 5 / 6 GHz</td><td class="num">320 MHz</td><td>4096-QAM</td><td class="num">16</td><td class="num">약 46 Gbps</td><td class="num">5.8 Gbps (320 MHz)</td></tr>
+      </tbody>
+    </table></div>
+    <p>“이론 최대”는 표준이 허용하는 최대 스트림을 다 쓴 값이라 실제 제품과는 거리가 멀다. 휴대폰은 안테나 공간과 배터리 때문에 보통 <b>2×2</b>(스트림 2개)이므로 오른쪽 끝 열이 현실적인 상한이다. 예를 들어 Wi-Fi 6 160 MHz 2×2 링크 속도 2,402 Mbps는 이렇게 나온다: 데이터 부반송파 1,960개 × 10비트(1024-QAM) × 부호율 5/6 × 2스트림 ÷ 심볼 13.6 µs. 12장의 OFDM 식 그대로다.</p>
+    <div class="callout tip"><strong>6 GHz가 왜 반가운가</strong><p>2.4 GHz와 5 GHz는 이미 너무 붐빈다. 한국은 2020년 5,925~7,125 MHz의 <b>1.2 GHz 폭</b>을 비면허 Wi-Fi용으로 세계에서 가장 먼저 개방한 나라 중 하나다. 이 대역에는 옛날 기기가 아예 없어서 구형 기기를 배려하는 느린 프레임이 없고, 320 MHz 채널도 여기서만 가능하다. 대신 주파수가 높아 벽을 더 못 뚫는다(아래 거리 시뮬레이터).</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="channels">
+    <h2>채널과 간섭: 1·6·11번만 쓰라는 이유</h2>
+    <p>Wi-Fi 대역은 여러 <b>채널</b>로 나뉜다. 2.4 GHz에서는 채널 번호가 5 MHz 간격(1번 = 2,412 MHz, 2번 = 2,417 MHz …, 한국은 13번까지)인데, 정작 Wi-Fi 신호 하나는 폭이 약 20 MHz다. 그래서 인접한 채널끼리는 스펙트럼이 겹치고, <b>서로 완전히 겹치지 않는 채널은 1·6·11번(또는 1·5·9·13) 세 개 남짓</b>뿐이다.</p>
+    <p>직관과 반대되는 사실이 하나 있다. 이웃이 1번과 6번을 쓰고 있을 때 “사이의 3번은 비어 있겠지”라며 3번을 고르면 오히려 <b>더 나쁘다</b>. 같은 채널(1번)의 이웃끼리는 서로의 프레임 머리를 해독할 수 있어 차례를 지키며 나눠 쓴다(아래 CSMA/CA). 반면 반쯤 겹치는 채널의 신호는 해독되지 않는 “잡음”으로 들어와, 내 프레임이 날아가는 도중에 끼어들어 깨뜨린다. 시간을 나눠 쓰는 손해보다 받는 쪽 SNR이 무너지는 손해가 더 크다.</p>
+    <div class="sim" id="sim-ch">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>아파트 2.4 GHz 채널 고르기</h3></div>
+      <div class="sim-view"><canvas id="cv-ch"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>내 AP 채널 <output id="ch-my-out"></output></span><input type="range" id="ch-my" min="1" max="13" value="3"></label>
+        <div class="ctrl"><span>채널 폭</span><div class="seg" id="ch-w"><button data-value="20" class="on">20 MHz</button><button data-value="40">40 MHz</button></div></div>
+        <div class="ctrl"><span>이웃들의 사용량</span><div class="seg" id="ch-load"><button data-value="1" class="on">한산한 낮</button><button data-value="2">저녁 피크</button></div></div>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn primary" id="ch-auto">가장 좋은 채널 찾기</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">같은 채널 이웃 (시간 나눠 씀)</span><span class="v" id="o-ch-co">—</span></div>
+        <div class="stat"><span class="k">일부 겹치는 이웃 (잡음이 됨)</span><span class="v" id="o-ch-adj">—</span></div>
+        <div class="stat"><span class="k">간섭 손실</span><span class="v" id="o-ch-score">—</span></div>
+        <div class="stat"><span class="k">예상 처리율</span><span class="v" id="o-ch-tp">—</span></div>
+      </div>
+      <div class="sim-note">혹 하나가 AP 하나의 스펙트럼이다(높이 = 우리 집에서 들리는 세기). 내 AP는 파랑, 같은 채널 이웃은 주황, 일부만 겹쳐 잡음이 되는 이웃은 빨강으로 칠해진다. 해볼 것: ① 3번과 1번을 비교해 보자. ② 40 MHz로 넓히면 이론 속도는 두 배지만 겹치는 이웃도 늘어난다. 2.4 GHz에서 40 MHz를 잘 쓰지 않는 이유다. 단순화: 내 기기의 신호는 −50 dBm으로 고정, 같은 채널 이웃은 그 사용률만큼 내 공중 시간을 빼앗고, 겹치는 이웃은 내 프레임과 겹치는 순간 프레임을 깨뜨린다(공유기는 빠른 속도로 보내다 깨지는 쪽과 간섭을 견디는 느린 속도 중 나은 쪽을 고른다)고 보았다.</div>
+    </div>
+    <p>5 GHz와 6 GHz는 사정이 훨씬 낫다. 채널이 처음부터 20 MHz 간격으로 겹치지 않게 놓여 있고, 5 GHz에 20 MHz 채널이 20개 남짓, 6 GHz에는 59개가 있다. 이웃한 20 MHz 채널을 붙여 쓰는 것을 <span class="term">채널 본딩</span><span class="en">(channel bonding)</span>이라 하는데, 40 → 80 → 160 → 320 MHz로 넓힐수록 속도는 비례해 늘지만 쓸 수 있는 채널 개수는 반씩 줄고 이웃과 겹칠 확률은 커진다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 256" style="min-width:600px" role="img" aria-label="6 GHz에서 20 MHz 채널을 묶어 40, 80, 160, 320 MHz 채널을 만드는 모습">
+        <text x="20" y="22" class="t" style="font-weight:700">6 GHz 대역의 일부 (20 MHz 칸 16개 = 320 MHz)</text>
+        <g class="t-mono">
+          <text x="20" y="56">20 MHz</text><text x="20" y="96">40 MHz</text><text x="20" y="136">80 MHz</text><text x="20" y="176">160 MHz</text><text x="20" y="216">320 MHz</text>
+        </g>
+        <g>
+          <rect x="100" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="142" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="184" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="226" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="268" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="310" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="352" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="394" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="436" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="478" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="520" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="562" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="604" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="646" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="688" y="40" width="40" height="24" rx="4" class="f-surface"/><rect x="730" y="40" width="40" height="24" rx="4" class="f-surface"/>
+          <rect x="100" y="80" width="82" height="24" rx="4" class="f-acc-soft"/><rect x="184" y="80" width="82" height="24" rx="4" class="f-acc-soft"/><rect x="268" y="80" width="82" height="24" rx="4" class="f-acc-soft"/><rect x="352" y="80" width="82" height="24" rx="4" class="f-acc-soft"/><rect x="436" y="80" width="82" height="24" rx="4" class="f-acc-soft"/><rect x="520" y="80" width="82" height="24" rx="4" class="f-acc-soft"/><rect x="604" y="80" width="82" height="24" rx="4" class="f-acc-soft"/><rect x="688" y="80" width="82" height="24" rx="4" class="f-acc-soft"/>
+          <rect x="100" y="120" width="166" height="24" rx="4" class="f-acc-soft"/><rect x="268" y="120" width="166" height="24" rx="4" class="f-acc-soft"/><rect x="436" y="120" width="166" height="24" rx="4" class="f-acc-soft"/><rect x="604" y="120" width="166" height="24" rx="4" class="f-acc-soft"/>
+          <rect x="100" y="160" width="334" height="24" rx="4" class="f-acc2-soft"/><rect x="436" y="160" width="334" height="24" rx="4" class="f-acc2-soft"/>
+          <rect x="100" y="200" width="670" height="24" rx="4" class="f-acc2-soft"/>
+        </g>
+        <g class="t-mono" text-anchor="middle">
+          <text x="120" y="56">287M</text>
+          <text x="141" y="96">574 Mbps</text>
+          <text x="183" y="136">1.2 Gbps</text>
+          <text x="267" y="176">2.4 Gbps (Wi-Fi 6)</text><text x="603" y="176">2.4 Gbps (Wi-Fi 6)</text>
+          <text x="435" y="216">320 MHz 하나 · 2×2 Wi-Fi 7 약 5.8 Gbps</text>
+        </g>
+        <text x="20" y="244" class="t-dim">칸 안 숫자: 2×2 단말의 최대 링크 속도(Wi-Fi 6 기준, 1024-QAM 5/6). 20 MHz 칸은 16개, 40 MHz는 8개, 80 MHz는 4개.</text>
+      </svg></div>
+      <figcaption><b>그림 13-2.</b> 채널 본딩. 폭을 두 배로 하면 부반송파가 두 배가 되어 속도도 약 두 배가 된다. 하지만 같은 대역에서 동시에 쓸 수 있는 채널 수는 반으로 줄어, 옆집과 같은 칸을 쓸 확률이 커진다. 또 잡음 바닥이 3 dB 올라가므로 먼 거리에서는 이득이 줄어든다.</figcaption>
+    </figure>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">이웃 AP들이 1번과 6번 채널을 많이 쓰고 있다. 내 AP를 어디에 두는 편이 나을까?</p><p class="wi-hint">채널 고르기 시뮬레이터에서 3번과 1번의 예상 처리율을 비교해 보자.</p><div class="opts">
+      <button class="opt">비어 보이는 3번 — 아무도 정확히 그 채널을 쓰지 않으니까</button><button class="opt" data-correct>1번(또는 6·11번) — 차라리 같은 채널에서 차례를 나눠 쓰는 편이 낫다</button><button class="opt">어디든 같다 — 2.4 GHz는 전부 겹치니까</button>
+    </div><div class="quiz-exp">같은 채널의 이웃은 프레임 머리(프리앰블)를 해독해 서로 기다려 주므로 “시간을 나눠 쓰는” 손해만 생긴다. 반쯤 겹친 채널의 신호는 해독되지 않는 잡음이라 기다려 주지도 않고 SINR을 무너뜨린다. 그래서 2.4 GHz에서는 1·6·11번 중 하나에 맞추는 것이 원칙이다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="csma">
+    <h2>CSMA/CA: 먼저 듣고, 기다렸다가, 말하기</h2>
+    <p>한 채널의 공기는 한 번에 한 명만 쓸 수 있다. 두 기기가 동시에 보내면 신호가 섞여 둘 다 깨진다. 유선 이더넷은 옛날에 “보내면서 충돌을 감지”(CSMA/CD)했지만, 무선 기기는 자기가 내는 강한 신호 때문에 남의 약한 신호를 들을 수 없어 충돌을 감지할 수 없다. 그래서 Wi-Fi는 아예 충돌을 <b>피하는</b> 규칙, <span class="term">CSMA/CA</span><span class="en">(Carrier Sense Multiple Access with Collision Avoidance)</span>를 쓴다.</p>
+    <ol>
+      <li><b>듣기</b>: 보낼 데이터가 생기면 채널이 조용한지 먼저 듣는다(carrier sense).</li>
+      <li><b>DIFS 기다리기</b>: 조용해도 바로 보내지 않고 DIFS(5 GHz에서 34 µs)만큼 더 기다린다.</li>
+      <li><b>백오프</b>: 0~CW 사이에서 무작위 수를 뽑아, 채널이 조용한 슬롯(9 µs)마다 하나씩 센다. 누가 말하기 시작하면 세기를 멈췄다가 다시 조용해지면 이어서 센다. 0이 되면 보낸다. 이 무작위 대기가 <span class="term">백오프</span><span class="en">(backoff)</span>다.</li>
+      <li><b>ACK</b>: 받는 쪽은 SIFS(16 µs) 뒤 “잘 받았다”는 ACK를 보낸다. SIFS가 DIFS보다 짧아서 ACK는 남에게 끼어들 틈을 주지 않는다.</li>
+      <li><b>충돌하면</b>: ACK가 오지 않으면 충돌로 보고 CW를 두 배로(15 → 31 → 63 … → 1023) 늘려 다시 백오프한다.</li>
+    </ol>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 230" style="min-width:600px" role="img" aria-label="CSMA/CA 타이밍: DIFS, 백오프, 데이터, SIFS, ACK">
+        <g class="t" style="font-weight:700"><text x="14" y="62">단말 A</text><text x="14" y="122">AP</text><text x="14" y="182">단말 B</text></g>
+        <path d="M80 70 H790 M80 130 H790 M80 190 H790" class="s-axis"/>
+        <rect x="90" y="40" width="120" height="30" rx="4" fill="var(--text-faint)" opacity=".35"/><text x="150" y="60" text-anchor="middle" class="t-mono">다른 전송 중</text>
+        <rect x="90" y="160" width="120" height="30" rx="4" fill="var(--text-faint)" opacity=".35"/><text x="150" y="180" text-anchor="middle" class="t-mono">다른 전송 중</text>
+        <rect x="212" y="46" width="44" height="24" rx="3" class="f-surface"/><text x="234" y="62" text-anchor="middle" class="t-mono">DIFS</text>
+        <rect x="212" y="166" width="44" height="24" rx="3" class="f-surface"/><text x="234" y="182" text-anchor="middle" class="t-mono">DIFS</text>
+        <g class="t-mono" text-anchor="middle">
+          <rect x="258" y="46" width="22" height="24" rx="3" class="f-acc-soft"/><text x="269" y="62">2</text>
+          <rect x="282" y="46" width="22" height="24" rx="3" class="f-acc-soft"/><text x="293" y="62">1</text>
+          <rect x="306" y="46" width="22" height="24" rx="3" class="f-acc-soft"/><text x="317" y="62">0</text>
+          <rect x="258" y="166" width="22" height="24" rx="3" class="f-acc2-soft"/><text x="269" y="182">5</text>
+          <rect x="282" y="166" width="22" height="24" rx="3" class="f-acc2-soft"/><text x="293" y="182">4</text>
+          <rect x="306" y="166" width="22" height="24" rx="3" class="f-acc2-soft"/><text x="317" y="182">3</text>
+        </g>
+        <rect x="330" y="40" width="220" height="30" rx="4" class="f-acc"/><text x="440" y="60" text-anchor="middle" style="fill:#fff;font-weight:700" class="t">DATA (A → AP)</text>
+        <rect x="552" y="106" width="34" height="24" rx="3" class="f-surface"/><text x="569" y="122" text-anchor="middle" class="t-mono">SIFS</text>
+        <rect x="588" y="100" width="60" height="30" rx="4" fill="var(--ok)"/><text x="618" y="120" text-anchor="middle" style="fill:#fff;font-weight:700" class="t">ACK</text>
+        <rect x="330" y="166" width="318" height="24" rx="3" fill="none" stroke="var(--warn)" stroke-dasharray="5 4"/><text x="489" y="182" text-anchor="middle" class="t-mono" style="fill:var(--warn)">채널이 바쁨 → 카운터 3에서 멈춤</text>
+        <rect x="650" y="166" width="44" height="24" rx="3" class="f-surface"/><text x="672" y="182" text-anchor="middle" class="t-mono">DIFS</text>
+        <g class="t-mono" text-anchor="middle"><rect x="696" y="166" width="22" height="24" rx="3" class="f-acc2-soft"/><text x="707" y="182">2</text><rect x="720" y="166" width="22" height="24" rx="3" class="f-acc2-soft"/><text x="731" y="182">1</text><rect x="744" y="166" width="22" height="24" rx="3" class="f-acc2-soft"/><text x="755" y="182">0</text></g>
+        <text x="80" y="222" class="t-dim">시간 →   A가 먼저 0이 되어 보내고, B는 세던 숫자를 얼려 두었다가 이어서 센다(오래 기다린 쪽이 유리).</text>
+      </svg></div>
+      <figcaption><b>그림 13-3.</b> CSMA/CA의 시간표. 슬롯 하나는 9 µs, SIFS 16 µs, DIFS 34 µs(5 GHz OFDM 기준). 백오프 숫자가 작은 기기가 이긴다. 두 기기가 같은 숫자를 뽑으면 동시에 0이 되어 충돌한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-csma">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>단말이 늘면 충돌도 는다: 백오프 카운터 들여다보기</h3></div>
+      <div class="sim-view"><canvas id="cv-csma"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>동시에 보내려는 단말 수 <output id="cs-n-out"></output></span><input type="range" id="cs-n" min="1" max="30" value="6"></label>
+        <div class="ctrl"><span>재생 속도</span><div class="seg" id="cs-speed"><button data-value="1" class="on">천천히</button><button data-value="4">빠르게</button></div></div>
+        <label class="check"><input type="checkbox" id="cs-rts"> RTS/CTS 사용 (짧은 예약 신호 먼저)</label>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn" id="cs-reset">다시 시작</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">충돌 확률 (전송 시도당)</span><span class="v" id="o-cs-pc">—</span></div>
+        <div class="stat"><span class="k">데이터에 쓴 공중 시간</span><span class="v" id="o-cs-eff">—</span></div>
+        <div class="stat"><span class="k">합계 처리율 (링크 600 Mbps 가정)</span><span class="v" id="o-cs-tp">—</span></div>
+        <div class="stat"><span class="k">단말 1대당 몫</span><span class="v" id="o-cs-per">—</span></div>
+      </div>
+      <div class="sim-note">위: 단말마다 남은 백오프 숫자와 현재 CW. 조용한 슬롯마다 모두 1씩 줄고, 0이 된 단말이 보낸다(파랑 = 성공, 빨강 = 둘 이상이 동시에 0 → 충돌, CW가 두 배). 가운데 띠는 실제 시간 비율로 그린 채널 사용 기록, 아래 그래프는 단말 수에 따른 데이터 시간 비율(수천 번 반복한 평균)이다. 가정: 모든 단말이 늘 보낼 데이터가 있음(포화 상태), 데이터 프레임 300 µs, 모두가 서로를 들을 수 있음.</div>
+    </div>
+    <p>단말이 30대로 늘어도 효율이 0으로 떨어지지는 않는다. 충돌한 단말이 CW를 키워 스스로 물러나기 때문이다. 하지만 <b>전체 파이를 30명이 나눠 먹으니</b> 한 대의 몫은 약 1/30이 되고, 충돌로 버리는 시간까지 생긴다. 사람 많은 카페와 공항 Wi-Fi가 느린 진짜 이유다.</p>
+    <h3>숨은 노드 문제와 RTS/CTS</h3>
+    <p>“먼저 듣기”는 모두가 서로의 소리를 들을 수 있을 때만 통한다. 거실 양 끝의 노트북 A와 C가 둘 다 AP에는 닿지만 서로는 벽에 가려 못 듣는다면, A가 보내는 중에도 C는 채널이 조용하다고 판단하고 보내 버린다. AP에서는 두 신호가 겹쳐 둘 다 깨진다. 이것이 <span class="term">숨은 노드 문제</span><span class="en">(hidden node problem)</span>다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 264" style="min-width:600px" role="img" aria-label="숨은 노드 문제와 RTS/CTS">
+        <circle cx="150" cy="120" r="118" fill="var(--accent-soft)" stroke="var(--accent)" stroke-dasharray="5 4"/>
+        <circle cx="330" cy="120" r="118" fill="var(--accent-2-soft)" stroke="var(--accent-2)" stroke-dasharray="5 4"/>
+        <rect x="236" y="62" width="8" height="78" fill="var(--text-dim)"/><text x="240" y="54" text-anchor="middle" class="t-dim">벽</text>
+        <circle cx="150" cy="120" r="18" class="f-acc"/><text x="150" y="125" text-anchor="middle" style="fill:#fff;font-weight:700" class="t">A</text>
+        <circle cx="330" cy="120" r="18" fill="var(--accent-2)"/><text x="330" y="125" text-anchor="middle" style="fill:#fff;font-weight:700" class="t">C</text>
+        <rect x="216" y="162" width="48" height="30" rx="6" class="f-elev"/><text x="240" y="182" text-anchor="middle" class="t" style="font-weight:700">AP</text>
+        <text x="240" y="258" text-anchor="middle" class="t-dim">A와 C 둘 다 AP에 닿지만 서로는 못 듣는다</text>
+        <g transform="translate(470,20)">
+          <text x="0" y="12" class="t" style="font-weight:700">RTS/CTS로 예약하기</text>
+          <text x="0" y="44" class="t-mono">A</text><text x="0" y="104" class="t-mono">AP</text><text x="0" y="164" class="t-mono">C</text>
+          <path d="M30 50 H320 M30 110 H320 M30 170 H320" class="s-axis"/>
+          <rect x="34" y="30" width="40" height="20" rx="3" class="f-acc"/><text x="54" y="45" text-anchor="middle" style="fill:#fff" class="t-mono">RTS</text>
+          <rect x="82" y="90" width="40" height="20" rx="3" fill="var(--ok)"/><text x="102" y="105" text-anchor="middle" style="fill:#fff" class="t-mono">CTS</text>
+          <rect x="130" y="30" width="120" height="20" rx="3" class="f-acc"/><text x="190" y="45" text-anchor="middle" style="fill:#fff" class="t-mono">DATA</text>
+          <rect x="258" y="90" width="40" height="20" rx="3" fill="var(--ok)"/><text x="278" y="105" text-anchor="middle" style="fill:#fff" class="t-mono">ACK</text>
+          <rect x="122" y="150" width="176" height="20" rx="3" fill="none" stroke="var(--warn)" stroke-dasharray="4 3"/><text x="210" y="165" text-anchor="middle" class="t-mono" style="fill:var(--warn)">CTS를 듣고 침묵(NAV)</text>
+          <text x="0" y="206" class="t-dim">C는 A의 RTS는 못 들었지만 AP의 CTS는 듣는다.</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 13-4.</b> 숨은 노드와 RTS/CTS. A가 먼저 짧은 “보내도 될까요?”(RTS)를 보내고, AP가 “A가 ○○ µs 동안 쓴다”(CTS)를 모두에게 알린다. C는 그 시간만큼 침묵한다(NAV, 가상 반송파 감지). 충돌이 나도 짧은 RTS끼리만 부딪혀 손해가 작다.</figcaption>
+    </figure>
+    <p>RTS/CTS는 공짜가 아니다. 매 전송마다 짧은 프레임 두 개와 SIFS 두 번이 더 붙는다. 위 시뮬레이터에서 RTS/CTS를 켜 보면 단말이 적을 때는 오히려 효율이 떨어지고, 단말이 많아 충돌이 잦을 때 이득이 생긴다. 그래서 공유기는 보통 긴 프레임에만 RTS/CTS를 쓴다.</p>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">한 AP에 모두 바쁘게 보내는 단말이 1대에서 20대로 늘었다. 채널 전체의 데이터 시간 비율(효율)은 어떻게 될까?</p><p class="wi-hint">CSMA/CA 시뮬레이터에서 단말 수 슬라이더를 1 → 20으로 옮기며 아래 그래프를 보자.</p><div class="opts">
+      <button class="opt">1/20로 줄어든다</button><button class="opt">0에 가깝게 무너진다</button><button class="opt" data-correct>조금(대략 열 몇 %포인트) 떨어진다. 대신 한 대의 몫은 1/20 아래로 준다</button><button class="opt">그대로다</button>
+    </div><div class="quiz-exp">충돌이 늘지만 CW를 두 배로 늘리는 지수 백오프가 경쟁을 진정시켜 전체 효율은 완만하게만 떨어진다. 문제는 그 파이를 20명이 나눠 갖는다는 것이다. 그래서 Wi-Fi 6는 “한 번에 여러 명에게 동시에” 보내는 OFDMA를 도입했다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="throughput">
+    <h2>링크 속도 2.4 Gbps인데 왜 1 Gbps도 안 나올까</h2>
+    <p>휴대폰 설정에서 보이는 “링크 속도”는 데이터 비트가 공중을 지나가는 순간의 속도(PHY 속도)다. 하지만 공기를 쓰는 시간 중 데이터가 지나가는 시간은 일부뿐이다. 실제 처리율을 깎는 범인은 세 가지다.</p>
+    <ul>
+      <li><b>오버헤드</b>: 매 전송마다 DIFS + 백오프 + 프리앰블(수신기가 동기를 맞추는 머리, 약 40 µs) + SIFS + ACK가 붙는다. 데이터가 짧으면 앞뒤 의식이 본론보다 길다. 그래서 여러 프레임을 한 번에 묶어 보내는 <span class="term">프레임 집적</span><span class="en">(A-MPDU aggregation)</span>이 결정적이다.</li>
+      <li><b>반이중</b>: 같은 채널에서 보내기와 받기를 동시에 못 한다. 다운로드 중에도 휴대폰은 TCP ACK(9장)를 올려 보내야 하고, 그 시간에는 내려받지 못한다.</li>
+      <li><b>공유 매체</b>: 같은 채널의 모든 기기와 이웃 AP가 공중 시간을 나눠 쓰고, 충돌한 시간은 버려진다.</li>
+    </ul>
+    <div class="formula">실효 처리율 ≈ PHY 속도 × <b>데이터 시간 ÷ (데이터 + 오버헤드 + 충돌 + 상향 ACK 시간)</b> × (페이로드 ÷ 헤더 포함 프레임)
+      <div class="where">예: 2,402 Mbps, 256개 집적(약 1.3 ms 데이터) + 고정 오버헤드 약 0.2 ms + TCP ACK 전송 약 0.2 ms → 약 75% → 헤더 5% 빼면 약 1.7 Gbps. 집적이 없으면 1,500바이트 프레임은 5 µs 만에 지나가고 나머지 0.2 ms는 의식이다.</div>
+    </div>
+    <div class="sim" id="sim-tp">
+      <div class="sim-head"><span class="sim-tag">CALCULATOR</span><h3>표시 속도에서 실제 속도까지: 손실 폭포</h3></div>
+      <div class="sim-view"><canvas id="cv-tp"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>링크(PHY) 속도</span><div class="seg" id="tp-rate"><button data-value="300">Wi-Fi 4 · 300M</button><button data-value="867">Wi-Fi 5 · 867M</button><button data-value="2402" class="on">Wi-Fi 6 · 2.4G</button><button data-value="5765">Wi-Fi 7 · 5.8G</button></div></div>
+        <div class="ctrl"><span>프레임 집적 (한 번에 묶는 프레임 수)</span><div class="seg" id="tp-agg"><button data-value="1">없음 (1개)</button><button data-value="64">64개</button><button data-value="256" class="on">256개</button></div></div>
+        <label class="ctrl"><span>함께 내려받는 기기 수 <output id="tp-n-out"></output></span><input type="range" id="tp-n" min="1" max="20" value="1"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">데이터가 공중에 있는 시간</span><span class="v" id="o-tp-air">—</span></div>
+        <div class="stat"><span class="k">전체 실효 처리율</span><span class="v" id="o-tp-all">—</span></div>
+        <div class="stat"><span class="k">기기 1대당 (속도 측정 앱 값)</span><span class="v" id="o-tp-one">—</span></div>
+        <div class="stat"><span class="k">표시 속도 대비</span><span class="v" id="o-tp-pct">—</span></div>
+      </div>
+      <div class="sim-note">왼쪽 막대에서 시작해 손실을 하나씩 빼 나간다. 해볼 것: ① 집적을 “없음”으로 하면 Wi-Fi 7이든 Wi-Fi 4든 실제 속도가 비슷하게 바닥이다. 속도를 결정하는 건 PHY가 아니라 의식(오버헤드)이기 때문이다. ② 기기 수를 늘리면 충돌 손실이 커지고 한 대의 몫은 급격히 준다. 가정: 프레임 1,538바이트(TCP 페이로드 1,460), 고정 오버헤드 = DIFS 34 + 평균 백오프 + 프리앰블 40 + SIFS 16 + 블록 ACK 32 µs, 한 PPDU 최대 5.484 ms, 상향 TCP ACK는 내려받기 1회마다 짧은 전송 1회, 충돌 확률은 위 CSMA 모델(AP + 기기 수만큼의 경쟁자)에서 계산.</div>
+    </div>
+    <div class="callout tip"><strong>집에서 속도를 올리는 현실적인 순서</strong><p>① 공유기를 집 가운데, 바닥이 아닌 높은 곳에 둔다. ② 5 GHz나 6 GHz에 붙인다(2.4 GHz는 이웃이 너무 많다). ③ 고정 기기(TV, 데스크톱, 게임기)는 유선으로 빼서 공중 시간을 비워 준다. ④ 그래도 안 되면 메시 또는 AP를 하나 더(가능하면 유선 백홀로). 공유기를 “더 비싼 세대”로 바꾸는 것은 그다음이다. 휴대폰이 그 세대를 지원하지 않으면 효과가 없다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="range">
+    <h2>거리와 벽: 속도는 계단처럼 떨어진다</h2>
+    <p>11장의 링크 버짓을 공유기에 적용해 보자. 받는 세기 <b>RSSI</b>(Received Signal Strength Indicator)는 송신 전력에서 경로 손실과 벽 손실을 뺀 값이다. 여기서 잡음 바닥(20 MHz에 약 −94 dBm, 채널 폭이 두 배가 될 때마다 +3 dB)을 빼면 SNR이 나온다. Wi-Fi는 SNR에 맞춰 12장의 MCS(변조 + 부호율 조합)를 고른다. 1024-QAM 5/6은 SNR이 약 37 dB 넘게 필요하고, BPSK 1/2은 5 dB 정도면 된다. MCS는 정해진 몇 단계뿐이라 속도는 매끄럽게 줄지 않고 <b>계단</b>처럼 떨어진다. 그리고 한국 아파트의 철근 콘크리트 벽 하나는 5 GHz 신호를 15~20 dB, 즉 <b>1/30~1/100</b>로 줄인다.</p>
+    <div class="sim" id="sim-range">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>거리 → RSSI → MCS → 속도</h3></div>
+      <div class="sim-view"><canvas id="cv-range"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>공유기에서 거리 <output id="rg-d-out"></output></span><input type="range" id="rg-d" min="1" max="40" step="0.5" value="8"></label>
+        <div class="ctrl"><span>대역 · 채널 폭</span><div class="seg" id="rg-band"><button data-value="0">2.4 GHz · 40</button><button data-value="1" class="on">5 GHz · 80</button><button data-value="2">5 GHz · 160</button><button data-value="3">6 GHz · 320 (Wi-Fi 7)</button></div></div>
+        <div class="ctrl"><span>약 6 m마다 있는 벽</span><div class="seg" id="rg-wall"><button data-value="none">트인 공간</button><button data-value="gyp">석고보드</button><button data-value="con" class="on">콘크리트</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">RSSI (받는 세기)</span><span class="v" id="o-rg-rssi">—</span></div>
+        <div class="stat"><span class="k">SNR</span><span class="v" id="o-rg-snr">—</span></div>
+        <div class="stat"><span class="k">MCS</span><span class="v" id="o-rg-mcs" style="font-size:15px">—</span></div>
+        <div class="stat"><span class="k">링크 속도 → 실제 (≈60%)</span><span class="v" id="o-rg-rate">—</span></div>
+      </div>
+      <div class="sim-note">위 그림: 공유기(왼쪽)에서 휴대폰까지와 그 사이의 벽. 아래 그래프: 거리별 링크 속도(굵은 선)와 벽이 없을 때(점선). 벽을 하나 지날 때마다 계단이 뚝 떨어진다. 해볼 것: 6 GHz 320 MHz는 가까이에선 압도적이지만 콘크리트 벽 두 개만 지나면 2.4 GHz보다 느려질 수 있다. 가정: 송신 20 dBm, 양쪽 안테나 이득 합 4 dBi, 경로 손실 지수 2.2(1 m 기준 자유 공간 손실에서 시작, 벽 손실은 따로 더함), 잡음 지수 7 dB, 2×2 스트림, 벽 손실은 석고보드 3~5 dB, 콘크리트 12/17/19 dB(2.4/5/6 GHz). 실제 기기는 휴대폰 쪽 송신 전력이 더 약해 상향이 먼저 한계에 닿는다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="modern">
+    <h2>메시, 로밍, 그리고 Wi-Fi 6·7의 새 무기</h2>
+    <h3>메시 Wi-Fi와 로밍</h3>
+    <p>벽이 많은 집에서는 공유기 하나로 구석까지 덮기 어렵다. <span class="term">메시 Wi-Fi</span><span class="en">(mesh Wi-Fi)</span>는 여러 AP(노드)가 같은 SSID를 내보내고, 노드끼리 무선(또는 유선)으로 이어져 하나의 망처럼 동작한다. 주의할 점은 <b>무선 백홀</b>이다. 노드와 노드 사이를 같은 라디오로 중계하면 같은 데이터를 공중에서 두 번 보내야 하므로 홉마다 속도가 대략 절반이 된다. 그래서 고급 메시는 노드 사이 전용 라디오(트라이밴드)를 따로 두고, 가능하면 랜선으로 잇는 <b>유선 백홀</b>을 권한다.</p>
+    <p>휴대폰이 한 AP에서 다른 AP로 옮겨 가는 것을 <span class="term">로밍</span><span class="en">(roaming)</span>이라 한다. Wi-Fi에서 로밍의 결정권은 AP가 아니라 <b>단말</b>에 있다. 신호가 약해져도 원래 AP를 끈질기게 붙잡는 “끈적한 단말” 문제를 줄이려고 802.11k(주변 AP 목록 알려 주기), 802.11v(“저쪽 AP로 옮겨 가 주세요” 권고), 802.11r(키 교환을 미리 해 두어 수십 ms 안에 갈아타기) 표준이 생겼다. 휴대폰 망의 핸드오버(14장)는 기지국이 지휘한다는 점이 다르다.</p>
+    <h3>Wi-Fi 6: OFDMA와 TWT</h3>
+    <p>Wi-Fi 5까지는 한 번 전송하면 채널 전체(예: 80 MHz)를 한 단말이 독차지했다. 메신저 알림 몇백 바이트를 보낼 때도 고속도로 전체를 막고 승용차 한 대가 지나가는 셈이다. Wi-Fi 6는 4G LTE에서 가져온 <span class="term">OFDMA</span><span class="en">(Orthogonal Frequency Division Multiple Access)</span>로 부반송파를 <b>자원 단위</b>(RU, 최소 26개 부반송파 ≈ 2 MHz)로 쪼개 한 번의 전송에 여러 단말에게 나눠 준다. 작은 패킷이 많은 환경에서 대기 시간과 오버헤드가 크게 준다.</p>
+    <p><span class="term">TWT</span><span class="en">(Target Wake Time)</span>는 AP와 단말이 “다음엔 몇 시 몇 ms에 깨어나서 이야기하자”고 약속하는 기능이다. 단말은 그 사이에 무선부를 완전히 꺼 둘 수 있어, 배터리로 도는 IoT 센서의 수명이 크게 늘어난다. 또 이웃 AP의 프레임을 색깔 번호로 구분해 약한 이웃 신호는 무시하고 보내는 <b>BSS 컬러링</b>으로 밀집 지역의 동시 사용을 늘렸다.</p>
+    <h3>Wi-Fi 7: MLO</h3>
+    <p>Wi-Fi 7의 대표 기능은 <span class="term">MLO</span><span class="en">(Multi-Link Operation)</span>다. 지금까지 단말은 2.4·5·6 GHz 중 <b>하나</b>의 대역에만 붙었다. MLO는 한 연결이 여러 대역의 링크를 동시에 쓰게 한다. 두 링크로 데이터를 나눠 실으면 속도가 더해지고, 한쪽 채널이 바쁘면 먼저 비는 쪽으로 보내 지연과 그 흔들림(지터)이 줄어든다. 여기에 320 MHz 채널, 4096-QAM(1024-QAM보다 비트 20% 증가), 채널 일부가 이웃에게 막혀 있으면 그 20 MHz만 빼고 쓰는 <b>프리앰블 펑처링</b>이 더해졌다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 800 250" style="min-width:600px" role="img" aria-label="OFDM과 OFDMA 비교, MLO 다중 링크">
+        <text x="20" y="20" class="t" style="font-weight:700">Wi-Fi 5 (OFDM)</text>
+        <text x="280" y="20" class="t" style="font-weight:700">Wi-Fi 6 (OFDMA)</text>
+        <text x="20" y="226" class="t-dim">시간 →  (세로 = 주파수)</text>
+        <g transform="translate(20,32)">
+          <rect x="0" y="0" width="60" height="160" rx="3" class="f-acc"/><text x="30" y="84" text-anchor="middle" style="fill:#fff" class="t">A</text>
+          <rect x="64" y="0" width="40" height="160" rx="3" class="f-surface"/><text x="84" y="84" text-anchor="middle" class="t-mono">대기</text>
+          <rect x="108" y="0" width="30" height="160" rx="3" fill="var(--accent-2)"/><text x="123" y="84" text-anchor="middle" style="fill:#fff" class="t">B</text>
+          <rect x="142" y="0" width="40" height="160" rx="3" class="f-surface"/><text x="162" y="84" text-anchor="middle" class="t-mono">대기</text>
+          <rect x="186" y="0" width="30" height="160" rx="3" fill="var(--warn)"/><text x="201" y="84" text-anchor="middle" style="fill:#fff" class="t">C</text>
+        </g>
+        <g transform="translate(280,32)">
+          <rect x="0" y="0" width="90" height="70" rx="3" class="f-acc"/><text x="45" y="40" text-anchor="middle" style="fill:#fff" class="t">A</text>
+          <rect x="0" y="74" width="90" height="40" rx="3" fill="var(--accent-2)"/><text x="45" y="99" text-anchor="middle" style="fill:#fff" class="t">B</text>
+          <rect x="0" y="118" width="90" height="42" rx="3" fill="var(--warn)"/><text x="45" y="144" text-anchor="middle" style="fill:#fff" class="t">C</text>
+          <text x="100" y="84" class="t-dim">한 번에 셋 다.</text>
+          <text x="100" y="102" class="t-dim">대기가 사라진다.</text>
+        </g>
+        <line x1="500" y1="10" x2="500" y2="236" stroke="var(--border)"/>
+        <text x="520" y="20" class="t" style="font-weight:700">Wi-Fi 7 MLO</text>
+        <rect x="520" y="100" width="70" height="50" rx="8" class="f-elev"/><text x="555" y="130" text-anchor="middle" class="t" style="font-weight:700">AP</text>
+        <rect x="700" y="100" width="80" height="50" rx="8" class="f-elev"/><text x="740" y="130" text-anchor="middle" class="t" style="font-weight:700">단말</text>
+        <path d="M590 108 C640 60, 650 60, 700 108" fill="none" stroke="var(--accent)" stroke-width="3"/><text x="645" y="62" text-anchor="middle" class="t-mono">5 GHz 링크</text>
+        <path d="M590 142 C640 190, 650 190, 700 142" fill="none" stroke="var(--accent-2)" stroke-width="3"/><text x="645" y="200" text-anchor="middle" class="t-mono">6 GHz 링크</text>
+        <text x="650" y="230" text-anchor="middle" class="t-dim">한 연결이 두 대역을 동시에</text>
+      </svg></div>
+      <figcaption><b>그림 13-5.</b> 왼쪽: Wi-Fi 5는 작은 데이터도 채널 전체를 차례로 독차지한다. 가운데: Wi-Fi 6의 OFDMA는 주파수를 쪼개 여러 단말에 한꺼번에 준다(같은 아이디어를 14장의 LTE·5G가 쓴다). 오른쪽: Wi-Fi 7의 MLO는 여러 대역을 하나의 연결로 묶는다.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="short-range">
+    <h2>블루투스, NFC, UWB, 그리고 사물 인터넷의 전파들</h2>
+    <p>Wi-Fi는 빠르지만 전기를 많이 먹는다. 이어폰, 시계, 도어락 센서, 교통카드처럼 작고 배터리가 귀한 기기에는 다른 방식이 필요하다. 무선 기술 선택은 결국 <b>거리 · 속도 · 전력</b> 세 가지 중 무엇을 희생할지의 문제다(2장의 섀넌 한계와 11장의 링크 버짓이 그 이유다: 멀리, 적은 전력으로 보내려면 속도를 낮춰야 한다).</p>
+    <ul>
+      <li><b>블루투스</b>: Wi-Fi와 같은 2.4 GHz를 쓴다. 클래식 블루투스는 1 MHz 폭 채널 79개를 초당 1,600번 옮겨 다니는 <span class="term">주파수 도약</span><span class="en">(frequency hopping)</span>으로 간섭을 피한다. 어느 한 채널이 막혀도 잠깐만 손해 보고 다른 채널로 간다. 요즘은 잡음 채널을 빼고 도는 적응형 도약을 쓴다. <span class="term">BLE</span><span class="en">(Bluetooth Low Energy)</span>는 2 MHz 폭 채널 40개(그중 3개는 “나 여기 있어요” 광고용)를 쓰고, 대부분의 시간을 잠자다 수 ms만 깨어나 보내므로 코인 전지 하나로 몇 년을 간다. 무선 이어폰 음질은 코덱이 정한다: SBC 약 330 kbps, AAC 약 256 kbps, LDAC 최대 990 kbps, 그리고 BLE 기반 LE Audio의 LC3.</li>
+      <li><b>NFC</b>(Near Field Communication): 13.56 MHz에서 전파라기보다 두 코일 사이의 <b>자기장 결합</b>으로 통신한다. 수 cm 안에서만 동작하는 것이 오히려 장점이다. 멀리서 몰래 읽기 어렵고, “갖다 댄다”는 행동 자체가 승인이 된다. 교통카드는 배터리가 없어도 단말기의 자기장에서 전력을 받아 동작한다(106~424 kbps).</li>
+      <li><b>UWB</b>(Ultra-Wideband): 6~8 GHz에서 500 MHz 폭의 아주 짧은 펄스(약 2 ns)를 쏜다. 펄스가 짧으니 도착 시각을 ns 단위로 잴 수 있고, 빛은 1 ns에 30 cm를 가므로 왕복 시간(ToF)으로 <b>수~10 cm 정밀도</b>의 거리를 잰다. 스마트폰 분실물 태그, 차 디지털 키(차 안인지 밖인지 구분)에 쓴다.</li>
+      <li><b>Zigbee / Thread / Matter</b>: Zigbee와 Thread는 같은 IEEE 802.15.4 무선(2.4 GHz, 250 kbps)을 쓰는 저전력 <b>메시</b>다. 전원 연결된 기기가 중계해 집 전체를 덮는다. Thread는 IPv6를 그대로 쓴다. <span class="term">Matter</span>는 그 위의 공통 언어(응용 계층 표준)로, 제조사가 달라도 Wi-Fi·Thread·이더넷 위에서 같은 방식으로 전구·도어락을 제어하게 한다.</li>
+      <li><b>LoRa / NB-IoT</b>: 수 km를 수 kbps로, 배터리 수년. <span class="term">LoRa</span>는 1 GHz 아래 비면허 대역(한국 920 MHz대)에서 신호를 넓게 펼쳐(확산) 잡음 아래로 묻힌 신호도 건져 낸다. NB-IoT는 통신사 LTE 망의 180 kHz 좁은 조각을 쓰는 면허 대역 방식이다. 수도·가스 원격 검침, 주차 센서, 위치 추적기에 쓴다.</li>
+    </ul>
+    <div class="table-wrap"><table class="wf-tbl">
+      <thead><tr><th>기술</th><th>주파수</th><th>거리</th><th>속도</th><th>전력</th><th>대표 쓰임</th></tr></thead>
+      <tbody>
+        <tr><td>Wi-Fi 6/7</td><td>2.4/5/6 GHz</td><td class="num">~30 m(실내)</td><td class="num">수백 Mbps~수 Gbps</td><td>높음 (전원·매일 충전)</td><td>인터넷 접속</td></tr>
+        <tr><td>블루투스 클래식</td><td>2.4 GHz, 79 ch</td><td class="num">~10 m</td><td class="num">1~3 Mbps</td><td>중간</td><td>이어폰, 차량 오디오</td></tr>
+        <tr><td>BLE</td><td>2.4 GHz, 40 ch</td><td class="num">~10~50 m</td><td class="num">125 kbps~2 Mbps</td><td>매우 낮음 (코인 전지 수년)</td><td>시계, 센서, 비콘</td></tr>
+        <tr><td>NFC</td><td>13.56 MHz</td><td class="num">~4 cm</td><td class="num">106~424 kbps</td><td>카드는 0 (전력을 받음)</td><td>교통카드, 결제, 출입</td></tr>
+        <tr><td>UWB</td><td>6.5 / 8 GHz</td><td class="num">~수십 m</td><td class="num">~수 Mbps</td><td>중간</td><td>cm 정밀 위치, 디지털 키</td></tr>
+        <tr><td>Zigbee / Thread</td><td>2.4 GHz (802.15.4)</td><td class="num">10~100 m + 메시</td><td class="num">250 kbps</td><td>매우 낮음</td><td>스마트홈 센서, 조명</td></tr>
+        <tr><td>LoRaWAN</td><td>920 MHz (비면허)</td><td class="num">2~15 km</td><td class="num">0.3~수십 kbps</td><td>매우 낮음 (5~10년)</td><td>원격 검침, 농업 센서</td></tr>
+        <tr><td>NB-IoT</td><td>LTE 면허 대역</td><td class="num">수~10 km, 실내 깊숙이</td><td class="num">수십~수백 kbps</td><td>낮음 (수년)</td><td>계량기, 추적기</td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout analogy"><strong>목소리 크기와 말 빠르기</strong><p>시끄러운 운동장 건너편 친구에게 말을 전하려면 크게(전력) 또는 천천히 또박또박(낮은 속도) 말해야 한다. 귓속말(NFC)은 아주 작게 말해도 되지만 붙어 있어야 한다. LoRa는 운동장 끝까지 들리게 한 글자씩 아주 천천히 외치는 방식이고, Wi-Fi는 가까운 거리에서 빠르게 많은 말을 쏟아 내는 방식이다.</p></div>
+    <div class="sim" id="sim-pick">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>무선 기술 고르기: 거리·속도·배터리 조건 → 추천</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cv-pick"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>통신 거리</span><div class="seg" id="pk-d"><button data-value="0.03">갖다 대기</button><button data-value="8" class="on">한 방</button><button data-value="40">집 전체</button><button data-value="3000">동네~도시</button></div></div>
+          <div class="ctrl"><span>필요한 속도</span><div class="seg" id="pk-r"><button data-value="1000" class="on">센서 값</button><button data-value="400000">오디오</button><button data-value="20000000">HD 영상</button><button data-value="1000000000">대용량</button></div></div>
+          <div class="ctrl"><span>전원</span><div class="seg" id="pk-p"><button data-value="0" class="on">전지로 수년</button><button data-value="1">며칠마다 충전</button><button data-value="2">콘센트</button></div></div>
+          <label class="check"><input type="checkbox" id="pk-loc"> 위치를 10 cm 단위로 알아야 함</label>
+          <label class="check"><input type="checkbox" id="pk-free"> 통신사 요금 없이 (비면허)</label>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">1순위</span><span class="v" id="o-pk-1">—</span></div>
+        <div class="stat"><span class="k">2순위</span><span class="v" id="o-pk-2">—</span></div>
+        <div class="stat"><span class="k">이유</span><span class="v" id="o-pk-why" style="font-size:14px;font-weight:500">—</span></div>
+      </div>
+      <div class="sim-note">막대는 요구 조건과의 적합도(100 = 모든 조건 충족)다. 해볼 것: 무선 이어폰(한 방·오디오·며칠마다 충전), 수도 검침기(동네·센서 값·전지로 수년·요금 없이), 차 디지털 키(한 방·센서 값·위치 cm), 교통카드(갖다 대기)를 차례로 맞춰 보자. 단순화: 각 기술의 대표 범위만 보고 점수를 매긴 것으로, 실제 선택에는 비용, 생태계, 보안이 함께 고려된다.</div>
+    </div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>공유기는 <b>모뎀/ONT · 라우터(NAT·DHCP) · 스위치 · AP</b>를 한 상자에 넣은 것이다. AP는 비컨으로 SSID를 알리고, 단말은 스캔 → 인증 → 연결 → <b>4-way 핸드셰이크</b>(비밀번호는 전파로 나가지 않음) → DHCP 순서로 붙는다.</li>
+      <li>Wi-Fi는 <b>채널 폭 · 변조 차수 · 공간 스트림</b>을 키워 11 Mbps(802.11b)에서 2×2 기준 약 5.8 Gbps(Wi-Fi 7, 320 MHz·4096-QAM)까지 빨라졌다.</li>
+      <li>2.4 GHz에서 겹치지 않는 채널은 <b>1·6·11</b>뿐이다. 반쯤 겹치는 채널은 해독 불가능한 잡음이 되므로 같은 채널을 나눠 쓰는 것보다 나쁘다. 5·6 GHz는 채널이 많지만 본딩할수록 채널 수가 준다.</li>
+      <li><b>CSMA/CA</b>: 듣고, DIFS와 무작위 백오프만큼 기다린 뒤 보내고, ACK로 확인한다. 충돌하면 CW를 두 배로. 숨은 노드는 <b>RTS/CTS</b>로 예약해 해결한다.</li>
+      <li>실제 처리율이 표시 속도의 절반 남짓인 이유는 <b>오버헤드(프리앰블·대기·ACK), 반이중, 공유 매체</b>다. 프레임 집적이 오버헤드를 숨기는 핵심이다.</li>
+      <li>거리와 벽은 RSSI → SNR → MCS를 거쳐 속도를 <b>계단식</b>으로 떨어뜨린다. 높은 대역일수록 벽에 약하다.</li>
+      <li>Wi-Fi 6는 <b>OFDMA·TWT</b>로 많은 단말과 저전력을, Wi-Fi 7은 <b>MLO</b>와 320 MHz로 속도와 지연을 개선했다. 메시는 무선 백홀이 속도를 깎는다.</li>
+      <li>근거리 무선은 거리·속도·전력의 교환이다: 블루투스(도약), BLE(저전력), NFC(수 cm), UWB(cm 위치), Zigbee/Thread/Matter(스마트홈 메시), LoRa/NB-IoT(수 km·수년).</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>휴대폰이 집 Wi-Fi에 연결되었는데 인터넷만 안 된다. 상태 화면에 IP 주소가 169.254.x.x로 나온다. 실패한 단계는?</p><div class="opts">
+        <button class="opt">비컨 스캔</button><button class="opt">4-way 핸드셰이크</button><button class="opt" data-correct>DHCP로 IP 주소 받기</button><button class="opt">채널 본딩</button>
+      </div><div class="quiz-exp">무선 연결과 암호화(4-way)까지는 성공했지만, 라우터의 DHCP에게서 주소를 받지 못해 기기가 스스로 임시 주소(169.254.x.x)를 붙인 상태다(7장).</div></div>
+      <div class="quiz-q"><p>WPA2/WPA3의 4-way 핸드셰이크에 대한 설명으로 옳은 것은?</p><div class="opts">
+        <button class="opt" data-correct>비밀번호 자체는 보내지 않고, 주고받은 난수와 미리 가진 키로 양쪽이 각자 세션 키를 계산한다</button>
+        <button class="opt">비밀번호를 암호화해서 AP에 보낸다</button>
+        <button class="opt">AP가 IP 주소를 나눠 주는 과정이다</button>
+        <button class="opt">4개의 채널을 묶는 과정이다</button>
+      </div><div class="quiz-exp">ANonce와 SNonce, 그리고 비밀번호에서 만든 마스터 키로 세션 키(PTK)를 각자 계산하고 MIC로 같은 키를 가졌음만 증명한다.</div></div>
+      <div class="quiz-q"><p>무선 Wi-Fi가 유선 이더넷의 옛 방식처럼 “보내면서 충돌을 감지”(CSMA/CD)하지 않는 이유는?</p><div class="opts">
+        <button class="opt">무선은 충돌이 일어나지 않아서</button><button class="opt">ACK가 필요 없어서</button><button class="opt">전파는 빛보다 느려서</button><button class="opt" data-correct>자기가 내는 강한 송신 신호 때문에 남의 약한 신호를 동시에 들을 수 없어서</button>
+      </div><div class="quiz-exp">송신 신호가 수신 신호보다 수십 dB 강해 보내는 동안에는 충돌을 들을 수 없다. 그래서 미리 피하고(백오프), ACK가 없으면 충돌로 간주한다.</div></div>
+      <div class="quiz-q"><p>RTS/CTS가 해결하려는 문제는?</p><div class="opts">
+        <button class="opt">2.4 GHz 채널이 겹치는 문제</button><button class="opt" data-correct>AP에는 닿지만 서로는 들리지 않는 두 단말이 동시에 보내는 숨은 노드 문제</button><button class="opt">비밀번호를 엿듣는 문제</button><button class="opt">IP 주소가 모자라는 문제</button>
+      </div><div class="quiz-exp">AP가 보내는 CTS는 숨은 단말에게도 들리므로, 그 시간 동안 침묵(NAV)하게 만든다.</div></div>
+      <div class="quiz-q"><p>공유기에서 멀어지자 속도가 매끄럽게 줄지 않고 몇 단계로 뚝뚝 떨어졌다. 가장 직접적인 이유는?</p><div class="opts">
+        <button class="opt">공유기가 일부러 속도를 제한해서</button><button class="opt">전파 속도가 느려져서</button><button class="opt" data-correct>SNR에 맞춰 정해진 몇 단계의 MCS(변조·부호율) 중 하나를 고르기 때문에</button><button class="opt">DHCP가 다시 실행되어서</button>
+      </div><div class="quiz-exp">MCS는 BPSK 1/2부터 4096-QAM 5/6까지 정해진 단계라, SNR이 문턱을 넘나들 때마다 속도가 계단처럼 바뀐다. 벽을 지날 때는 SNR이 한 번에 크게 떨어진다.</div></div>
+      <div class="quiz-q"><p>지하철 교통카드에 쓰이는 기술과 그 특징으로 옳은 것은?</p><div class="opts">
+        <button class="opt">UWB — ns 펄스로 cm 단위 위치를 잰다</button><button class="opt">LoRa — 수 km를 저전력으로</button><button class="opt">BLE — 코인 전지로 수년</button><button class="opt" data-correct>NFC — 13.56 MHz 자기장 결합, 수 cm 안에서 카드가 단말기의 전력을 받아 동작</button>
+      </div><div class="quiz-exp">교통카드에는 전지가 없다. 단말기 코일의 자기장에서 전력을 얻고, 짧은 거리라는 한계가 오히려 보안과 “갖다 대기” 사용성을 준다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------- 공통: 802.11ax/be MCS 표 (12장 연결) ---------- */
+  const NSD = { 20: 234, 40: 468, 80: 980, 160: 1960, 320: 3920 };
+  // [비트/심볼, 부호율, 이름, 필요 SNR(dB, 대략)]
+  const MCS = [[1, 0.5, "BPSK 1/2", 5], [2, 0.5, "QPSK 1/2", 8], [2, 0.75, "QPSK 3/4", 11], [4, 0.5, "16-QAM 1/2", 14], [4, 0.75, "16-QAM 3/4", 17], [6, 2 / 3, "64-QAM 2/3", 21], [6, 0.75, "64-QAM 3/4", 23], [6, 5 / 6, "64-QAM 5/6", 25], [8, 0.75, "256-QAM 3/4", 29], [8, 5 / 6, "256-QAM 5/6", 31], [10, 0.75, "1024-QAM 3/4", 34], [10, 5 / 6, "1024-QAM 5/6", 37], [12, 0.75, "4096-QAM 3/4", 40], [12, 5 / 6, "4096-QAM 5/6", 43]];
+  const heRate = (m, bw, nss) => (m < 0 ? 0 : (NSD[bw] * MCS[m][0] * MCS[m][1] * nss) / 13.6);
+  const pickMcs = (snr, maxM) => { let k = -1; for (let i = 0; i <= maxM; i++) if (snr >= MCS[i][3]) k = i; return k; };
+  const noiseFloor = (bwMHz) => -174 + 10 * Math.log10(bwMHz * 1e6) + 7;
+  const dbsum = (arr) => 10 * Math.log10(arr.reduce((s, v) => s + Math.pow(10, v / 10), 0));
+  const mbps = (x) => (x < 0.95 ? "1 Mbps 미만" : x >= 1000 ? (x / 1000).toFixed(2) + " Gbps" : x >= 10 ? Math.round(x) + " Mbps" : x.toFixed(1) + " Mbps");
+
+  /* ---------- 1. 채널 고르기 ---------- */
+  const NEI = [
+    { ch: 1, r: -58, a: 0.22, w: 20 }, { ch: 1, r: -74, a: 0.14, w: 20 }, { ch: 4, r: -67, a: 0.18, w: 20 },
+    { ch: 6, r: -55, a: 0.26, w: 20 }, { ch: 6, r: -80, a: 0.1, w: 20 }, { ch: 9, r: -71, a: 0.16, w: 40 },
+    { ch: 11, r: -63, a: 0.22, w: 20 }, { ch: 11, r: -84, a: 0.08, w: 20 }, { ch: 13, r: -78, a: 0.12, w: 20 },
+  ];
+  const fc = (ch) => 2407 + 5 * ch;
+  const span = (ch, w) => { if (w === 20) return [fc(ch) - 10, fc(ch) + 10]; return ch <= 9 ? [fc(ch) - 10, fc(ch) + 30] : [fc(ch) - 30, fc(ch) + 10]; };
+  const chMy = NB.range("ch-my", (v) => v + "번 (" + fc(v) + " MHz)", () => chUpdate());
+  const chW = NB.seg("ch-w", () => chUpdate());
+  const chLoad = NB.seg("ch-load", () => chUpdate());
+  function chEval(my, w, load) {
+    const S = -50, N = noiseFloor(w), [lo, hi] = span(my, w);
+    let air = 1, co = 0, adj = 0, pClean = 1; const I = [];
+    const kinds = NEI.map((n) => {
+      const a = Math.min(0.6, n.a * load), [nlo, nhi] = span(n.ch, n.w);
+      const ov = Math.max(0, Math.min(hi, nhi) - Math.max(lo, nlo));
+      if (ov <= 0) return "none";
+      if (n.ch === my || (w === 40 && n.w === 40 && Math.abs(fc(n.ch) - fc(my)) < 1)) { if (n.r > -82) air -= a; co++; return "co"; }
+      const ip = n.r + 10 * Math.log10(ov / n.w);
+      if (ip < N - 6) return "none";
+      adj++; I.push(ip); pClean *= 1 - Math.min(1, 2 * a); // 내 프레임 앞뒤로 겹칠 수 있는 취약 구간은 사용률의 약 2배
+      if (ip > -62) air -= a; // 에너지 감지(−62 dBm)에 걸리면 해독은 못 해도 기다린다
+      return "adj";
+    });
+    air = Math.max(0.05, air);
+    const snr = S - N, rClean = heRate(pickMcs(snr, 11), w, 2);
+    const sinr = I.length ? S - dbsum([N, ...I]) : snr, rInt = heRate(pickMcs(sinr, 11), w, 2);
+    // 속도 제어: 빠른 MCS로 보내다 겹치면 통째로 잃거나, 처음부터 간섭을 견디는 느린 MCS를 쓰거나 — 나은 쪽
+    const eff = 0.65, tp = air * Math.max(pClean * rClean, rInt) * eff;
+    return { tp, ideal: rClean * eff, co, adj, kinds, sinr, air };
+  }
+  let chRes = null;
+  function chUpdate() {
+    const w = Number(chW()), load = Number(chLoad());
+    chRes = chEval(chMy(), w, load);
+    NB.stat("o-ch-co", chRes.co + "개");
+    NB.stat("o-ch-adj", `<span style="color:${chRes.adj ? "var(--bad)" : "inherit"}">${chRes.adj}개</span>`);
+    const loss = Math.round(100 * (1 - chRes.tp / chRes.ideal));
+    NB.stat("o-ch-score", `<span style="color:${loss > 60 ? "var(--bad)" : loss > 35 ? "var(--warn)" : "var(--ok)"}">${loss}%</span>`);
+    NB.stat("o-ch-tp", mbps(chRes.tp));
+    chCv.redraw();
+  }
+  $("ch-auto").onclick = () => {
+    const w = Number(chW()), load = Number(chLoad()); let best = 1, bt = -1;
+    for (let c = 1; c <= 13; c++) { const r = chEval(c, w, load).tp; if (r > bt + 0.01) { bt = r; best = c; } }
+    chMy.set(best);
+  };
+  const chCv = NB.canvas("#cv-ch", (ctx, w, h) => {
+    const P = NB.palette(); if (!chRes) return;
+    const small = w < 500;
+    const box = { x: small ? 40 : 52, y: 22, w: w - (small ? 52 : 70), h: h - 72 };
+    const X = (f) => box.x + ((f - 2392) / (2492 - 2392)) * box.w;
+    const Y = (d) => box.y + box.h - ((d + 98) / 63) * box.h;
+    ctx.strokeStyle = P.grid; ctx.lineWidth = 1; ctx.font = "11px " + NB.font();
+    for (let d = -90; d <= -40; d += 10) { ctx.beginPath(); ctx.moveTo(box.x, Y(d)); ctx.lineTo(box.x + box.w, Y(d)); ctx.stroke(); NB.text(ctx, d + "", box.x - 6, Y(d), { align: "right", size: 10.5, color: P.dim, mono: true }); }
+    NB.text(ctx, "dBm", box.x - 6, box.y - 10, { align: "right", size: 10.5, color: P.faint });
+    const hump = (lo, hi, top, fill, stroke, lw) => {
+      const pts = [[lo - 10, top - 30], [lo - 1, top - 22], [lo + 1, top - 1], [lo + 2, top], [hi - 2, top], [hi - 1, top - 1], [hi + 1, top - 22], [hi + 10, top - 30]];
+      ctx.beginPath(); ctx.moveTo(X(lo - 10), Y(-98));
+      pts.forEach(([f, d]) => ctx.lineTo(X(f), Y(Math.max(-98, d)))); ctx.lineTo(X(hi + 10), Y(-98)); ctx.closePath();
+      ctx.globalAlpha = 0.22; ctx.fillStyle = fill; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke();
+    };
+    const wMy = Number(chW());
+    ctx.save(); ctx.beginPath(); ctx.rect(box.x, box.y - 30, box.w, box.h + 30); ctx.clip();
+    NEI.forEach((n, i) => {
+      const k = chRes.kinds[i], col = k === "co" ? P.warn : k === "adj" ? P.bad : P.faint;
+      const [lo, hi] = span(n.ch, n.w); hump(lo, hi, n.r, col, col, k === "none" ? 1 : 1.6);
+    });
+    const [lo, hi] = span(chMy(), wMy); hump(lo, hi, -50, P.accent, P.accent, 2.6);
+    NB.text(ctx, "내 AP", X((lo + hi) / 2), Y(-50) - 10, { align: "center", size: 12, bold: true, color: P.accent });
+    ctx.restore();
+    // 노이즈 바닥
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = P.dim; ctx.beginPath(); ctx.moveTo(box.x, Y(noiseFloor(wMy))); ctx.lineTo(box.x + box.w, Y(noiseFloor(wMy))); ctx.stroke(); ctx.setLineDash([]);
+    NB.text(ctx, "잡음 바닥", box.x + box.w - 4, Y(noiseFloor(wMy)) - 8, { align: "right", size: 10.5, color: P.dim });
+    // 채널 눈금
+    ctx.strokeStyle = P.axis; ctx.beginPath(); ctx.moveTo(box.x, box.y + box.h); ctx.lineTo(box.x + box.w, box.y + box.h); ctx.stroke();
+    for (let c = 1; c <= 13; c++) {
+      const key = c === 1 || c === 6 || c === 11;
+      NB.text(ctx, String(c), X(fc(c)), box.y + box.h + 12, { align: "center", size: small ? 10 : 11.5, bold: key || c === chMy(), mono: true, color: c === chMy() ? P.accent : key ? P.text : P.dim });
+    }
+    NB.text(ctx, "채널 번호 (굵게: 겹치지 않는 1·6·11)   2.4 GHz →", box.x + box.w / 2, box.y + box.h + 32, { align: "center", size: small ? 10.5 : 12, color: P.dim });
+    const lg = [[P.accent, "내 AP"], [P.warn, "같은 채널"], [P.bad, "일부 겹침"], [P.faint, "무관"]];
+    let lx = box.x + 6; lg.forEach(([c, t]) => { ctx.fillStyle = c; ctx.fillRect(lx, box.y + 2, 10, 10); NB.text(ctx, t, lx + 14, box.y + 7, { size: 11, color: P.dim }); lx += ctx.measureText(t).width + 30; });
+  }, { aspect: 0.45, minHeight: 280, maxHeight: 380 });
+  chUpdate();
+
+  /* ---------- 2. CSMA/CA ---------- */
+  const SLOT = 9, PAY = 300;
+  const T = (rts) => (rts ? { s: 34 + 40 + 16 + 36 + 16 + PAY + 16 + 32, c: 34 + 40 + 50 } : { s: 34 + PAY + 16 + 32, c: 34 + PAY + 50 });
+  function csmaMC(n, rts, events, seed) {
+    const rnd = NB.rng(seed || 11), tt = T(rts);
+    const cw = new Array(n).fill(15), bo = cw.map((c) => Math.floor(rnd() * (c + 1)));
+    let busy = 0, idle = 0, succ = 0, att = 0, collAtt = 0;
+    for (let e = 0; e < events; e++) {
+      const m = Math.min(...bo); idle += m;
+      const who = []; for (let i = 0; i < n; i++) { bo[i] -= m; if (bo[i] === 0) who.push(i); }
+      att += who.length;
+      if (who.length === 1) { succ++; busy += tt.s; cw[who[0]] = 15; }
+      else { collAtt += who.length; busy += tt.c; who.forEach((i) => (cw[i] = Math.min(1023, cw[i] * 2 + 1))); }
+      who.forEach((i) => (bo[i] = Math.floor(rnd() * (cw[i] + 1))));
+    }
+    const total = busy + idle * SLOT;
+    return { pc: collAtt / att, eff: (succ * PAY) / total, idlePerTx: (idle * SLOT) / events, collFrac: (events - succ) / events };
+  }
+  const curve = { basic: [], rts: [] };
+  for (let n = 1; n <= 30; n++) { curve.basic.push([n, csmaMC(n, false, 3000, n).eff]); curve.rts.push([n, csmaMC(n, true, 3000, n + 50).eff]); }
+  const csN = NB.range("cs-n", (v) => v + "대", () => csReset());
+  const csSpeed = NB.seg("cs-speed", null);
+  $("cs-rts").onchange = () => csReset();
+  $("cs-reset").onclick = () => csReset();
+  let cs = null;
+  function csReset() {
+    const n = csN(), rts = $("cs-rts").checked;
+    cs = { n, rts, cw: new Array(n).fill(15), bo: [], state: "difs", timer: 0, tx: [], succ: 0, coll: 0, log: [], now: 0 };
+    for (let i = 0; i < n; i++) cs.bo.push(Math.floor(Math.random() * 16));
+    const r = csmaMC(n, rts, 8000, 99 + n);
+    NB.stat("o-cs-pc", (r.pc * 100).toFixed(1) + "%");
+    NB.stat("o-cs-eff", (r.eff * 100).toFixed(0) + "%");
+    NB.stat("o-cs-tp", Math.round(600 * r.eff) + " Mbps");
+    NB.stat("o-cs-per", (600 * r.eff / n).toFixed(n > 9 ? 1 : 0) + " Mbps");
+    csCv.redraw();
+  }
+  function csStep() {
+    const tt = T(cs.rts);
+    if (cs.state === "difs") { cs.state = "idle"; return 0.25; }
+    if (cs.state === "busy") {
+      const ok = cs.tx.length === 1;
+      cs.tx.forEach((i) => { cs.cw[i] = ok ? 15 : Math.min(1023, cs.cw[i] * 2 + 1); cs.bo[i] = Math.floor(Math.random() * (cs.cw[i] + 1)); });
+      cs.tx = []; cs.state = "difs"; return 0.3;
+    }
+    const who = []; for (let i = 0; i < cs.n; i++) if (cs.bo[i] === 0) who.push(i);
+    if (who.length) {
+      cs.tx = who; cs.state = "busy";
+      const ok = who.length === 1; ok ? cs.succ++ : cs.coll++;
+      cs.log.push({ t0: cs.now, d: ok ? tt.s : tt.c, k: ok ? "s" : "c" }); cs.now += ok ? tt.s : tt.c;
+      return 0.9;
+    }
+    for (let i = 0; i < cs.n; i++) cs.bo[i]--;
+    cs.log.push({ t0: cs.now, d: SLOT, k: "i" }); cs.now += SLOT;
+    if (cs.log.length > 400) cs.log.splice(0, 100);
+    return 0.14;
+  }
+  const csCv = NB.canvas("#cv-csma", (ctx, w, h) => {
+    const P = NB.palette(); if (!cs) return;
+    const small = w < 500, cwid = small ? 52 : 66, chh = small ? 38 : 44, cols = Math.max(1, Math.floor((w - 20) / cwid));
+    const rows = Math.ceil(cs.n / cols), chipsH = Math.min(rows * chh, h * 0.5);
+    const ch = Math.min(chh, chipsH / rows);
+    for (let i = 0; i < cs.n; i++) {
+      const c = i % cols, r = Math.floor(i / cols), x = 10 + c * cwid, y = 8 + r * ch;
+      const tx = cs.state === "busy" && cs.tx.includes(i), coll = tx && cs.tx.length > 1;
+      NB.box(ctx, x, y, cwid - 6, ch - 6, { fill: coll ? P.bad : tx ? P.accent : P.surface, stroke: tx ? "transparent" : P.border, r: 6 });
+      NB.text(ctx, String(cs.bo[i]), x + (cwid - 6) / 2, y + (ch - 6) * 0.42, { align: "center", size: small ? 13 : 15, bold: true, mono: true, color: tx ? "#fff" : cs.bo[i] <= 2 ? P.accent : P.text });
+      NB.text(ctx, "CW" + cs.cw[i], x + (cwid - 6) / 2, y + (ch - 6) * 0.8, { align: "center", size: 9.5, mono: true, color: tx ? "#fff" : P.faint });
+    }
+    // 상태 + 타임라인
+    let y0 = 14 + rows * ch;
+    const st = cs.state === "busy" ? (cs.tx.length > 1 ? `충돌! ${cs.tx.length}대가 동시에 0` : `STA ${cs.tx[0] + 1} 전송 성공${cs.rts ? " (RTS→CTS→DATA→ACK)" : " (DATA→ACK)"}`) : cs.state === "difs" ? "DIFS 대기" : "빈 슬롯 → 모두 카운터 −1";
+    NB.text(ctx, st, 12, y0 + 6, { size: 12.5, bold: true, color: cs.state === "busy" ? (cs.tx.length > 1 ? P.bad : P.accent) : P.dim });
+    NB.text(ctx, `성공 ${cs.succ} · 충돌 ${cs.coll}`, w - 12, y0 + 6, { align: "right", size: 12, mono: true, color: P.dim });
+    y0 += 18;
+    const win = 6000, tlx = 10, tlw = w - 20, th = 18, tEnd = cs.now;
+    NB.rrect(ctx, tlx, y0, tlw, th, 4); ctx.fillStyle = P.surface; ctx.fill();
+    cs.log.forEach((e) => {
+      const a = tlx + tlw - ((tEnd - e.t0) / win) * tlw, b = a + (e.d / win) * tlw; if (b < tlx) return;
+      ctx.fillStyle = e.k === "s" ? P.accent : e.k === "c" ? P.bad : P.faint; ctx.globalAlpha = e.k === "i" ? 0.35 : 1;
+      ctx.fillRect(Math.max(tlx, a), y0 + (e.k === "i" ? 6 : 1), Math.max(1, b - Math.max(tlx, a) - 0.5), e.k === "i" ? th - 12 : th - 2); ctx.globalAlpha = 1;
+    });
+    NB.text(ctx, "← 최근 6 ms 채널 기록 (파랑 성공 · 빨강 충돌 · 회색 빈 슬롯)", tlx, y0 + th + 11, { size: 10.5, color: P.faint });
+    // 효율 곡선
+    const by = y0 + th + 26, bh = h - by - 26;
+    if (bh > 60) {
+      const res = NB.chart(ctx, { x: small ? 40 : 50, y: by, w: w - (small ? 52 : 70), h: bh }, {
+        x: [1, 30], y: [0.3, 0.75], yFmt: (v) => Math.round(v * 100) + "%", xFmt: (v) => v + "대",
+        series: [{ data: curve.basic, color: P.accent, width: 2.2 }, { data: curve.rts, color: P.accent2, width: 2, dash: [5, 4] }],
+        vlines: [{ x: cs.n, color: P.warn }],
+      });
+      NB.text(ctx, "기본", res.X(2), res.Y(curve.basic[1][1]) - 10, { align: "left", size: 11, color: P.accent, bold: true });
+      NB.text(ctx, "RTS/CTS", res.X(2), res.Y(curve.rts[1][1]) + 12, { align: "left", size: 11, color: P.accent2, bold: true });
+      NB.text(ctx, "데이터 시간 비율", res.box.x + 4, res.box.y + 8, { size: 11, color: P.dim });
+    }
+  }, { aspect: 0.6, minHeight: 440, maxHeight: 480 });
+  let csAcc = 0, csWait = 0;
+  NB.loop($("cv-csma"), (dt) => {
+    if (!cs) return; csAcc += dt * Number(csSpeed());
+    let changed = false;
+    while (csAcc >= csWait) { csAcc -= csWait; csWait = csStep(); changed = true; }
+    if (changed) csCv.redraw();
+  });
+  csReset();
+
+  /* ---------- 3. 처리율 폭포 ---------- */
+  const tpRate = NB.seg("tp-rate", () => tpUpdate());
+  const tpAgg = NB.seg("tp-agg", () => tpUpdate());
+  const tpN = NB.range("tp-n", (v) => v + "대", () => tpUpdate());
+  const collCache = {};
+  const collOf = (n) => (collCache[n] || (collCache[n] = csmaMC(n, false, 4000, 7 + n)));
+  let tpSteps = [];
+  function tpUpdate() {
+    const R = Number(tpRate()), n = tpN(), MP = 1538 * 8;
+    const K = Math.max(1, Math.min(Number(tpAgg()), Math.floor((5.484e3 * R) / MP)));
+    const Td = (K * MP) / R; // µs
+    const cm = collOf(n + 1);
+    const O = 34 + cm.idlePerTx + 40 + 16 + 32;
+    const Tc = (cm.collFrac / (1 - cm.collFrac)) * (Td * 0.6 + 34 + 40 + 50);
+    const Tack = 34 + 40 + 40 + 16 + 32 + ((K / 2) * 100 * 8) / (R / 2);
+    const e1 = (R * Td) / (Td + O), e2 = (R * Td) / (Td + O + Tc), e3 = (R * Td) / (Td + O + Tc + Tack), e4 = e3 * (1460 / 1538);
+    tpSteps = [["표시 속도", R, "base"], ["프리앰블·대기·ACK", e1, "loss"], ["충돌", e2, "loss"], ["상향 TCP ACK (반이중)", e3, "loss"], ["헤더", e4, "loss"], ["실제 합계", e4, "res"], ["1대당", e4 / n, "res2"]];
+    NB.stat("o-tp-air", ((100 * Td) / (Td + O + Tc + Tack)).toFixed(0) + "%");
+    NB.stat("o-tp-all", mbps(e4)); NB.stat("o-tp-one", mbps(e4 / n));
+    NB.stat("o-tp-pct", ((100 * e4) / R).toFixed(0) + "%" + (n > 1 ? " (1대 " + ((100 * e4) / n / R).toFixed(0) + "%)" : ""));
+    tpCv.redraw();
+  }
+  const tpCv = NB.canvas("#cv-tp", (ctx, w, h) => {
+    const P = NB.palette(); if (!tpSteps.length) return;
+    const small = w < 520, R = tpSteps[0][1];
+    const bx = small ? 8 : 20, bw = w - bx * 2, top = 34, bot = h - (small ? 52 : 40), n = tpSteps.length, gap = small ? 4 : 10, cw = (bw - gap * (n - 1)) / n;
+    const Y = (v) => bot - (v / R) * (bot - top);
+    let prev = R;
+    tpSteps.forEach(([name, v, k], i) => {
+      const x = bx + i * (cw + gap);
+      let y1, y2, col;
+      if (k === "base") { y1 = Y(v); y2 = bot; col = P.accent; }
+      else if (k === "loss") { y1 = Y(prev); y2 = Y(v); col = P.bad; }
+      else { y1 = Y(v); y2 = bot; col = k === "res" ? P.ok : P.accent2; }
+      const hh = Math.max(1.5, y2 - y1);
+      ctx.fillStyle = col; ctx.globalAlpha = k === "loss" ? 0.75 : 0.9; NB.rrect(ctx, x, y1, cw, hh, 4); ctx.fill(); ctx.globalAlpha = 1;
+      if (k === "loss" && i < n - 1) { ctx.strokeStyle = P.faint; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x + cw, Y(v)); ctx.lineTo(x + cw + gap, Y(v)); ctx.stroke(); ctx.setLineDash([]); }
+      if (k === "base") { ctx.strokeStyle = P.faint; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x + cw, Y(v)); ctx.lineTo(x + cw + gap, Y(v)); ctx.stroke(); ctx.setLineDash([]); }
+      const cm = (x) => (x >= 1000 ? (x / 1000).toFixed(1) + "G" : Math.round(x) + "M");
+      const lab = small ? (k === "loss" ? "−" + cm(prev - v) : cm(v)) : k === "loss" ? "−" + mbps(prev - v) : mbps(v);
+      NB.text(ctx, lab, x + cw / 2, y1 - 9, { align: "center", size: small ? 9.5 : 11.5, bold: k !== "loss", mono: true, color: k === "loss" ? P.bad : P.text });
+      const SHORT = ["표시", "의식", "충돌", "TCP\nACK", "헤더", "합계", "1대당"];
+      if (small) SHORT[i].split("\n").forEach((s, j) => NB.text(ctx, s, x + cw / 2, bot + 12 + j * 13, { align: "center", size: 10, color: P.dim }));
+      else NB.text(ctx, name, x + cw / 2, bot + 14, { align: "center", size: 11, color: P.dim });
+      if (k === "loss") prev = v;
+    });
+    ctx.strokeStyle = P.axis; ctx.beginPath(); ctx.moveTo(bx, bot); ctx.lineTo(bx + bw, bot); ctx.stroke();
+  }, { aspect: 0.42, minHeight: 260, maxHeight: 340 });
+  tpUpdate();
+
+  /* ---------- 4. 거리 → 속도 ---------- */
+  const BANDS = [{ f: 2437, bw: 40, maxM: 11, name: "2.4 GHz", con: 12, gyp: 3 }, { f: 5500, bw: 80, maxM: 11, name: "5 GHz", con: 17, gyp: 4 }, { f: 5500, bw: 160, maxM: 11, name: "5 GHz", con: 17, gyp: 4 }, { f: 6400, bw: 320, maxM: 13, name: "6 GHz", con: 19, gyp: 5 }];
+  const WALLS = [6, 12, 18, 24, 30, 36];
+  const rgD = NB.range("rg-d", (v) => v + " m", () => rgUpdate());
+  const rgBand = NB.seg("rg-band", () => rgUpdate());
+  const rgWall = NB.seg("rg-wall", () => rgUpdate());
+  function link(d, b, wallType) {
+    const fspl1 = 20 * Math.log10(b.f) - 27.55;
+    const nw = wallType === "none" ? 0 : WALLS.filter((x) => x < d).length;
+    const wl = wallType === "none" ? 0 : b[wallType];
+    const rssi = 20 + 4 - fspl1 - 22 * Math.log10(Math.max(1, d)) - nw * wl;
+    const snr = rssi - noiseFloor(b.bw), m = pickMcs(snr, b.maxM);
+    return { rssi, snr, m, rate: heRate(m, b.bw, 2), nw };
+  }
+  let rgCur = null;
+  function rgUpdate() {
+    const b = BANDS[Number(rgBand())]; rgCur = link(rgD(), b, rgWall());
+    NB.stat("o-rg-rssi", rgCur.rssi.toFixed(0) + " dBm");
+    NB.stat("o-rg-snr", rgCur.snr.toFixed(0) + " dB");
+    NB.stat("o-rg-mcs", rgCur.m < 0 ? "<span style='color:var(--bad)'>연결 끊김</span>" : "MCS " + rgCur.m + " · " + MCS[rgCur.m][2]);
+    const rr = rgCur.rate, G = rr >= 1000;
+    NB.stat("o-rg-rate", rgCur.m < 0 ? "0" : G ? (rr / 1000).toFixed(2) + " → " + (rr * 0.6 / 1000).toFixed(2) + " Gbps" : Math.round(rr) + " → " + Math.round(rr * 0.6) + " Mbps");
+    rgCv.redraw();
+  }
+  const rgCv = NB.canvas("#cv-range", (ctx, w, h) => {
+    const P = NB.palette(); if (!rgCur) return;
+    const b = BANDS[Number(rgBand())], wt = rgWall(), small = w < 500, d = rgD();
+    // 위: 집 단면
+    const sx = small ? 40 : 56, ex = w - 18, sy = 10, sh = 56, Xd = (m) => sx + ((m - 1) / 39) * (ex - sx);
+    NB.rrect(ctx, sx - 30, sy, ex - sx + 40, sh, 8); ctx.fillStyle = P.surface; ctx.fill();
+    if (wt !== "none") WALLS.forEach((m) => { ctx.fillStyle = wt === "con" ? P.dim : P.faint; ctx.fillRect(Xd(m) - (wt === "con" ? 3 : 1.5), sy + 4, wt === "con" ? 6 : 3, sh - 8); });
+    NB.box(ctx, sx - 24, sy + 16, 28, 24, { fill: P.accent2, stroke: false, text: "AP", color: "#fff", size: 10.5, bold: true, r: 5 });
+    ctx.strokeStyle = P.accent2; ctx.globalAlpha = 0.5; for (let k = 1; k <= 3; k++) { ctx.beginPath(); ctx.arc(sx - 10, sy + 28, 10 + k * 7, -0.7, 0.7); ctx.stroke(); } ctx.globalAlpha = 1;
+    const px = Xd(d);
+    NB.box(ctx, px - 9, sy + 14, 18, 28, { fill: rgCur.m < 0 ? P.bad : P.accent, stroke: false, r: 4 });
+    NB.text(ctx, d + " m", px, sy + sh - 4, { align: "center", size: 10.5, mono: true, color: P.text, base: "bottom" });
+    // 아래: 속도 계단
+    const data = [], ref = [];
+    for (let x = 1; x <= 40; x += 0.1) { data.push([x, link(x, b, wt).rate]); ref.push([x, link(x, b, "none").rate]); }
+    const ymax = heRate(b.maxM, b.bw, 2) * 1.08;
+    const res = NB.chart(ctx, { x: small ? 46 : 58, y: sy + sh + 16, w: w - (small ? 58 : 76), h: h - sy - sh - 60 }, {
+      x: [1, 40], y: [0, ymax], xLabel: "공유기에서 거리 (m)", yFmt: (v) => (v >= 1000 ? v / 1000 + "G" : v + ""),
+      series: [{ data: ref, color: P.faint, width: 1.5, dash: [4, 4] }, { data, color: P.accent, width: 2.6 }],
+      vlines: wt === "none" ? [] : WALLS.map((m) => ({ x: m, color: P.border, dash: [2, 3] })),
+      points: [{ x: d, y: rgCur.rate, color: rgCur.m < 0 ? P.bad : P.warn, r: 6 }],
+    });
+    NB.text(ctx, "링크 속도 (Mbps)", res.box.x + 6, res.box.y + 8, { size: 11, color: P.dim });
+  }, { aspect: 0.55, minHeight: 330, maxHeight: 430 });
+  rgUpdate();
+
+  /* ---------- 5. 무선 기술 고르기 ---------- */
+  const TECH = [
+    { n: "Wi-Fi", r: [1, 40], b: [1e6, 5e9], p: 2, lic: false, loc: 1 },
+    { n: "블루투스 클래식", r: [0.5, 10], b: [1e5, 3e6], p: 1, lic: false, loc: 0 },
+    { n: "BLE", r: [0.5, 40], b: [1e3, 1.4e6], p: 0, lic: false, loc: 1 },
+    { n: "NFC", r: [0.005, 0.05], b: [1e3, 4.24e5], p: 0, lic: false, loc: 0 },
+    { n: "UWB", r: [0.1, 40], b: [1e4, 6.8e6], p: 1, lic: false, loc: 2 },
+    { n: "Zigbee/Thread", r: [5, 80], b: [1e2, 2.5e5], p: 0, lic: false, loc: 0 },
+    { n: "LoRaWAN", r: [500, 15000], b: [100, 2e4], p: 0, lic: false, loc: 0 },
+    { n: "NB-IoT", r: [200, 10000], b: [1e3, 1.5e5], p: 0, lic: true, loc: 0 },
+    { n: "LTE/5G", r: [50, 5000], b: [1e5, 2e9], p: 2, lic: true, loc: 0 },
+  ];
+  const pkD = NB.seg("pk-d", () => pkUpdate()), pkR = NB.seg("pk-r", () => pkUpdate()), pkP = NB.seg("pk-p", () => pkUpdate());
+  $("pk-loc").onchange = () => pkUpdate(); $("pk-free").onchange = () => pkUpdate();
+  let pkRank = [];
+  function pkUpdate() {
+    const D = Number(pkD()), Rq = Number(pkR()), Pw = Number(pkP()), loc = $("pk-loc").checked, free = $("pk-free").checked;
+    pkRank = TECH.map((t) => {
+      let pen = 0; const why = [];
+      if (D > t.r[1]) { pen += 30 * Math.log10(D / t.r[1]); why.push("거리 부족"); } else if (D < t.r[0]) { pen += 12 * Math.log10(t.r[0] / D); }
+      if (Rq > t.b[1]) { pen += 32 * Math.log10(Rq / t.b[1]); why.push("속도 부족"); } else if (Rq * 300 < t.b[0]) pen += 6;
+      if (t.p > Pw) { pen += 38 * (t.p - Pw); why.push("전력 과다"); }
+      if (loc && t.loc < 2) { pen += t.loc ? 25 : 45; why.push("정밀 위치 불가"); }
+      if (free && t.lic) { pen += 40; why.push("통신사 요금"); }
+      return { t, s: Math.max(0, Math.round(100 - pen)), why };
+    }).sort((a, b) => b.s - a.s);
+    const [a, b] = pkRank;
+    NB.stat("o-pk-1", a.t.n + " <small style='color:var(--text-dim)'>" + a.s + "점</small>");
+    NB.stat("o-pk-2", b.t.n + " <small style='color:var(--text-dim)'>" + b.s + "점</small>");
+    const R = { "Wi-Fi": "빠르고 집 전체를 덮지만 전력을 많이 쓴다.", "블루투스 클래식": "오디오 스트리밍에 맞춘 속도와 거리.", BLE: "짧게 깨어나 보내고 잠들어 전지로 오래 간다.", NFC: "갖다 대는 순간만 통신, 카드는 전원도 필요 없다.", UWB: "ns 펄스의 비행 시간으로 cm 단위 거리를 잰다.", "Zigbee/Thread": "저전력 메시로 집 안 센서를 묶는다.", LoRaWAN: "느리지만 수 km를 비면허·저전력으로.", "NB-IoT": "통신사 망으로 지하·실내 깊숙이까지 닿는다.", "LTE/5G": "넓은 지역에서 빠르지만 요금과 전력이 든다." };
+    NB.stat("o-pk-why", R[a.t.n] + (a.why.length ? " (아쉬운 점: " + a.why.join(", ") + ")" : ""));
+    pkCv.redraw();
+  }
+  const pkCv = NB.canvas("#cv-pick", (ctx, w, h) => {
+    const P = NB.palette(); if (!pkRank.length) return;
+    const small = w < 460, lw = small ? 92 : 120, n = pkRank.length, rh = (h - 16) / n;
+    pkRank.forEach((e, i) => {
+      const y = 8 + i * rh, bwid = ((w - lw - 56) * e.s) / 100;
+      NB.text(ctx, e.t.n, lw - 8, y + rh / 2, { align: "right", size: small ? 11 : 12.5, bold: i === 0, color: i === 0 ? P.accent : P.text });
+      NB.rrect(ctx, lw, y + rh * 0.2, w - lw - 56, rh * 0.6, 4); ctx.fillStyle = P.surface; ctx.fill();
+      if (bwid > 0) { NB.rrect(ctx, lw, y + rh * 0.2, Math.max(4, bwid), rh * 0.6, 4); ctx.fillStyle = i === 0 ? P.accent : e.s >= 70 ? P.accent2 : e.s >= 40 ? P.warn : P.bad; ctx.globalAlpha = i === 0 ? 1 : 0.7; ctx.fill(); ctx.globalAlpha = 1; }
+      NB.text(ctx, String(e.s), w - 8, y + rh / 2, { align: "right", size: 12, mono: true, bold: true, color: P.dim });
+    });
+  }, { aspect: 0.62, minHeight: 300, maxHeight: 380 });
+  pkUpdate();
+})();
+</script>
+</body>
+</html>

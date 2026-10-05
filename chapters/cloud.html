@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>클라우드 네트워크 · NetworkBook</title>
+<meta name="description" content="리전과 가용 영역, 가상 스위치와 VPC, 보안 그룹과 네트워크 ACL, VXLAN 오버레이, SDN, 로드 밸런서와 일관된 해싱, CDN·애니캐스트·글로벌 로드 밸런싱, 하이브리드 연결을 시뮬레이터로 익힌다.">
+<link rel="canonical" href="https://networkbook.euiyun.com/chapters/cloud.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="NetworkBook">
+<meta property="og:title" content="클라우드 네트워크 · NetworkBook">
+<meta property="og:description" content="리전과 가용 영역, 가상 스위치와 VPC, 보안 그룹과 네트워크 ACL, VXLAN 오버레이, SDN, 로드 밸런서와 일관된 해싱, CDN·애니캐스트·글로벌 로드 밸런싱, 하이브리드 연결을 시뮬레이터로 익힌다.">
+<meta property="og:url" content="https://networkbook.euiyun.com/chapters/cloud.html">
+<meta property="og:image" content="https://networkbook.euiyun.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"클라우드 네트워크","name":"클라우드 네트워크 · NetworkBook","url":"https://networkbook.euiyun.com/chapters/cloud.html","mainEntityOfPage":"https://networkbook.euiyun.com/chapters/cloud.html","inLanguage":"ko","isAccessibleForFree":true,"learningResourceType":"interactive textbook chapter","position":21,"image":"https://networkbook.euiyun.com/og.png","dateModified":"2026-10-05","isPartOf":{"@type":"Book","@id":"https://networkbook.euiyun.com/#book","name":"NetworkBook — 인터랙티브 네트워크 교과서","url":"https://networkbook.euiyun.com/"},"publisher":{"@type":"Organization","name":"NetworkBook","url":"https://networkbook.euiyun.com/"},"description":"리전과 가용 영역, 가상 스위치와 VPC, 보안 그룹과 네트워크 ACL, VXLAN 오버레이, SDN, 로드 밸런서와 일관된 해싱, CDN·애니캐스트·글로벌 로드 밸런싱, 하이브리드 연결을 시뮬레이터로 익힌다."},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"NetworkBook","item":"https://networkbook.euiyun.com/"},{"@type":"ListItem","position":2,"name":"21 클라우드 네트워크","item":"https://networkbook.euiyun.com/chapters/cloud.html"}]}]}</script>
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .vpc-checks { display: grid; gap: 6px; padding: 12px 18px; border-top: 1px solid var(--border); grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+  .vpc-checks button { text-align: left; font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; display: flex; gap: 8px; align-items: flex-start; }
+  .vpc-checks button.sel { outline: 2px solid var(--accent); }
+  .vpc-checks button .mk { font-weight: 800; min-width: 1.2em; }
+  .vpc-checks button.good .mk { color: var(--ok); }
+  .vpc-checks button.badc .mk { color: var(--bad); }
+  .vpc-checks button small { display: block; color: var(--text-dim); font-size: 12.5px; margin-top: 2px; }
+  .vpc-verdict { padding: 10px 18px; border-top: 1px solid var(--border); font-size: 15px; }
+  .ctl-grid { display: grid; gap: 8px 18px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .ctl-grid .ttl { font-size: 13px; font-weight: 700; color: var(--text); margin-top: 4px; }
+  .bad-txt { color: var(--bad); font-weight: 700; }
+  .ok-txt { color: var(--ok); font-weight: 700; }
+  .warn-txt { color: var(--warn); font-weight: 700; }
+</style>
+</head>
+<body data-chapter="cloud">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 21</div>
+    <h1>클라우드 네트워크</h1>
+    <p class="lead">클라우드 콘솔에서 버튼 몇 번만 누르면 서울에 서버가 생기고, 나만의 사설 네트워크와 방화벽, 로드 밸런서가 1분 안에 만들어진다. 케이블을 꽂은 사람은 아무도 없다. 20장의 거대한 물리 네트워크 위에 수백만 고객이 각자 “내 것” 같은 네트워크를 겹쳐 쓰고 있는 것이다. 서로 같은 IP 주소를 써도 섞이지 않고, 남의 서버에는 절대 닿지 않는다. 어떻게 가능할까? 이 장은 소프트웨어로 만든 네트워크, 그리고 전 세계 사용자를 가장 가까운 서버로 안내하는 기술을 다룬다.</p>
+    <ul class="objectives">
+      <li>리전, 가용 영역(AZ), 엣지 PoP의 계층 구조와 각각의 지연 수준을 안다.</li>
+      <li>하이퍼바이저 안의 가상 스위치와 컨테이너 네트워킹이 패킷을 어떻게 나르는지 이해한다.</li>
+      <li>VPC, 서브넷, 라우팅 테이블, 인터넷·NAT 게이트웨이, 보안 그룹(상태 저장)과 네트워크 ACL(무상태)로 안전한 구조를 설계한다.</li>
+      <li>VXLAN 오버레이가 가상망을 물리망과 분리하는 원리와 50바이트 오버헤드를 계산한다.</li>
+      <li>SDN의 중앙 제어와 클라우드의 분산 SDN을 구분한다.</li>
+      <li>L4/L7 로드 밸런서의 알고리즘, 헬스 체크, 일관된 해싱의 장점을 시뮬레이터로 확인한다.</li>
+      <li>CDN, 애니캐스트, 글로벌 로드 밸런싱, 하이브리드 연결과 트래픽 비용 감각을 익힌다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="region">
+    <h2>리전, 가용 영역, 엣지</h2>
+    <p>대형 클라우드는 세계를 <span class="term">리전</span><span class="en">(region)</span>으로 나눈다. 리전은 서울, 도쿄, 버지니아처럼 한 도시권에 모인 데이터센터 묶음이다. 리전 안에는 보통 셋 이상의 <span class="term">가용 영역</span><span class="en">(Availability Zone, AZ)</span>이 있다. AZ는 전력·냉각·네트워크가 서로 독립된 데이터센터(또는 그 묶음)로, 한 AZ에 정전이나 화재가 나도 다른 AZ는 멀쩡하도록 수 km~수십 km 떨어져 있다. 그러면서도 같은 리전 안의 AZ끼리는 전용 광케이블로 이어져 왕복 지연이 보통 1~2 ms 수준이다. 그래서 서비스를 여러 AZ에 나눠 두고 데이터를 실시간 복제할 수 있다.</p>
+    <p>리전과 리전 사이는 클라우드 회사가 직접 깔거나 빌린 해저·육상 광케이블로 만든 <b>사설 백본</b>이 잇는다(5장). 공용 인터넷을 거치지 않으므로 혼잡이 덜하고 경로가 안정적이다. 그리고 사용자 가까이에는 수백 곳의 <span class="term">엣지 PoP</span><span class="en">(Point of Presence)</span>가 있다. 리전보다 훨씬 작은 거점으로, 콘텐츠 캐시(CDN), DNS, 보안 필터, TLS 연결 종료를 맡아 사용자의 첫 접속 지점을 몇 ms 거리로 끌어당긴다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 300" style="min-width:600px" role="img" aria-label="리전, 가용 영역, 엣지 PoP의 계층 구조">
+        <defs><marker id="cl-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"/></marker></defs>
+        <rect x="20" y="40" width="330" height="190" rx="14" class="f-acc-soft"/>
+        <text x="36" y="62" class="t" style="font-weight:700">리전: 서울</text>
+        <g class="t" style="font-size:12px" text-anchor="middle">
+          <rect x="40" y="80" width="88" height="70" rx="10" class="f-elev"/><text x="84" y="104" style="font-weight:700">AZ-a</text><text x="84" y="124" class="t-dim">데이터센터</text><text x="84" y="140" class="t-dim">2~3동</text>
+          <rect x="141" y="80" width="88" height="70" rx="10" class="f-elev"/><text x="185" y="104" style="font-weight:700">AZ-b</text><text x="185" y="124" class="t-dim">독립 전력</text><text x="185" y="140" class="t-dim">독립 냉각</text>
+          <rect x="242" y="80" width="88" height="70" rx="10" class="f-elev"/><text x="286" y="104" style="font-weight:700">AZ-c</text><text x="286" y="124" class="t-dim">수~수십 km</text><text x="286" y="140" class="t-dim">떨어짐</text>
+        </g>
+        <g stroke="var(--accent)" stroke-width="2.4"><path d="M128 115 H141 M229 115 H242"/><path d="M84 150 C 84 180, 286 180, 286 150" fill="none"/></g>
+        <text x="185" y="200" text-anchor="middle" class="t-mono" style="font-size:12px;fill:var(--accent)">AZ 간 왕복 ~1–2 ms · 전용 광링크</text>
+        <text x="185" y="220" text-anchor="middle" class="t-dim" style="font-size:12px">동기 복제, 다중 AZ 배치가 가능한 거리</text>
+        <rect x="470" y="40" width="330" height="80" rx="14" class="f-acc-soft"/>
+        <text x="486" y="62" class="t" style="font-weight:700">리전: 버지니아 · 프랑크푸르트 …</text>
+        <text x="486" y="86" class="t-dim" style="font-size:12px">전 세계 수십 개 리전, 각각 AZ 3개 이상</text>
+        <text x="486" y="106" class="t-dim" style="font-size:12px">리전 간: 데이터 주권·재해 복구 단위</text>
+        <path d="M350 100 C 400 80, 420 80, 466 80" fill="none" stroke="var(--accent-2)" stroke-width="3" marker-end="url(#cl-a)"/>
+        <text x="410" y="68" text-anchor="middle" style="fill:var(--accent-2);font-size:12px;font-weight:700">사설 백본</text>
+        <text x="635" y="142" text-anchor="middle" class="t-mono" style="font-size:11px;fill:var(--accent-2)">예: 서울↔버지니아 왕복 ~180 ms</text>
+        <g class="t" style="font-size:11px" text-anchor="middle">
+          <circle cx="490" cy="200" r="20" class="f-surface" stroke="var(--warn)"/><text x="490" y="204">PoP</text>
+          <circle cx="560" cy="180" r="20" class="f-surface" stroke="var(--warn)"/><text x="560" y="184">PoP</text>
+          <circle cx="630" cy="210" r="20" class="f-surface" stroke="var(--warn)"/><text x="630" y="214">PoP</text>
+          <circle cx="700" cy="185" r="20" class="f-surface" stroke="var(--warn)"/><text x="700" y="189">PoP</text>
+          <circle cx="765" cy="215" r="20" class="f-surface" stroke="var(--warn)"/><text x="765" y="219">PoP</text>
+        </g>
+        <text x="630" y="250" text-anchor="middle" style="fill:var(--warn);font-size:12px;font-weight:700">엣지 PoP: 수백 곳 · 사용자에서 수 ms</text>
+        <text x="630" y="270" text-anchor="middle" class="t-dim" style="font-size:12px">CDN 캐시, DNS, TLS 종료, DDoS 방어</text>
+        <path d="M350 200 H466" stroke="var(--warn)" stroke-width="1.6" stroke-dasharray="5 4"/>
+        <text x="185" y="270" text-anchor="middle" class="t-dim" style="font-size:12px">사용자 → 가까운 PoP → 백본 → 리전 → AZ</text>
+      </svg></div>
+      <figcaption><b>그림 21-1.</b> 클라우드의 지리적 계층. AZ는 “고장의 경계”, 리전은 “지리와 법(데이터 주권)의 경계”, 엣지 PoP는 “사용자와의 첫 만남 지점”이다.</figcaption>
+    </figure>
+    <div class="callout analogy"><strong>전국 물류망</strong><p>리전은 권역별 대형 물류 단지, AZ는 같은 단지 안에서 서로 다른 변전소를 쓰는 창고 동들이다. 한 동에 불이 나도 옆 동에서 출고가 계속된다. 엣지 PoP는 동네마다 있는 편의점 택배 보관함이다. 자주 찾는 물건(인기 영상, 이미지)은 아예 보관함에 미리 갖다 놓는다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="virt">
+    <h2>서버 안의 스위치: 가상화와 네트워크</h2>
+    <p>클라우드 서버 한 대(물리 호스트)에는 여러 고객의 <b>가상 머신</b>(VM)이 함께 산다. VM마다 진짜처럼 보이는 가상 NIC가 있고, 하이퍼바이저 안의 <span class="term">가상 스위치</span><span class="en">(virtual switch)</span>가 이 가상 NIC들과 물리 NIC 사이에서 이더넷 스위치(6장) 노릇을 한다. 같은 호스트 안의 VM끼리는 패킷이 케이블을 타지 않고 메모리 복사로 오간다. 오픈소스 Open vSwitch(OVS)가 대표적이다.</p>
+    <p>가상 스위치는 단순히 넘기기만 하지 않는다. 이 패킷이 어느 고객의 어느 가상망 소속인지 확인하고, 방화벽 규칙(보안 그룹)을 검사하고, 다른 호스트로 갈 패킷은 오버레이 헤더로 감싼다. 이 일을 CPU가 다 하면 손님에게 팔 CPU가 줄어든다. 그래서 대형 클라우드는 이 기능을 SmartNIC/DPU(17장) 같은 전용 하드웨어로 옮겼다. AWS의 Nitro 카드가 대표적이다.</p>
+    <p><b>컨테이너</b>는 VM보다 가볍게, 운영체제 커널 하나를 여러 앱이 나눠 쓴다. 컨테이너마다 독립된 <b>네트워크 네임스페이스</b>(자기만의 인터페이스·라우팅 테이블)를 받고, 한 쌍으로 이어진 가상 이더넷 케이블(veth)로 호스트의 브리지에 연결된다. 쿠버네티스는 모든 파드(pod)가 고유 IP를 갖고 NAT 없이 서로 통신해야 한다는 규칙만 정하고, 실제 연결은 CNI 플러그인(Calico, Cilium 등)에 맡긴다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 290" style="min-width:600px" role="img" aria-label="물리 호스트 안의 가상 머신, 가상 스위치, 컨테이너 네트워킹">
+        <rect x="16" y="16" width="788" height="258" rx="14" class="f-surface"/>
+        <text x="32" y="38" class="t" style="font-weight:700">물리 호스트 (서버 한 대)</text>
+        <g class="t" style="font-size:12px" text-anchor="middle">
+          <rect x="40" y="54" width="130" height="70" rx="10" class="f-elev"/><text x="105" y="78" style="font-weight:700">VM 1 (고객 A)</text><rect x="75" y="94" width="60" height="20" rx="4" class="f-acc-soft"/><text x="105" y="108" class="t-mono" style="font-size:10.5px">vNIC</text>
+          <rect x="190" y="54" width="130" height="70" rx="10" class="f-elev"/><text x="255" y="78" style="font-weight:700">VM 2 (고객 B)</text><rect x="225" y="94" width="60" height="20" rx="4" class="f-acc2-soft"/><text x="255" y="108" class="t-mono" style="font-size:10.5px">vNIC</text>
+          <rect x="340" y="54" width="130" height="70" rx="10" class="f-elev"/><text x="405" y="78" style="font-weight:700">VM 3 (고객 A)</text><rect x="375" y="94" width="60" height="20" rx="4" class="f-acc-soft"/><text x="405" y="108" class="t-mono" style="font-size:10.5px">vNIC</text>
+        </g>
+        <rect x="40" y="150" width="430" height="44" rx="10" class="f-acc"/>
+        <text x="255" y="170" text-anchor="middle" style="fill:#fff;font-weight:700;font-size:13px">가상 스위치 (하이퍼바이저 / SmartNIC)</text>
+        <text x="255" y="186" text-anchor="middle" style="fill:#fff;font-size:11px">고객별 가상망 구분 · 보안 그룹 검사 · VXLAN 캡슐화</text>
+        <g stroke="var(--accent)" stroke-width="2"><path d="M105 114 V150 M255 114 V150 M405 114 V150"/></g>
+        <rect x="200" y="222" width="110" height="34" rx="8" class="f-elev" stroke="var(--accent)"/><text x="255" y="243" text-anchor="middle" class="t" style="font-size:12px;font-weight:700">물리 NIC</text>
+        <path d="M255 194 V222" stroke="var(--accent)" stroke-width="3"/>
+        <path d="M310 239 H380" stroke="var(--warn)" stroke-width="3"/><text x="386" y="243" class="t-dim" style="font-size:12px">→ ToR (20장)</text>
+        <line x1="500" y1="50" x2="500" y2="260" stroke="var(--border)" stroke-dasharray="4 4"/>
+        <text x="520" y="64" class="t" style="font-weight:700;font-size:13px">컨테이너 (같은 커널 공유)</text>
+        <g class="t" style="font-size:11.5px" text-anchor="middle">
+          <rect x="520" y="80" width="80" height="54" rx="8" class="f-elev"/><text x="560" y="100">파드 1</text><text x="560" y="120" class="t-mono" style="font-size:10px">10.1.0.5</text>
+          <rect x="615" y="80" width="80" height="54" rx="8" class="f-elev"/><text x="655" y="100">파드 2</text><text x="655" y="120" class="t-mono" style="font-size:10px">10.1.0.6</text>
+          <rect x="710" y="80" width="80" height="54" rx="8" class="f-elev"/><text x="750" y="100">파드 3</text><text x="750" y="120" class="t-mono" style="font-size:10px">10.1.0.7</text>
+        </g>
+        <g stroke="var(--ok)" stroke-width="2"><path d="M560 134 V170 M655 134 V170 M750 134 V170"/></g>
+        <g style="font-size:10px;fill:var(--ok)"><text x="564" y="156">veth</text><text x="659" y="156">veth</text><text x="754" y="156">veth</text></g>
+        <rect x="520" y="170" width="270" height="30" rx="8" class="f-acc2-soft"/><text x="655" y="190" text-anchor="middle" class="t" style="font-size:12px">리눅스 브리지 / eBPF 데이터 경로 (CNI)</text>
+        <text x="655" y="226" text-anchor="middle" class="t-dim" style="font-size:12px">각 파드는 자기 네트워크 네임스페이스와 IP</text>
+        <text x="655" y="246" text-anchor="middle" class="t-dim" style="font-size:12px">다른 호스트의 파드와는 라우팅 또는 오버레이로</text>
+      </svg></div>
+      <figcaption><b>그림 21-2.</b> 한 대의 물리 서버 안. 왼쪽: 가상 스위치가 서로 다른 고객의 VM을 가르고 물리 NIC로 내보낸다. 오른쪽: 컨테이너(파드)는 veth 쌍으로 브리지에 붙는다. 가상 세계에도 NIC·스위치·라우터가 그대로 있다.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="vpc">
+    <h2>VPC: 내 전용 가상 네트워크 설계하기</h2>
+    <p><span class="term">VPC</span><span class="en">(Virtual Private Cloud)</span>는 클라우드 안에 만드는 나만의 사설 네트워크다. 먼저 <code>10.0.0.0/16</code>처럼 사설 주소 범위(7장)를 정하고, 이를 AZ별 <b>서브넷</b>으로 쪼갠다. 다른 고객도 똑같이 <code>10.0.0.0/16</code>을 써도 서로 보이지 않는다. 각 서브넷에는 <b>라우팅 테이블</b>(8장)이 붙는다.</p>
+    <ul>
+      <li><b>퍼블릭 서브넷</b>: 라우팅 테이블에 “<code>0.0.0.0/0</code>(그 밖의 모든 곳) → <span class="term">인터넷 게이트웨이</span>” 경로가 있는 서브넷. 공인 IP를 붙인 서버가 인터넷과 직접 주고받는다.</li>
+      <li><b>프라이빗 서브넷</b>: 인터넷 게이트웨이 경로가 없다. 바깥에서 들어올 길이 아예 없다. 안에서 바깥으로 업데이트를 받으러 나갈 때는 퍼블릭 서브넷의 <span class="term">NAT 게이트웨이</span>를 거친다(7장의 집 공유기 NAT와 같은 원리). 나갈 수는 있지만 들어올 수는 없다.</li>
+    </ul>
+    <p>여기에 두 겹의 방화벽이 붙는다. 둘의 차이가 시험에도, 실무 장애에도 자주 나온다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th></th><th><span class="term">보안 그룹</span><span class="en">(security group)</span></th><th><span class="term">네트워크 ACL</span><span class="en">(network ACL)</span></th></tr></thead>
+      <tbody>
+        <tr><td>붙는 곳</td><td>서버(가상 NIC) 하나하나</td><td>서브넷 경계</td></tr>
+        <tr><td>상태</td><td><b>상태 저장</b>(stateful): 들어온 요청의 응답은 자동 허용</td><td><b>무상태</b>(stateless): 응답 패킷도 규칙으로 따로 허용해야 함</td></tr>
+        <tr><td>규칙</td><td>허용만 있음 (나머지 모두 거부)</td><td>허용과 거부, 번호 순서대로 평가</td></tr>
+        <tr><td>출처 지정</td><td>IP 범위 또는 <b>다른 보안 그룹</b>(“웹 서버 그룹에서 오는 것”)</td><td>IP 범위만</td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout analogy"><strong>건물 출입 관리</strong><p>네트워크 ACL은 층마다 있는 출입구 경비원이다. 명단만 보고 들어오는 사람과 나가는 사람을 따로 검사하며, 아까 들어간 사람이 나오는지 기억하지 못한다. 보안 그룹은 사무실 문의 직원이다. 방문객 목록을 기억하므로, 내가 부른 손님이 돌아가는 것은 따로 묻지 않는다.</p></div>
+    <div class="sim" id="sim-vpc">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>VPC 설계와 도달성 점검</h3></div>
+      <div class="sim-view"><canvas id="cv-vpc"></canvas></div>
+      <div class="vpc-checks" id="vpc-checks"></div>
+      <div class="vpc-verdict" id="vpc-verdict"></div>
+      <div class="sim-controls">
+        <div class="ctl-grid">
+          <div><div class="ttl">배치</div>
+            <label class="check"><input type="checkbox" id="v-webpub" checked> 웹 서버를 퍼블릭 서브넷에</label>
+            <label class="check"><input type="checkbox" id="v-dbpub"> DB를 퍼블릭 서브넷에(공인 IP)</label>
+            <label class="check"><input type="checkbox" id="v-bastion" checked> 관리 서버(배스천) 두기</label>
+            <label class="check"><input type="checkbox" id="v-nat" checked> NAT 게이트웨이 두기</label></div>
+          <div><div class="ttl">보안 그룹 규칙</div>
+            <label class="check"><input type="checkbox" id="v-w443" checked> 웹: TCP 443 ← 0.0.0.0/0</label>
+            <label class="check"><input type="checkbox" id="v-w22"> 웹: TCP 22(SSH) ← 0.0.0.0/0</label>
+            <label class="check"><input type="checkbox" id="v-dbweb" checked> DB: TCP 3306 ← 웹 서버 그룹</label>
+            <label class="check"><input type="checkbox" id="v-dbany"> DB: TCP 3306 ← 0.0.0.0/0</label>
+            <label class="check"><input type="checkbox" id="v-db22" checked> DB: TCP 22 ← 관리 서버 그룹</label></div>
+          <div><div class="ttl">프라이빗 서브넷 네트워크 ACL</div>
+            <label class="check"><input type="checkbox" id="v-eph" checked> 아웃바운드: 임시 포트 1024–65535 허용</label></div>
+        </div>
+      </div>
+      <div class="sim-note">점검 항목을 누르면 그 경로가 그림에 그려진다(초록 = 통함, 빨강 ✕ = 막힌 곳). ✓/✗ 표시의 색은 “바라는 결과인가”를 뜻한다. 인터넷 → DB가 막혀 있으면 초록 ✗로 좋은 것이다. 단순화: 네트워크 ACL은 프라이빗 서브넷에만 두고, 인바운드는 VPC 내부와 응답 포트를 허용한다고 가정했다. 같은 서브넷 안의 통신은 ACL을 지나지 않는다. 해볼 것: ① DB를 퍼블릭에 두고 3306을 0.0.0.0/0에 열어 보자(실제 데이터 유출 사고의 흔한 원인). ② NAT를 끄면 프라이빗 DB가 보안 패치를 못 받는다. ③ ACL의 임시 포트 허용을 끄면?</div>
+    </div>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">프라이빗 서브넷의 네트워크 ACL이 인바운드 3306은 허용하지만, 아웃바운드 임시 포트(1024–65535)를 막았다. 보안 그룹은 모두 올바르다. 웹 서버 → DB 질의는?</p><p class="wi-hint">VPC 시뮬레이터에서 ‘임시 포트 허용’을 끄고 “웹 → DB” 항목을 눌러 보자.</p><div class="opts">
+      <button class="opt">문제없다 — 보안 그룹이 응답을 자동 허용하므로</button><button class="opt" data-correct>실패한다 — 요청은 들어가지만 DB의 응답이 ACL에서 막힌다</button><button class="opt">요청 자체가 들어가지 못한다</button><button class="opt">NAT 게이트웨이를 거쳐 우회한다</button>
+    </div><div class="quiz-exp">웹 서버의 연결은 출발 포트로 임시 포트(예: 49152)를 쓰므로, DB의 응답은 “3306 → 49152”로 나간다. 보안 그룹은 상태 저장이라 응답을 기억하지만, 네트워크 ACL은 무상태라 응답도 별도 규칙이 필요하다. 연결이 맺어지지 않고 시간 초과로 끝나, 원인을 찾기 어려운 장애가 된다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="overlay">
+    <h2>오버레이: 상자 안에 상자를 한 번 더</h2>
+    <p>고객 A의 VM(10.0.1.5)이 다른 호스트에 있는 같은 고객의 VM(10.0.2.9)에 패킷을 보낸다고 하자. 물리 데이터센터망(20장의 리프-스파인)은 고객의 사설 주소를 모른다. 게다가 고객 B도 똑같은 10.0.1.5를 쓸 수 있다. 해법은 3장의 캡슐화를 한 번 더 하는 것이다. 출발 호스트의 가상 스위치가 VM의 이더넷 프레임을 통째로 새 상자에 넣고, 겉면에 <b>물리 호스트의 IP</b>와 <b>가상망 번호</b>를 적는다. 물리망은 겉 상자만 보고 호스트에서 호스트로 나르고, 도착 호스트가 겉 상자를 벗겨 안쪽 프레임을 VM에게 건넨다.</p>
+    <p>이렇게 물리망(<span class="term">언더레이</span><span class="en">(underlay)</span>) 위에 소프트웨어로 그린 가상망을 <span class="term">오버레이</span><span class="en">(overlay)</span>라 한다. 가장 널리 쓰는 형식이 <span class="term">VXLAN</span><span class="en">(Virtual eXtensible LAN, RFC 7348)</span>이다. 안쪽 프레임 앞에 8바이트 VXLAN 헤더를 붙이고 UDP(목적지 포트 <b>4789</b>)/IP/이더넷으로 감싼다. VXLAN 헤더의 <b>VNI</b>(VXLAN Network Identifier)는 24비트라 2²⁴ ≈ <b>1,677만</b> 개의 가상망을 구분한다. VLAN(6장)의 12비트(4,094개)로는 수백만 고객을 감당할 수 없었다. 바깥 UDP 출발 포트는 안쪽 흐름의 해시로 정해, 20장의 ECMP가 오버레이 흐름도 여러 경로에 고르게 나누게 한다. 요즘은 확장 필드를 붙일 수 있는 GENEVE(UDP 6081)도 많이 쓴다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 250" style="min-width:620px" role="img" aria-label="VXLAN 캡슐화 구조">
+        <text x="20" y="24" class="t" style="font-weight:700">바깥 (언더레이: 물리망이 보는 부분)</text>
+        <text x="800" y="24" text-anchor="end" class="t" style="font-weight:700">안쪽 (오버레이: VM이 보낸 원래 프레임)</text>
+        <g class="t" style="font-size:12px" text-anchor="middle">
+          <rect x="20" y="40" width="110" height="64" rx="6" class="f-surface" stroke="var(--warn)"/><text x="75" y="64" style="font-weight:700">바깥 이더넷</text><text x="75" y="84" class="t-mono" style="font-size:11px">14 B</text>
+          <rect x="134" y="40" width="130" height="64" rx="6" class="f-surface" stroke="var(--warn)"/><text x="199" y="64" style="font-weight:700">바깥 IP</text><text x="199" y="84" class="t-mono" style="font-size:11px">20 B · 호스트 IP</text>
+          <rect x="268" y="40" width="110" height="64" rx="6" class="f-surface" stroke="var(--warn)"/><text x="323" y="64" style="font-weight:700">UDP</text><text x="323" y="84" class="t-mono" style="font-size:11px">8 B · 포트 4789</text>
+          <rect x="382" y="40" width="120" height="64" rx="6" class="f-acc2-soft"/><text x="442" y="64" style="font-weight:700">VXLAN</text><text x="442" y="84" class="t-mono" style="font-size:11px">8 B · VNI 24비트</text>
+          <rect x="510" y="40" width="96" height="64" rx="6" class="f-acc-soft"/><text x="558" y="64">안쪽 이더넷</text><text x="558" y="84" class="t-mono" style="font-size:11px">VM MAC</text>
+          <rect x="610" y="40" width="80" height="64" rx="6" class="f-acc-soft"/><text x="650" y="64">안쪽 IP</text><text x="650" y="84" class="t-mono" style="font-size:11px">10.0.x.x</text>
+          <rect x="694" y="40" width="106" height="64" rx="6" class="f-acc-soft"/><text x="747" y="64">TCP + 데이터</text><text x="747" y="84" class="t-mono" style="font-size:11px">원래 내용</text>
+        </g>
+        <path d="M20 118 H502" stroke="var(--warn)" stroke-width="2"/><path d="M20 112 V124 M502 112 V124" stroke="var(--warn)" stroke-width="2"/>
+        <text x="261" y="140" text-anchor="middle" style="fill:var(--warn);font-size:13px;font-weight:700">추가되는 헤더 14 + 20 + 8 + 8 = 50바이트</text>
+        <path d="M510 118 H800" stroke="var(--accent)" stroke-width="2"/><path d="M510 112 V124 M800 112 V124" stroke="var(--accent)" stroke-width="2"/>
+        <text x="655" y="140" text-anchor="middle" style="fill:var(--accent);font-size:13px;font-weight:700">VM의 프레임 그대로 (변경 없음)</text>
+        <g class="t" style="font-size:12px">
+          <rect x="20" y="164" width="780" height="70" rx="10" class="f-surface"/>
+          <text x="36" y="188">① VM 10.0.1.5가 10.0.2.9로 프레임을 보낸다 → ② 출발 호스트의 가상 스위치(VTEP)가 “10.0.2.9는 호스트 192.168.7.21에 있다”를 조회</text>
+          <text x="36" y="210">③ 50바이트를 덧씌워 물리망으로 → 리프·스파인은 바깥 IP만 보고 전달 → ④ 도착 호스트가 VNI 확인 후 껍데기를 벗겨 VM에 전달</text>
+        </g>
+      </svg></div>
+      <figcaption><b>그림 21-3.</b> VXLAN 캡슐화. 3장에서 본 “상자 속 상자”가 한 겹 더 늘었다. 바깥 IPv4 기준 50바이트(바깥 VLAN 태그가 있으면 54, IPv6면 70바이트)가 추가된다. 캡슐을 씌우고 벗기는 장치를 VTEP(VXLAN Tunnel End Point)이라 한다.</figcaption>
+    </figure>
+    <div class="sim" id="sim-vx">
+      <div class="sim-head"><span class="sim-tag">CALCULATOR</span><h3>오버레이 오버헤드와 MTU</h3></div>
+      <div class="sim-view"><canvas id="cv-vx"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>물리망(언더레이) MTU</span><div class="seg" id="vx-mtu"><button data-value="1500">1500 (보통)</button><button data-value="9001" class="on">9001 (점보 프레임)</button></div></div>
+        <div class="ctrl"><span>바깥 IP</span><div class="seg" id="vx-ip"><button data-value="20" class="on">IPv4 (20 B)</button><button data-value="40">IPv6 (40 B)</button></div></div>
+        <label class="ctrl"><span>VM이 보내는 IP 패킷 크기 <output id="vx-p-out"></output></span><input type="range" id="vx-p" min="64" max="9000" step="1" value="1500"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">추가 헤더</span><span class="v" id="o-vx-oh">—</span></div>
+        <div class="stat"><span class="k">VM에 줄 수 있는 최대 MTU</span><span class="v" id="o-vx-mtu">—</span></div>
+        <div class="stat"><span class="k">바깥 프레임 크기</span><span class="v" id="o-vx-len">—</span></div>
+        <div class="stat"><span class="k">전송 효율 (안쪽 IP / 바깥 프레임)</span><span class="v" id="o-vx-eff">—</span></div>
+      </div>
+      <div class="sim-note">프레임 길이는 이더넷 헤더 14바이트를 포함하고 FCS·프리앰블은 뺐다. 물리망 MTU(IP 패킷 기준)가 1500이면 VM에는 1450까지만 줄 수 있다. 그래서 클라우드 데이터센터는 물리망을 9000바이트급 점보 프레임으로 운영하고, VM에 1500 이상(예: 9001)을 그대로 준다. 해볼 것: 패킷을 64바이트로 줄이면 효율이 급격히 떨어진다. 작은 패킷이 많은 서비스(DNS, 게임)일수록 헤더 비용이 크다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="sdn">
+    <h2>SDN: 네트워크의 두뇌를 떼어 내기</h2>
+    <p>전통적인 라우터와 스위치는 장비마다 두뇌와 손발을 함께 갖는다. 두뇌인 <b>제어 평면</b>(control plane)이 이웃과 라우팅 정보를 교환해 경로를 계산하고(8장의 OSPF, BGP), 손발인 <b>데이터 평면</b>(data plane)이 그 결과표대로 패킷을 초당 수십억 개씩 넘긴다(17장). 수천 대가 각자 계산하고 각자 설정을 받으니, 네트워크 전체를 한 번에 바꾸기가 어렵다.</p>
+    <p><span class="term">SDN</span><span class="en">(Software-Defined Networking)</span>은 두뇌를 장비 밖으로 꺼내 <b>컨트롤러</b>라는 소프트웨어에 모은다. 컨트롤러는 망 전체 지도를 보고 경로를 계산해 각 스위치의 “일치 → 동작” 표(이 주소면 3번 포트로, 저 포트면 버리기)를 직접 채운다. 2008년 스탠퍼드에서 나온 <span class="term">오픈플로우</span><span class="en">(OpenFlow)</span>가 그 표를 원격으로 채우는 표준 규약이었다. 구글은 이 방식으로 데이터센터 간 백본(B4)의 링크 사용률을 크게 끌어올렸다고 발표했다.</p>
+    <figure class="diagram">
+      <div style="overflow-x:auto"><svg viewBox="0 0 820 270" style="min-width:600px" role="img" aria-label="분산 제어, 중앙 SDN, 클라우드 분산 SDN 비교">
+        <text x="135" y="22" text-anchor="middle" class="t" style="font-weight:700">전통: 장비마다 두뇌</text>
+        <text x="410" y="22" text-anchor="middle" class="t" style="font-weight:700">SDN: 중앙 컨트롤러</text>
+        <text x="685" y="22" text-anchor="middle" class="t" style="font-weight:700">클라우드: 분산 SDN</text>
+        <g stroke="var(--border)" stroke-width="2"><path d="M70 130 L200 130 M70 130 L135 210 M200 130 L135 210"/></g>
+        <g class="t" style="font-size:11px" text-anchor="middle">
+          <rect x="40" y="105" width="60" height="50" rx="8" class="f-elev"/><circle cx="70" cy="120" r="7" fill="var(--accent-2)"/><text x="70" y="145">라우터</text>
+          <rect x="170" y="105" width="60" height="50" rx="8" class="f-elev"/><circle cx="200" cy="120" r="7" fill="var(--accent-2)"/><text x="200" y="145">라우터</text>
+          <rect x="105" y="185" width="60" height="50" rx="8" class="f-elev"/><circle cx="135" cy="200" r="7" fill="var(--accent-2)"/><text x="135" y="225">라우터</text>
+        </g>
+        <text x="135" y="70" text-anchor="middle" class="t-dim" style="font-size:12px">보라 점 = 제어 평면</text>
+        <text x="135" y="88" text-anchor="middle" class="t-dim" style="font-size:12px">이웃끼리 경로 정보 교환</text>
+        <line x1="272" y1="36" x2="272" y2="250" stroke="var(--border)" stroke-dasharray="4 4"/>
+        <rect x="350" y="40" width="120" height="40" rx="10" fill="var(--accent-2)"/><text x="410" y="65" text-anchor="middle" style="fill:#fff;font-weight:700;font-size:13px">컨트롤러</text>
+        <g stroke="var(--accent-2)" stroke-width="1.6" stroke-dasharray="5 4"><path d="M380 80 L330 130 M410 80 L410 130 M440 80 L490 130"/></g>
+        <text x="476" y="104" style="fill:var(--accent-2);font-size:11px">OpenFlow</text>
+        <g stroke="var(--border)" stroke-width="2"><path d="M330 150 L410 150 L490 150"/></g>
+        <g class="t" style="font-size:11px" text-anchor="middle">
+          <rect x="300" y="130" width="60" height="40" rx="8" class="f-acc-soft"/><text x="330" y="154">스위치</text>
+          <rect x="380" y="130" width="60" height="40" rx="8" class="f-acc-soft"/><text x="410" y="154">스위치</text>
+          <rect x="460" y="130" width="60" height="40" rx="8" class="f-acc-soft"/><text x="490" y="154">스위치</text>
+        </g>
+        <text x="410" y="200" text-anchor="middle" class="t-dim" style="font-size:12px">스위치는 표대로 넘기기만(데이터 평면)</text>
+        <text x="410" y="218" text-anchor="middle" class="t-dim" style="font-size:12px">망 전체를 한 프로그램으로 제어</text>
+        <line x1="548" y1="36" x2="548" y2="250" stroke="var(--border)" stroke-dasharray="4 4"/>
+        <rect x="610" y="40" width="150" height="40" rx="10" fill="var(--accent-2)"/><text x="685" y="58" text-anchor="middle" style="fill:#fff;font-weight:700;font-size:12px">제어 평면 (복제된 DB)</text><text x="685" y="73" text-anchor="middle" style="fill:#fff;font-size:10.5px">VPC·SG·라우팅 설정</text>
+        <g stroke="var(--accent-2)" stroke-width="1.6" stroke-dasharray="5 4"><path d="M640 80 L600 130 M685 80 L685 130 M730 80 L770 130"/></g>
+        <g class="t" style="font-size:10.5px" text-anchor="middle">
+          <rect x="565" y="130" width="70" height="50" rx="8" class="f-elev"/><text x="600" y="150">호스트</text><text x="600" y="168" style="fill:var(--accent)">가상 스위치</text>
+          <rect x="650" y="130" width="70" height="50" rx="8" class="f-elev"/><text x="685" y="150">호스트</text><text x="685" y="168" style="fill:var(--accent)">가상 스위치</text>
+          <rect x="735" y="130" width="70" height="50" rx="8" class="f-elev"/><text x="770" y="150">호스트</text><text x="770" y="168" style="fill:var(--accent)">가상 스위치</text>
+        </g>
+        <text x="685" y="208" text-anchor="middle" class="t-dim" style="font-size:12px">수백만 호스트가 각자 규칙 집행</text>
+        <text x="685" y="226" text-anchor="middle" class="t-dim" style="font-size:12px">물리망은 단순한 IP 패브릭</text>
+      </svg></div>
+      <figcaption><b>그림 21-4.</b> 제어 평면의 세 가지 모습. 클라우드는 “의도”(이 VPC, 이 보안 그룹)를 중앙에서 관리하되, 실제 패킷 판단은 각 호스트의 가상 스위치(또는 SmartNIC)가 나눠서 한다. 컨트롤러가 잠시 멈춰도 이미 받은 규칙으로 패킷은 계속 흐른다.</figcaption>
+    </figure>
+    <p>순수한 중앙 집중 SDN은 컨트롤러가 병목이자 단일 장애점이 될 수 있다. 그래서 오늘날 클라우드는 <b>분산 SDN</b>을 쓴다. 사용자가 콘솔에서 보안 그룹을 바꾸면, 그 “의도”가 복제된 제어 평면 데이터베이스에 기록되고, 관련 호스트 수천 대의 가상 스위치에 몇 초 안에 퍼진다. 물리 스위치는 VXLAN 바깥 IP만 보고 나르는 단순한 IP 패브릭으로 남는다. 마이크로소프트의 VFP, AWS의 Nitro·Hyperplane, 구글의 Andromeda가 이런 구조다. 네트워크가 사실상 거대한 분산 소프트웨어가 된 것이다.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="lb">
+    <h2>로드 밸런서: 손님을 창구에 나눠 보내기</h2>
+    <p>인기 서비스는 서버 한 대로 감당할 수 없다. 앞에 <span class="term">로드 밸런서</span><span class="en">(load balancer)</span>를 두어 하나의 주소로 들어온 요청을 뒤의 서버 여러 대에 나눈다. 고장 난 서버는 주기적인 <span class="term">헬스 체크</span><span class="en">(health check)</span>로 찾아내 명단에서 뺀다.</p>
+    <ul>
+      <li><b>L4 로드 밸런서</b>: IP와 포트(전송 계층, 9장)만 보고 TCP/UDP 연결 단위로 나눈다. 내용을 읽지 않아 매우 빠르고, 초당 수백만 연결도 처리한다.</li>
+      <li><b>L7 로드 밸런서</b>: HTTP 요청(10장)을 열어 본다. <code>/api</code>는 API 서버로, <code>/images</code>는 이미지 서버로, 쿠키에 따라 같은 사용자를 같은 서버로 보낼 수 있다. TLS 암호를 대신 풀어 주기도(TLS 종료) 한다. 더 똑똑한 대신 더 많은 계산이 든다.</li>
+    </ul>
+    <p>나누는 방법(알고리즘)도 여러 가지다. <b>라운드 로빈</b>은 순서대로 한 번씩, <b>최소 연결</b>은 지금 처리 중인 요청이 가장 적은 서버에, <b>해시</b>는 클라이언트 IP 같은 값의 해시로 정해 같은 손님이 늘 같은 서버로 가게 한다.</p>
+    <div class="sim" id="sim-lb">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>로드 밸런서: 알고리즘, 느린 서버, 장애</h3></div>
+      <div class="sim-view"><canvas id="cv-lb"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>알고리즘</span><div class="seg" id="lb-alg"><button data-value="rr" class="on">라운드 로빈</button><button data-value="lc">최소 연결</button><button data-value="hash">IP 해시</button></div></div>
+        <div class="ctrl"><span>요청 종류</span><div class="seg" id="lb-wl"><button data-value="even" class="on">고른 요청</button><button data-value="heavy">가끔 무거운 요청</button></div></div>
+        <label class="ctrl"><span>서버 수 <output id="lb-n-out"></output></span><input type="range" id="lb-n" min="3" max="8" step="1" value="5"></label>
+        <label class="ctrl"><span>전체 부하 (총 처리 능력 대비) <output id="lb-rho-out"></output></span><input type="range" id="lb-rho" min="30" max="95" step="5" value="70"></label>
+        <label class="check"><input type="checkbox" id="lb-slow"> 서버 1은 절반 성능의 구형 서버</label>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn primary" id="lb-fail">서버 2 장애 내기</button><button class="btn" id="lb-reset">통계 초기화</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">평균 응답 (최근 5초)</span><span class="v" id="o-lb-avg">—</span></div>
+        <div class="stat"><span class="k">p99 응답 (최근 5초)</span><span class="v" id="o-lb-p99">—</span></div>
+        <div class="stat"><span class="k">실패한 요청 (누적)</span><span class="v" id="o-lb-err">—</span></div>
+        <div class="stat"><span class="k">초당 요청</span><span class="v" id="o-lb-rate">—</span></div>
+      </div>
+      <div class="sim-note">서버마다 동시에 4개씩 처리하고(작업자 4명), 요청 하나는 평균 50 ms가 걸린다. ‘가끔 무거운 요청’은 10%가 평균 275 ms, 나머지가 25 ms다. 막대의 진한 부분은 처리 중, 옅은 부분은 대기열이다. IP 해시는 클라이언트 50명 중 몇 명이 요청 대부분을 보내는(지프 분포) 상황으로 만들었다. 헬스 체크는 1초마다, 2번 연속 실패하면 명단에서 뺀다. 해볼 것: ① 구형 서버를 켜고 라운드 로빈과 최소 연결을 비교하자. ② 장애를 내면 제외되기까지 약 2초 동안 실패가 쌓인다. 최소 연결은 즉시 거절되는 죽은 서버를 “한가하다”고 착각해 더 많이 보낸다(블랙홀 효과). ③ 서버 3대에 부하 70%에서 한 대가 죽으면 남은 둘이 감당할 수 있을까?</div>
+    </div>
+    <h3 style="margin-top:28px">일관된 해싱: 서버가 바뀌어도 덜 흔들리게</h3>
+    <p>캐시 서버나 분산 저장소는 “이 키(사용자 ID, 파일 이름)는 어느 서버에 있나”를 해시로 정한다. 가장 단순한 방법은 <code>hash(키) mod N</code>이다. 그런데 서버가 N대에서 N+1대가 되면 나머지 값이 거의 다 바뀌어 키의 대부분이 다른 서버로 옮겨 간다. 캐시라면 순식간에 거의 모든 캐시가 비어 원본 DB에 요청이 폭주한다.</p>
+    <p><span class="term">일관된 해싱</span><span class="en">(consistent hashing)</span>은 해시 값을 둥근 고리 위의 위치로 본다. 서버도 고리 위에 놓고, 각 키는 시계 방향으로 가다 처음 만나는 서버에 맡긴다. 서버가 하나 늘면 새 서버 바로 앞 구간의 키만 옮겨 가므로, 평균 1/(N+1)만 움직인다. 서버 하나를 고리 여러 곳에 <b>가상 노드</b>로 뿌리면 구간이 고르게 나뉘어 부하 편차도 줄어든다. 아마존 Dynamo, 카산드라, CDN 캐시, 구글의 Maglev 로드 밸런서가 이 아이디어를 쓴다.</p>
+    <div class="sim" id="sim-ch">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>해시 링: 노드를 더하고 빼면 키가 얼마나 옮겨 갈까</h3></div>
+      <div class="sim-view"><canvas id="cv-ch"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>배정 방식</span><div class="seg" id="ch-mode"><button data-value="mod">hash mod N</button><button data-value="ring" class="on">일관된 해싱</button></div></div>
+        <label class="ctrl"><span>노드당 가상 노드 수 <output id="ch-v-out"></output></span><input type="range" id="ch-v" min="1" max="100" step="1" value="1"></label>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn primary" id="ch-add">노드 추가</button><button class="btn" id="ch-del">노드 제거</button><button class="btn" id="ch-reset">처음으로</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">노드 수</span><span class="v" id="o-ch-n">—</span></div>
+        <div class="stat"><span class="k">방금 옮겨 간 키</span><span class="v" id="o-ch-mv">—</span></div>
+        <div class="stat"><span class="k">이론값</span><span class="v" id="o-ch-th">—</span></div>
+        <div class="stat"><span class="k">가장 많은 노드 / 평균</span><span class="v" id="o-ch-bal">—</span></div>
+      </div>
+      <div class="sim-note">점 하나가 키(총 400개)이고 색은 맡은 노드다. 고리 바깥의 굵은 눈금이 노드(가상 노드)의 위치다. 방금 옮겨 간 키는 크게, 테두리를 그려 표시한다. 해볼 것: ‘hash mod N’에서 노드를 추가하면 키 대부분이 이사한다. 일관된 해싱에서는 약 1/(N+1)만 움직인다. 가상 노드가 1개면 구간 길이가 들쭉날쭉해 어떤 노드는 평균의 2배 넘게 맡는다. 가상 노드를 100개로 늘려 균형을 비교하자.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="edge">
+    <h2>가장 가까운 곳에서 답하기: CDN, 애니캐스트, 글로벌 로드 밸런싱</h2>
+    <p>빛이 광섬유에서 1 ms에 약 200 km를 가므로(5장), 서울에서 버지니아 리전까지는 아무리 빨라도 왕복 150 ms를 넘는다. 웹 페이지 하나에 왕복이 수십 번 필요하다면 이 거리만으로 몇 초가 된다. 해법은 사용자 가까이에서 답하는 것이다.</p>
+    <ul>
+      <li><b>CDN</b>(10장): 이미지·동영상 같은 정적 콘텐츠를 엣지 PoP에 복사해 두고 가까운 곳에서 준다. 인기 콘텐츠는 90% 이상이 엣지에서 끝난다.</li>
+      <li><b>엣지 컴퓨팅</b>: 콘텐츠뿐 아니라 짧은 코드(로그인 검사, 이미지 변환, A/B 테스트)를 엣지에서 실행한다. TCP·TLS 연결도 엣지에서 맺으므로, 먼 리전까지 가는 왕복은 백본의 이미 열린 연결로 한 번만 하면 된다.</li>
+      <li><span class="term">애니캐스트</span><span class="en">(anycast)</span>: 여러 곳의 서버가 <b>같은 IP 주소</b>를 BGP(8장)로 동시에 광고한다. 인터넷 라우팅이 각 사용자를 “가장 가까운”(BGP 기준) 곳으로 자연스럽게 보낸다. 공용 DNS(1.1.1.1, 8.8.8.8)와 루트 DNS 서버, CDN이 이 방식을 쓰며, DDoS 공격도 여러 곳으로 흩어진다.</li>
+      <li><span class="term">글로벌 로드 밸런싱</span><span class="en">(GSLB)</span>: DNS가 질문한 사용자(또는 그 DNS 리졸버)의 위치를 보고 가장 가까운, 그리고 살아 있는 리전의 주소를 답한다. 리전이 장애 나면 다음 리전 주소를 답하는 <b>페일오버</b>도 DNS로 한다(TTL만큼 지연된다).</li>
+    </ul>
+    <div class="sim" id="sim-geo">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>지도에서 사용자 위치를 눌러 보세요</h3></div>
+      <div class="sim-view"><canvas id="cv-geo" style="cursor:crosshair"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>연결 방식</span><div class="seg" id="geo-mode"><button data-value="gslb" class="on">리전에 직접 (DNS GSLB)</button><button data-value="edge">엣지 PoP 경유 (애니캐스트)</button></div></div>
+        <label class="check"><input type="checkbox" id="geo-fail"> 가장 가까운 리전에 장애 발생 (페일오버)</label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">선택된 리전</span><span class="v" id="o-geo-reg">—</span></div>
+        <div class="stat"><span class="k">리전까지 왕복 (RTT)</span><span class="v" id="o-geo-rtt">—</span></div>
+        <div class="stat"><span class="k">다음 후보</span><span class="v" id="o-geo-next">—</span></div>
+        <div class="stat"><span class="k">첫 접속 지점까지 RTT</span><span class="v" id="o-geo-first">—</span></div>
+      </div>
+      <div class="sim-note">사각형 = 클라우드 리전 10곳, 작은 점 = 엣지 PoP. RTT는 대원 거리 × 1.4(실제 케이블 경로 우회) ÷ 광섬유 속도(200 km/ms) × 2 + 접속망 2 ms로 어림했다. 엣지 모드에서는 사용자 → 가장 가까운 PoP(TCP·TLS 종료)는 공용 인터넷, PoP → 리전은 사설 백본(점선)이다. 해볼 것: 아프리카나 남미를 눌러 보자. 리전은 멀어도 엣지 PoP는 가깝다. 장애를 켜면 다음 리전으로 넘어가며 RTT가 얼마나 늘어나는지 보자.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="hybrid">
+    <h2>회사와 클라우드 잇기, 그리고 비용</h2>
+    <p>대부분의 기업은 자기 데이터센터나 사무실을 클라우드와 함께 쓰는 <b>하이브리드</b>, 또는 여러 클라우드를 함께 쓰는 <b>멀티 클라우드</b>다. 이 둘을 잇는 방법은 크게 두 가지다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th></th><th>사이트 간 VPN</th><th>전용선 (Direct Connect, ExpressRoute 류)</th></tr></thead>
+      <tbody>
+        <tr><td>경로</td><td>공용 인터넷 위의 암호화 터널(IPsec, 22장)</td><td>통신사 전용 회선으로 클라우드 접속 지점에 물리 연결</td></tr>
+        <tr><td>대역폭</td><td>터널당 약 1 Gbps 수준</td><td>1 / 10 / 100 Gbps 포트(최근 400G도)</td></tr>
+        <tr><td>지연·품질</td><td>인터넷 상황에 따라 흔들림</td><td>일정하고 예측 가능</td></tr>
+        <tr><td>준비 기간·비용</td><td>몇 분, 저렴</td><td>몇 주(회선 공사), 월정액 + 포트 비용</td></tr>
+        <tr><td>흔한 쓰임</td><td>소규모 지사, 전용선의 예비 경로</td><td>대용량 데이터 이전, 금융·제조 핵심 시스템</td></tr>
+      </tbody>
+    </table></div>
+    <p>클라우드 네트워크 설계에서 의외로 큰 변수는 <b>돈</b>이다. 대형 클라우드는 보통 데이터가 들어오는 것(ingress)은 무료지만, 인터넷으로 <b>나가는 것</b>(<span class="term">이그레스</span><span class="en">(egress)</span>)에는 GB당 약 0.05~0.09달러 수준의 요금을 매긴다(양이 많을수록 할인). 월 100 TB를 내보내면 수천 달러다. 같은 리전의 AZ 사이, 리전 사이 전송에도 요금이 붙는다. 그래서 CDN으로 엣지에서 응답하고, 통신이 많은 서비스는 같은 AZ에 두고, 데이터를 클라우드 밖으로 자주 옮기지 않도록 설계한다. 데이터를 한 번 넣으면 빼기 비싼 구조가 이른바 “클라우드 종속”의 한 원인으로 지적되기도 한다.</p>
+    <div class="callout deep"><strong>서비스 메시와 제로 트러스트</strong><p>서비스가 수백 개의 작은 마이크로서비스로 쪼개지면, 서비스끼리의 통신(동서 트래픽)을 관리하는 일이 커진다. <span class="term">서비스 메시</span><span class="en">(service mesh)</span>는 각 서비스 옆에 작은 프록시(사이드카, 예: Envoy)를 붙여 재시도, 시간 제한, 부하 분산, 관측, 그리고 서로 인증서를 확인하는 상호 TLS(mTLS)를 앱 코드 대신 처리한다. 이는 “내부망 안이니 믿는다”는 옛 경계 보안을 버리고, 모든 요청을 출처와 무관하게 매번 인증·인가하는 <b>제로 트러스트</b>(22장)의 실천 방법이기도 하다. VPC와 보안 그룹은 울타리, 서비스 메시와 mTLS는 문마다의 신분증 검사다.</p></div>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>클라우드는 <b>리전</b>(지리) → <b>가용 영역</b>(독립된 고장 단위, 서로 왕복 1~2 ms) → 사용자 가까운 <b>엣지 PoP</b>의 계층으로 이뤄지고, 리전 사이는 사설 백본이 잇는다.</li>
+      <li>하이퍼바이저의 <b>가상 스위치</b>(또는 SmartNIC)가 VM·컨테이너의 패킷을 고객별로 가르고 방화벽과 캡슐화를 맡는다.</li>
+      <li><b>VPC</b>는 서브넷·라우팅 테이블·인터넷/NAT 게이트웨이로 구성한다. <b>보안 그룹</b>은 서버 단위·상태 저장, <b>네트워크 ACL</b>은 서브넷 단위·무상태다.</li>
+      <li><b>VXLAN</b>은 VM 프레임을 UDP 4789로 감싸 물리망(언더레이)과 가상망(오버레이)을 분리한다. VNI 24비트로 약 1,677만 개 가상망, 오버헤드는 50바이트다.</li>
+      <li><b>SDN</b>은 제어 평면을 데이터 평면에서 떼어 소프트웨어로 중앙 관리한다. 클라우드는 의도를 중앙에서, 집행은 호스트마다 하는 분산 SDN을 쓴다.</li>
+      <li><b>로드 밸런서</b>는 L4(연결)·L7(HTTP) 수준에서 요청을 나누고 헬스 체크로 장애 서버를 뺀다. <b>일관된 해싱</b>은 노드가 바뀌어도 키의 약 1/(N+1)만 옮긴다.</li>
+      <li><b>CDN·애니캐스트·GSLB</b>로 사용자를 가까운 곳에서 받고, 하이브리드 연결은 VPN 또는 전용선으로 한다. 나가는 트래픽(<b>이그레스</b>) 비용이 설계를 좌우한다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>서비스를 한 리전 안의 여러 가용 영역(AZ)에 나눠 배치하는 주된 목적은?</p><div class="opts">
+        <button class="opt" data-correct>한 데이터센터의 정전·화재 같은 장애에도 서비스를 계속하려고</button>
+        <button class="opt">다른 나라 사용자에게 더 가까워지려고</button>
+        <button class="opt">이그레스 요금을 없애려고</button>
+        <button class="opt">IP 주소를 더 많이 받으려고</button>
+      </div><div class="quiz-exp">AZ는 전력·냉각·네트워크가 독립된 고장 단위다. 서로 왕복 1~2 ms 정도로 가까워 실시간 복제가 가능하다. 다른 나라 사용자에게 가까워지는 것은 다른 리전이나 엣지의 역할이다.</div></div>
+      <div class="quiz-q"><p>프라이빗 서브넷의 DB 서버가 인터넷에서 보안 패치를 내려받아야 한다. 바깥에서 DB로 들어오는 연결은 계속 막아야 한다. 무엇을 쓰나?</p><div class="opts">
+        <button class="opt">DB 보안 그룹에 0.0.0.0/0 허용 추가</button>
+        <button class="opt">DB를 퍼블릭 서브넷으로 옮기기</button>
+        <button class="opt" data-correct>퍼블릭 서브넷의 NAT 게이트웨이로 가는 경로를 프라이빗 라우팅 테이블에 추가</button>
+        <button class="opt">VXLAN VNI를 바꾸기</button>
+      </div><div class="quiz-exp">NAT 게이트웨이는 안에서 시작한 연결만 바깥으로 내보내고 그 응답만 들여보낸다. 바깥에서 먼저 시작하는 연결은 받을 길이 없다.</div></div>
+      <div class="quiz-q"><p>보안 그룹과 네트워크 ACL의 차이로 옳은 것은?</p><div class="opts">
+        <button class="opt">보안 그룹은 무상태라 응답 규칙이 따로 필요하다</button>
+        <button class="opt">네트워크 ACL은 서버 하나하나에 붙는다</button>
+        <button class="opt">둘 다 거부 규칙을 쓸 수 없다</button>
+        <button class="opt" data-correct>보안 그룹은 상태 저장이라 허용된 요청의 응답이 자동으로 통과하지만, 네트워크 ACL은 응답도 따로 허용해야 한다</button>
+      </div><div class="quiz-exp">보안 그룹은 서버 단위·상태 저장·허용 규칙만, 네트워크 ACL은 서브넷 단위·무상태·허용/거부 규칙을 번호순으로 평가한다.</div></div>
+      <div class="quiz-q"><p>VXLAN에서 가상망을 구분하는 VNI는 24비트다. 구분할 수 있는 가상망의 수는 대략?</p><div class="opts">
+        <button class="opt">4,094개</button><button class="opt" data-correct>약 1,677만 개</button><button class="opt">약 43억 개</button><button class="opt">65,536개</button>
+      </div><div class="quiz-exp">2²⁴ = 16,777,216. VLAN의 12비트(4,094개 사용 가능)로는 수백만 고객의 가상망을 구분할 수 없어 VXLAN이 등장했다.</div></div>
+      <div class="quiz-q"><p>캐시 서버 10대를 <code>hash(키) mod N</code> 방식으로 쓰다가 1대를 추가했다. 대략 몇 %의 키가 다른 서버로 옮겨 갈까? 일관된 해싱이라면?</p><div class="opts">
+        <button class="opt">mod N: 약 9%, 일관된 해싱: 약 91%</button>
+        <button class="opt">둘 다 약 9%</button>
+        <button class="opt" data-correct>mod N: 약 91%, 일관된 해싱: 약 9%</button>
+        <button class="opt">둘 다 거의 0%</button>
+      </div><div class="quiz-exp">mod N에서는 N/(N+1) ≈ 10/11 ≈ 91%가 이사한다. 일관된 해싱은 새 노드가 맡게 될 구간만, 약 1/(N+1) ≈ 9%만 옮긴다.</div></div>
+      <div class="quiz-q"><p>공용 DNS 1.1.1.1은 전 세계 어디서나 같은 주소인데도 가까운 서버가 답한다. 이를 가능하게 하는 것은?</p><div class="opts">
+        <button class="opt">NAT 게이트웨이</button><button class="opt">네트워크 ACL</button><button class="opt" data-correct>애니캐스트 — 여러 곳에서 같은 IP를 BGP로 광고</button><button class="opt">VXLAN 캡슐화</button>
+      </div><div class="quiz-exp">여러 PoP가 같은 주소를 동시에 광고하면, 인터넷 라우팅이 각 사용자를 BGP 기준으로 가장 가까운 PoP로 보낸다. 한 곳이 장애 나면 광고를 거두기만 하면 다른 곳으로 흘러간다.</div></div>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  /* ================= VPC ================= */
+  const VKEYS = ["webpub", "dbpub", "bastion", "nat", "w443", "w22", "dbweb", "dbany", "db22", "eph"];
+  const V = () => { const o = {}; VKEYS.forEach((k) => (o[k] = $("v-" + k).checked)); return o; };
+  let vSel = 0;
+  // 각 점검: want = 바라는 결과(true: 통해야 함)
+  function vChecks(s) {
+    const dbPriv = !s.dbpub, webPriv = !s.webpub;
+    const out = [];
+    { // A 인터넷 → 웹 443
+      let ok = true, why = "퍼블릭 서브넷 + 443 허용", at = 2;
+      if (webPriv) { ok = false; why = "웹이 프라이빗 서브넷: 인터넷에서 들어올 경로 없음"; at = 1; }
+      else if (!s.w443) { ok = false; why = "웹 보안 그룹이 443을 허용하지 않음"; at = 2; }
+      out.push({ name: "인터넷 사용자 → 웹 (HTTPS 443)", want: true, ok, why, path: ["inet", "igw", "web"], at });
+    }
+    { // B 인터넷 → DB
+      let ok = false, why = "DB가 프라이빗 서브넷: 바깥에서 올 경로 없음", at = 1;
+      if (s.dbpub) { if (s.dbany) { ok = true; why = "DB가 공인 IP + 3306 전체 공개: 누구나 접속 시도 가능!"; } else { why = "DB 보안 그룹이 바깥 3306을 막음"; at = 2; } }
+      out.push({ name: "인터넷 → DB (MySQL 3306)", want: false, ok, why, path: ["inet", "igw", "db"], at });
+    }
+    { // C 웹 → DB
+      const cross = s.webpub !== s.dbpub && dbPriv; // 웹(퍼블릭) ↔ DB(프라이빗) 사이는 ACL 통과
+      let ok = true, why = "보안 그룹이 ‘웹 서버 그룹’에서 오는 3306 허용", at = 1;
+      if (!s.dbweb && !s.dbany) { ok = false; why = "DB 보안 그룹에 웹 서버 허용 규칙 없음"; }
+      else if (cross && !s.eph) { ok = false; why = "요청은 들어가지만 DB의 응답(임시 포트)이 무상태 ACL에서 막힘"; }
+      out.push({ name: "웹 서버 → DB (3306)", want: true, ok, why, path: ["web", "db"], at });
+    }
+    { // D 인터넷 → 웹 SSH
+      let ok = false, why = "SSH 포트가 닫혀 있음", at = 2;
+      if (webPriv) { why = "웹이 프라이빗 서브넷: 경로 없음"; at = 1; }
+      else if (s.w22) { ok = true; why = "전 세계에 SSH 공개: 무차별 대입 공격의 표적"; }
+      out.push({ name: "인터넷 → 웹 서버 SSH (22)", want: false, ok, why, path: ["inet", "igw", "web"], at });
+    }
+    { // E 관리자 → 배스천 → DB
+      let ok = true, why = "배스천(관리 서버)을 거쳐 DB에 SSH", at = 3;
+      if (!s.bastion) { ok = false; why = "관리 서버가 없음"; at = 1; }
+      else if (!s.db22) { ok = false; why = "DB 보안 그룹이 관리 서버의 22를 허용하지 않음"; at = 3; }
+      else if (dbPriv && !s.eph) { ok = false; why = "DB의 SSH 응답이 무상태 ACL에서 막힘"; at = 3; }
+      out.push({ name: "관리자 → 관리 서버 → DB (SSH)", want: true, ok, why, path: ["admin", "igw", "bastion", "db"], at });
+    }
+    { // F DB → 인터넷
+      let ok, why, path, at;
+      if (s.dbpub) { ok = true; why = "공인 IP로 직접 나감(대신 바깥에 노출됨)"; path = ["db", "igw", "inet"]; at = 1; }
+      else if (s.nat) { ok = true; why = "NAT 게이트웨이를 통해 나가고 응답만 돌아옴"; path = ["db", "nat", "igw", "inet"]; at = 1; }
+      else { ok = false; why = "프라이빗 서브넷에 NAT 경로 없음: 패치를 받을 수 없음"; path = ["db", "igw", "inet"]; at = 1; }
+      out.push({ name: "DB → 인터넷 (보안 패치 다운로드)", want: true, ok, why, path, at });
+    }
+    return out;
+  }
+  function vRender() {
+    const s = V(), cs = vChecks(s);
+    $("vpc-checks").innerHTML = cs.map((c, i) => `<button data-i="${i}" class="${c.ok === c.want ? "good" : "badc"}${i === vSel ? " sel" : ""}"><span class="mk">${c.ok ? "✓" : "✗"}</span><span>${c.name}<small>${c.why}</small></span></button>`).join("");
+    $("vpc-checks").querySelectorAll("button").forEach((b) => (b.onclick = () => { vSel = +b.dataset.i; vRender(); }));
+    const badN = cs.filter((c) => c.ok !== c.want);
+    $("vpc-verdict").innerHTML = badN.length ? `<span class="bad-txt">설계 문제 ${badN.length}개:</span> ` + badN.map((c) => c.name).join(", ") : `<span class="ok-txt">안전하고 동작하는 설계</span> — 필요한 길만 열리고 위험한 길은 막혔다.`;
+    vcv.redraw();
+  }
+  VKEYS.forEach((k) => ($("v-" + k).onchange = vRender));
+  const vcv = NB.canvas("#cv-vpc", (ctx, w, h) => {
+    const P = NB.palette(), s = V(), small = w < 520, fs = small ? 10.5 : 12;
+    const vx = 10, vy = 64, vw = w - 20, vh = h - 74;
+    // VPC
+    ctx.strokeStyle = P.accent; ctx.lineWidth = 2; NB.rrect(ctx, vx, vy, vw, vh, 12); ctx.stroke();
+    NB.text(ctx, "VPC 10.0.0.0/16", vx + 10, vy + 14, { size: fs, bold: true, color: P.accent });
+    const pubX = vx + 10, subW = (vw - 30) / 2, priX = pubX + subW + 10, subY = vy + 28, subH = vh - 38;
+    NB.box(ctx, pubX, subY, subW, subH, { fill: P.surface, stroke: P.ok, r: 10 });
+    NB.box(ctx, priX, subY, subW, subH, { fill: P.surface, stroke: P.accent2, r: 10 });
+    NB.text(ctx, small ? "퍼블릭 10.0.1.0/24" : "퍼블릭 서브넷 10.0.1.0/24", pubX + 8, subY + 13, { size: fs, bold: true, color: P.ok });
+    NB.text(ctx, small ? "프라이빗 10.0.2.0/24" : "프라이빗 서브넷 10.0.2.0/24", priX + 8, subY + 13, { size: fs, bold: true, color: P.accent2 });
+    NB.text(ctx, "ACL", priX + subW - 8, subY + 13, { align: "right", size: fs - 1, bold: true, color: s.eph ? P.dim : P.bad });
+    // 노드 위치
+    const pos = {};
+    pos.inet = [w * (small ? 0.8 : 0.55), 24]; pos.admin = [w * 0.2, 24]; pos.igw = [w * (small ? 0.62 : 0.36), vy];
+    const pubList = [], priList = [];
+    (s.webpub ? pubList : priList).push("web");
+    (s.dbpub ? pubList : priList).push("db");
+    if (s.bastion) pubList.push("bastion");
+    if (s.nat) pubList.push("nat");
+    const place = (list, x0) => list.forEach((k, i) => { pos[k] = [x0 + subW / 2, subY + 30 + ((i + 0.5) * (subH - 34)) / Math.max(list.length, 2)]; });
+    place(pubList, pubX); place(priList, priX);
+    const NAMES = { web: "웹 서버", db: "DB", bastion: "관리 서버", nat: "NAT 게이트웨이", igw: "인터넷 게이트웨이", inet: "인터넷", admin: "관리자 PC" };
+    // 선택 경로
+    const c = vChecks(s)[vSel];
+    if (c) {
+      const pts = c.path.map((k) => pos[k]).filter(Boolean);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const blocked = !c.ok && i + 1 >= c.at;
+        const col = c.ok ? (c.want ? P.ok : P.bad) : blocked ? P.faint : c.want ? P.warn : P.ok;
+        ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.setLineDash(blocked ? [5, 5] : []);
+        ctx.beginPath(); ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[i + 1][0], pts[i + 1][1]); ctx.stroke(); ctx.setLineDash([]);
+        if (!c.ok && i + 1 === c.at) { const mx = NB.lerp(pts[i][0], pts[i + 1][0], 0.6), my = NB.lerp(pts[i][1], pts[i + 1][1], 0.6); ctx.beginPath(); ctx.arc(mx, my, 12, 0, 7); ctx.fillStyle = P.bg; ctx.fill(); NB.text(ctx, "✕", mx, my + 1, { align: "center", size: 16, bold: true, color: P.bad }); }
+      }
+    }
+    const node = (k, fill, tc) => { const p = pos[k]; if (!p) return; const t = NAMES[k]; ctx.font = (small ? 10.5 : 12) + "px " + NB.font(); const bw = Math.min(ctx.measureText(t).width + 18, small ? 96 : 150); NB.box(ctx, p[0] - bw / 2, p[1] - 13, bw, 26, { fill, stroke: P.border, text: small && k === "igw" ? "IGW" : small && k === "nat" ? "NAT GW" : t, size: small ? 10.5 : 12, color: tc || P.text, r: 7 }); };
+    node("inet", P.surface); node("admin", P.surface); node("igw", P.warn, "#fff");
+    ["web", "db", "bastion", "nat"].forEach((k) => node(k, k === "db" ? P.accent2 : k === "nat" ? P.ok : P.accent, "#fff"));
+  }, { aspect: 0.52, minHeight: 320, maxHeight: 420 });
+  vRender();
+
+  /* ================= VXLAN 계산기 ================= */
+  const vxM = NB.seg("vx-mtu", vx), vxI = NB.seg("vx-ip", vx);
+  const vxP = NB.range("vx-p", (v) => v + " B", vx);
+  let VX = null;
+  function vx() {
+    const mtu = +vxM(), ip = +vxI(), p = vxP();
+    const oh = 14 + ip + 8 + 8; // 바깥 이더넷 + IP + UDP + VXLAN
+    const maxIn = mtu - (ip + 8 + 8 + 14); // 안쪽 이더넷 14 포함해 바깥 IP 패킷이 MTU 이하
+    const len = p + 14 + oh;
+    VX = { mtu, ip, p, oh, maxIn, len, fits: p <= maxIn };
+    NB.stat("o-vx-oh", oh + " B");
+    NB.stat("o-vx-mtu", maxIn + " B");
+    NB.stat("o-vx-len", len + " B" + (VX.fits ? "" : " <span class='bad-txt'>MTU 초과 → 단편화/버림</span>"));
+    NB.stat("o-vx-eff", ((p / len) * 100).toFixed(1) + "%");
+    vxcv.redraw();
+  }
+  const vxcv = NB.canvas("#cv-vx", (ctx, w, h) => {
+    if (!VX) return;
+    const P = NB.palette(), small = w < 520;
+    const segs = [["바깥 Eth", 14, P.warn], ["바깥 IP", VX.ip, P.warn], ["UDP", 8, P.warn], ["VXLAN", 8, P.accent2], ["안쪽 Eth", 14, P.accent], ["안쪽 IP 패킷", VX.p, P.ok]];
+    const x0 = 12, W = w - 24, y = 40, bh = 40;
+    const minW = small ? 26 : 44;
+    const total = VX.len, fixed = 5 * minW;
+    const rest = Math.max(30, W - fixed);
+    let x = x0;
+    const scale = W / Math.max(total, VX.mtu + 14);
+    segs.forEach(([n, b, col], i) => {
+      const ww = i < 5 ? Math.max(minW, b * scale) : Math.max(30, Math.min(rest, b * scale));
+      NB.box(ctx, x, y, ww - 2, bh, { fill: col, stroke: false, r: 4 });
+      ctx.save(); ctx.beginPath(); ctx.rect(x, y, ww - 2, bh); ctx.clip();
+      NB.text(ctx, small && i < 5 ? String(b) : n, x + (ww - 2) / 2, y + (small && i < 5 ? bh / 2 : 14), { align: "center", size: small ? 10 : 11, bold: true, color: "#fff" });
+      if (!small || i === 5) NB.text(ctx, b + " B", x + (ww - 2) / 2, y + (small && i === 5 ? 28 : 29), { align: "center", size: 10, color: "#fff" });
+      ctx.restore();
+      x += ww;
+    });
+    // MTU 선
+    const mx = x0 + 14 * scale + Math.max(0, (VX.mtu) * scale);
+    const lim = Math.min(w - 4, Math.max(x0 + 5 * minW, mx));
+    ctx.strokeStyle = VX.fits ? P.dim : P.bad; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(lim, y - 14); ctx.lineTo(lim, y + bh + 14); ctx.stroke(); ctx.setLineDash([]);
+    NB.text(ctx, "물리망 MTU " + VX.mtu, Math.min(lim, w - 6), y - 22, { align: "right", size: 11, color: VX.fits ? P.dim : P.bad });
+    NB.text(ctx, "■ 추가 헤더 " + VX.oh + " B", x0, y + bh + 26, { size: 11.5, color: P.warn, bold: true });
+    NB.text(ctx, "■ VM이 보낸 원래 프레임", x0 + (small ? 120 : 150), y + bh + 26, { size: 11.5, color: P.accent, bold: true });
+    if (small) NB.text(ctx, "(헤더 칸 숫자 = 바이트)", x0, y + bh + 44, { size: 10.5, color: P.faint });
+  }, { height: 150 });
+  vx();
+
+  /* ================= 로드 밸런서 ================= */
+  const lbAlg = NB.seg("lb-alg", lbClear), lbWl = NB.seg("lb-wl", lbClear);
+  const lbN = NB.range("lb-n", (v) => v + "대", lbBuild), lbRho = NB.range("lb-rho", (v) => v + "%", null);
+  $("lb-slow").onchange = lbBuild;
+  const WORK = 4, MEAN = 0.05;
+  let LB = null;
+  const CLW = []; { let s = 0; for (let i = 0; i < 50; i++) { s += 1 / (i + 1); CLW.push(s); } CLW.forEach((v, i) => (CLW[i] = v / s)); }
+  const hashInt = (str) => { let x = 2166136261; for (let i = 0; i < str.length; i++) { x ^= str.charCodeAt(i); x = Math.imul(x, 16777619); } x ^= x >>> 13; x = Math.imul(x, 0x5bd1e995); x ^= x >>> 15; return x >>> 0; };
+  function lbBuild() {
+    const n = lbN(), wasFail = LB ? LB.sv.some((s) => s.failed) : false;
+    LB = { t: 0, rr: 0, err: 0, hcT: 0, rec: [], sends: [], sv: [] };
+    for (let i = 0; i < n; i++) LB.sv.push({ speed: i === 0 && $("lb-slow").checked ? 0.5 : 1, busy: [], q: [], failed: false, up: true, hf: 0, ho: 0, done: 0 });
+    if (wasFail) { LB.sv[1].failed = true; }
+    lbBtn();
+  }
+  function lbClear() { if (LB) { LB.rec = []; LB.err = 0; LB.sv.forEach((s) => (s.done = 0)); } }
+  function lbBtn() { $("lb-fail").textContent = LB && LB.sv[1].failed ? "서버 2 복구" : "서버 2 장애 내기"; }
+  $("lb-fail").onclick = () => { const s = LB.sv[1]; s.failed = !s.failed; if (s.failed) { LB.err += s.busy.length + s.q.length; s.busy = []; s.q = []; } lbBtn(); };
+  $("lb-reset").onclick = lbClear;
+  const svc = () => { if (lbWl() === "heavy") return Math.random() < 0.1 ? -Math.log(Math.random()) * 0.275 : -Math.log(Math.random()) * 0.025; return -Math.log(Math.random()) * MEAN; };
+  function pick(client) {
+    const ups = LB.sv.map((s, i) => i).filter((i) => LB.sv[i].up);
+    if (!ups.length) return -1;
+    const a = lbAlg();
+    if (a === "rr") { LB.rr = (LB.rr + 1) % ups.length; return ups[LB.rr]; }
+    if (a === "lc") { let b = ups[0], bv = Infinity; ups.forEach((i) => { const v = LB.sv[i].busy.length + LB.sv[i].q.length + Math.random() * 0.01; if (v < bv) { bv = v; b = i; } }); return b; }
+    return ups[hashInt("client-" + client) % ups.length];
+  }
+  function lbStep(dt) {
+    const L = LB; L.t += dt;
+    const cap = L.sv.reduce((a, s) => a + (WORK * s.speed) / MEAN, 0);
+    const lam = (cap * lbRho()) / 100;
+    const nArr = NB.poisson(lam * dt);
+    for (let k = 0; k < nArr; k++) {
+      const r = Math.random(); let client = CLW.findIndex((c) => r <= c); if (client < 0) client = 49;
+      const i = pick(client), at = L.t - Math.random() * dt;
+      if (i < 0) { L.err++; continue; }
+      const s = L.sv[i];
+      L.sends.push({ i, t: L.t, fail: s.failed });
+      if (s.failed) { L.err++; continue; }
+      const job = { arr: at, svc: svc() / s.speed };
+      if (s.busy.length < WORK) { job.end = at + job.svc; s.busy.push(job); } else s.q.push(job);
+    }
+    L.sv.forEach((s) => {
+      s.busy = s.busy.filter((j) => { if (j.end <= L.t) { L.rec.push([L.t, j.end - j.arr]); s.done++; if (s.q.length) { const n = s.q.shift(); n.end = j.end + n.svc; s.busy.push(n); } return false; } return true; });
+    });
+    // 헬스 체크
+    L.hcT += dt;
+    if (L.hcT >= 1) { L.hcT -= 1; L.sv.forEach((s) => { if (s.failed) { s.hf++; s.ho = 0; if (s.hf >= 2) s.up = false; } else { s.ho++; s.hf = 0; if (!s.up && s.ho >= 2) s.up = true; } }); }
+    while (L.rec.length && L.rec[0][0] < L.t - 5) L.rec.shift();
+    while (L.sends.length && L.sends[0].t < L.t - 0.35) L.sends.shift();
+  }
+  const lbcv = NB.canvas("#cv-lb", (ctx, w, h) => {
+    if (!LB) return;
+    const P = NB.palette(), n = LB.sv.length, small = w < 520;
+    const lbx = w / 2, lby = 30;
+    NB.box(ctx, lbx - 70, lby - 16, 140, 32, { fill: P.accent2, stroke: false, text: "로드 밸런서", color: "#fff", bold: true, size: 13 });
+    const gw = (w - 20) / n, by = h - 40, bmax = h - 150;
+    const sx = (i) => 10 + gw * i + gw / 2;
+    for (let i = 0; i < n; i++) { ctx.strokeStyle = LB.sv[i].up ? P.border : P.faint; ctx.setLineDash(LB.sv[i].up ? [] : [4, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(lbx, lby + 16); ctx.lineTo(sx(i), by - bmax - 30); ctx.stroke(); ctx.setLineDash([]); }
+    LB.sends.forEach((sd) => { const f = NB.clamp((LB.t - sd.t) / 0.35, 0, 1); const x = NB.lerp(lbx, sx(sd.i), f), y = NB.lerp(lby + 16, by - bmax - 30, f); ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fillStyle = sd.fail ? P.bad : P.accent; ctx.fill(); });
+    const tot = LB.sv.reduce((a, s) => a + s.done, 0) || 1;
+    for (let i = 0; i < n; i++) {
+      const s = LB.sv[i], x = sx(i), bw = Math.min(gw * 0.55, 60);
+      const unit = bmax / 24;
+      const bH = Math.min(bmax, s.busy.length * unit), qH = Math.min(bmax - bH, s.q.length * unit);
+      ctx.strokeStyle = P.border; ctx.lineWidth = 1; ctx.strokeRect(x - bw / 2, by - bmax, bw, bmax);
+      ctx.fillStyle = s.failed ? P.bad : P.accent; ctx.fillRect(x - bw / 2, by - bH, bw, bH);
+      ctx.globalAlpha = 0.4; ctx.fillStyle = s.q.length > 12 ? P.bad : P.warn; ctx.fillRect(x - bw / 2, by - bH - qH, bw, qH); ctx.globalAlpha = 1;
+      if (s.q.length > 20) NB.text(ctx, "▲" + s.q.length, x, by - bmax - 8, { align: "center", size: 10, bold: true, color: P.bad });
+      const st = s.failed ? (s.up ? "장애(미감지)" : "제외됨") : !s.up ? "복귀 중" : s.speed < 1 ? "구형" : "정상";
+      const col = s.failed ? P.bad : !s.up ? P.warn : P.dim;
+      NB.text(ctx, "서버 " + (i + 1), x, by + 12, { align: "center", size: small ? 10 : 12, bold: true, color: P.text });
+      NB.text(ctx, st, x, by + 27, { align: "center", size: small ? 9.5 : 11, color: col });
+      NB.text(ctx, Math.round((s.done / tot) * 100) + "%", x, by - bmax - 22, { align: "center", size: small ? 9.5 : 11, color: P.dim, mono: true });
+    }
+    NB.text(ctx, "처리 몫", 8, by - bmax - 22, { size: 10, color: P.faint });
+  }, { aspect: 0.45, minHeight: 300, maxHeight: 360 });
+  let lbAcc = 0;
+  NB.loop($("cv-lb"), (dt) => {
+    if (!LB) return;
+    const steps = 4; for (let i = 0; i < steps; i++) lbStep(dt / steps);
+    lbcv.redraw();
+    lbAcc += dt; if (lbAcc > 0.3) {
+      lbAcc = 0;
+      const rs = LB.rec.map((r) => r[1]).sort((a, b) => a - b);
+      const avg = rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 0, p99 = rs.length ? rs[Math.floor(rs.length * 0.99)] : 0;
+      const col = (v) => (v > 0.5 ? "var(--bad)" : v > 0.15 ? "var(--warn)" : "var(--ok)");
+      NB.stat("o-lb-avg", rs.length ? `<span style="color:${col(avg)}">${Math.round(avg * 1000)} ms</span>` : "—");
+      NB.stat("o-lb-p99", rs.length ? `<span style="color:${col(p99)}">${Math.round(p99 * 1000)} ms</span>` : "—");
+      NB.stat("o-lb-err", LB.err ? `<span class="bad-txt">${LB.err}건</span>` : "0건");
+      NB.stat("o-lb-rate", Math.round(rs.length / Math.min(5, Math.max(LB.t, 0.1))) + " /s");
+    }
+  });
+  lbBuild();
+
+  /* ================= 일관된 해싱 ================= */
+  const chMode = NB.seg("ch-mode", () => chInit());
+  const chV = NB.range("ch-v", (v) => v + "개", () => chRecalc(true));
+  const KEYS = 400, NAMES = "ABCDEFGH";
+  const keyH = []; for (let i = 0; i < KEYS; i++) keyH.push(hashInt("key:" + i) / 4294967296);
+  let CH = null;
+  function ringOf(nodes) {
+    const pts = [], v = chV();
+    nodes.forEach((nd) => { for (let j = 0; j < v; j++) pts.push({ pos: hashInt("node:" + nd + "#" + j) / 4294967296, nd }); });
+    return pts.sort((a, b) => a.pos - b.pos);
+  }
+  function assign(nodes) {
+    if (chMode() === "mod") return keyH.map((h) => nodes[Math.floor(h * 4294967296) % nodes.length]);
+    const pts = ringOf(nodes);
+    return keyH.map((h) => { let lo = 0, hi = pts.length; while (lo < hi) { const m = (lo + hi) >> 1; if (pts[m].pos < h) lo = m + 1; else hi = m; } return (pts[lo] || pts[0]).nd; });
+  }
+  function chInit() { CH = { nodes: [0, 1, 2, 3], next: 4, prev: null, last: null }; CH.own = assign(CH.nodes); CH.moved = new Array(KEYS).fill(false); CH.last = null; chStat(); }
+  function chRecalc(keepMoved) { const o = assign(CH.nodes); if (!keepMoved) CH.moved = o.map((x, i) => x !== CH.own[i]); else CH.moved = new Array(KEYS).fill(false); CH.own = o; chStat(); }
+  function chChange(fn, kind) {
+    const n0 = CH.nodes.length; fn();
+    const o = assign(CH.nodes); CH.moved = o.map((x, i) => x !== CH.own[i]); CH.own = o; CH.last = { kind, n0 }; chStat();
+  }
+  $("ch-add").onclick = () => { if (CH.nodes.length >= 8) return; chChange(() => { const used = new Set(CH.nodes); let id = 0; while (used.has(id)) id++; CH.nodes.push(id); }, "add"); };
+  $("ch-del").onclick = () => { if (CH.nodes.length <= 2) return; chChange(() => { CH.nodes.splice(1, 1); }, "del"); };
+  $("ch-reset").onclick = chInit;
+  function chStat() {
+    const n = CH.nodes.length, mv = CH.moved.filter(Boolean).length;
+    NB.stat("o-ch-n", n + "개");
+    NB.stat("o-ch-mv", CH.last ? `${mv}개 (${((mv / KEYS) * 100).toFixed(0)}%)` : "—");
+    if (CH.last) {
+      const n0 = CH.last.n0, m = chMode() === "mod";
+      const th = CH.last.kind === "add" ? (m ? n0 / (n0 + 1) : 1 / (n0 + 1)) : m ? (n0 - 1) / n0 : 1 / n0;
+      NB.stat("o-ch-th", "약 " + (th * 100).toFixed(0) + "%" + (m ? " (거의 전부)" : ""));
+    } else NB.stat("o-ch-th", "—");
+    const cnt = {}; CH.nodes.forEach((nd) => (cnt[nd] = 0)); CH.own.forEach((nd) => cnt[nd]++);
+    const mx = Math.max(...Object.values(cnt));
+    NB.stat("o-ch-bal", (mx / (KEYS / n)).toFixed(2) + "배");
+    chcv.redraw();
+  }
+  const chcv = NB.canvas("#cv-ch", (ctx, w, h) => {
+    if (!CH) return;
+    const P = NB.palette(), small = w < 560;
+    const COLS = [P.accent, P.accent2, P.warn, P.ok, P.bad, P.blue, P.dim, P.red];
+    const col = (nd) => COLS[nd % COLS.length];
+    const cx = small ? w / 2 : w * 0.33, cy = small ? h * 0.32 : h / 2, R = small ? Math.min(w * 0.36, h * 0.27) : Math.min(w * 0.26, h * 0.4);
+    ctx.strokeStyle = P.border; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    const ang = (p) => -Math.PI / 2 + p * Math.PI * 2;
+    if (chMode() === "ring") {
+      ringOf(CH.nodes).forEach((pt) => { const a = ang(pt.pos); ctx.strokeStyle = col(pt.nd); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx + (R - 6) * Math.cos(a), cy + (R - 6) * Math.sin(a)); ctx.lineTo(cx + (R + 10) * Math.cos(a), cy + (R + 10) * Math.sin(a)); ctx.stroke(); });
+    } else NB.text(ctx, "mod N: 고리 위치와 무관하게 나머지로 배정", cx, cy + R + 22, { align: "center", size: 11, color: P.faint });
+    keyH.forEach((hh, i) => {
+      const a = ang(hh), rr = R - 14 - (i % 4) * 6, x = cx + rr * Math.cos(a), y = cy + rr * Math.sin(a), mv = CH.moved[i];
+      ctx.beginPath(); ctx.arc(x, y, mv ? 4 : 2.2, 0, 7); ctx.fillStyle = col(CH.own[i]); ctx.fill();
+      if (mv) { ctx.strokeStyle = P.text; ctx.lineWidth = 1; ctx.stroke(); }
+    });
+    NB.text(ctx, "키 " + KEYS + "개", cx, cy, { align: "center", size: 12, color: P.dim });
+    // 막대
+    const cnt = {}; CH.nodes.forEach((nd) => (cnt[nd] = 0)); CH.own.forEach((nd) => cnt[nd]++);
+    const bx = small ? 20 : w * 0.66, bw = small ? w - 40 : w * 0.3, by0 = small ? h * 0.67 : h * 0.18, bh = small ? h * 0.3 : h * 0.66;
+    const rowH = bh / 8, mx = Math.max(KEYS / 2, ...Object.values(cnt));
+    NB.text(ctx, "노드별 키 수 (평균 " + Math.round(KEYS / CH.nodes.length) + ")", bx, by0 - 12, { size: 11.5, bold: true, color: P.text });
+    CH.nodes.forEach((nd, j) => {
+      const y = by0 + j * rowH, ww = ((bw - 34) * cnt[nd]) / mx;
+      NB.text(ctx, NAMES[nd], bx, y + rowH / 2, { size: 11, bold: true, color: col(nd) });
+      ctx.fillStyle = col(nd); ctx.fillRect(bx + 16, y + 2, ww, rowH - 4);
+      NB.text(ctx, String(cnt[nd]), bx + 20 + ww, y + rowH / 2, { size: 10, mono: true, color: P.dim });
+    });
+    const ax = bx + 16 + ((bw - 34) * (KEYS / CH.nodes.length)) / mx;
+    ctx.strokeStyle = P.faint; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(ax, by0); ctx.lineTo(ax, by0 + CH.nodes.length * rowH); ctx.stroke(); ctx.setLineDash([]);
+  }, { aspect: 0.5, minHeight: (window.innerWidth < 600 ? 420 : 340), maxHeight: 440 });
+  chInit();
+
+  /* ================= 지도 GSLB ================= */
+  const LAND = [
+    [[-168,66],[-160,71],[-140,70],[-120,72],[-95,72],[-80,73],[-62,66],[-55,52],[-66,45],[-70,42],[-76,35],[-81,31],[-80,25],[-82,28],[-84,30],[-90,29],[-97,26],[-97,22],[-92,18],[-87,21],[-88,15],[-83,9],[-79,8],[-85,11],[-92,14],[-100,17],[-106,22],[-112,29],[-117,32],[-121,35],[-124,40],[-124,46],[-127,50],[-133,55],[-140,59],[-150,60],[-158,57],[-165,60]],
+    [[-80,8],[-75,11],[-62,11],[-52,5],[-50,0],[-35,-6],[-39,-14],[-41,-22],[-48,-26],[-53,-34],[-58,-38],[-65,-42],[-68,-50],[-70,-54],[-74,-50],[-73,-40],[-71,-30],[-70,-18],[-76,-14],[-81,-5],[-80,0],[-78,7]],
+    [[-10,36],[-9,43],[-2,44],[-5,48],[0,50],[5,53],[8,57],[5,62],[14,68],[25,71],[40,68],[60,70],[80,73],[100,77],[120,73],[140,72],[160,70],[180,68],[180,62],[163,58],[156,51],[142,47],[140,40],[135,35],[130,34],[126,37],[122,40],[121,32],[122,26],[117,23],[110,21],[106,16],[109,12],[105,9],[103,1],[101,6],[98,10],[98,16],[94,17],[92,22],[87,22],[80,15],[77,8],[73,17],[70,22],[66,25],[57,26],[59,22],[52,16],[45,13],[43,15],[39,22],[35,28],[34,31],[36,36],[30,37],[27,40],[24,38],[22,37],[20,40],[16,38],[18,40],[12,44],[14,45],[8,44],[3,43],[0,39],[-6,36]],
+    [[-17,21],[-16,28],[-10,30],[-6,36],[10,37],[11,33],[20,31],[32,31],[34,28],[39,22],[43,12],[51,12],[48,4],[40,-3],[40,-11],[35,-20],[33,-26],[28,-33],[20,-35],[18,-30],[12,-17],[13,-8],[9,-1],[9,4],[4,6],[-8,4],[-13,8],[-17,14]],
+    [[114,-22],[122,-18],[130,-12],[137,-12],[142,-11],[146,-19],[153,-25],[151,-34],[146,-39],[140,-38],[135,-35],[129,-32],[115,-34],[113,-26]],
+    [[-6,50],[1,51],[0,53],[-3,56],[-5,58],[-6,56],[-5,53]],
+    [[130,31],[135,34],[140,36],[142,40],[141,45],[144,44],[140,41],[136,37],[132,34]],
+    [[-50,60],[-42,60],[-20,70],[-20,80],[-60,82],[-70,77],[-55,70]],
+    [[95,5],[106,-6],[115,-8],[120,-9],[110,-3],[104,-1]], [[109,1],[117,7],[119,1],[116,-4],[110,-3]],
+    [[172,-35],[178,-38],[174,-41],[167,-46],[172,-41]],
+  ];
+  const REG = [["서울", 127, 37.5], ["도쿄", 139.7, 35.7], ["싱가포르", 103.8, 1.3], ["뭄바이", 72.9, 19], ["프랑크푸르트", 8.7, 50.1], ["런던", -0.1, 51.5], ["버지니아", -77.5, 39], ["오리건", -120.5, 45.6], ["상파울루", -46.6, -23.5], ["시드니", 151.2, -33.9]];
+  const POP = [[126.9,37.5],[139.7,35.7],[135.5,34.7],[114.2,22.3],[121.5,25],[103.8,1.3],[106.8,-6.2],[72.9,19],[77.2,28.6],[55.3,25.2],[8.7,50.1],[-0.1,51.5],[2.35,48.9],[-3.7,40.4],[18,59.3],[21,52.2],[28,-26.2],[3.4,6.5],[31.2,30],[36.8,-1.3],[-74,40.7],[-77.5,39],[-87.6,41.9],[-96.8,32.8],[-118.2,34],[-122.3,47.6],[-79.4,43.7],[-80.2,25.8],[-99.1,19.4],[-46.6,-23.5],[-74.1,4.7],[-70.7,-33.4],[-58.4,-34.6],[151.2,-33.9],[145,-37.8],[174.8,-36.8],[115.9,-31.9],[121,14.6],[100.5,13.8]];
+  let user = [126.8, 35.2];
+  const gMode = NB.seg("geo-mode", geo); $("geo-fail").onchange = geo;
+  const dist = (a, b) => { const r = Math.PI / 180, la1 = a[1] * r, la2 = b[1] * r, dl = (b[0] - a[0]) * r; const s = Math.sin((la2 - la1) / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dl / 2) ** 2; return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(s))); };
+  const rtt = (d) => (2 * d * 1.4) / 200 + 2;
+  let GEO = null;
+  function geo() {
+    const ranked = REG.map((r, i) => ({ i, d: dist(user, [r[1], r[2]]) })).sort((a, b) => a.d - b.d);
+    const failed = $("geo-fail").checked ? ranked[0].i : -1;
+    const ok = ranked.filter((r) => r.i !== failed);
+    const sel = ok[0], nxt = ok[1];
+    const pops = POP.map((p, i) => ({ i, d: dist(user, p) })).sort((a, b) => a.d - b.d);
+    const pop = pops[0];
+    const edge = gMode() === "edge";
+    const popReg = dist(POP[pop.i], [REG[sel.i][1], REG[sel.i][2]]);
+    GEO = { sel, nxt, failed, pop, edge };
+    NB.stat("o-geo-reg", REG[sel.i][0] + (failed >= 0 ? ` <small style="font-size:12px;color:var(--bad)">(${REG[failed][0]} 장애)</small>` : ""));
+    const regR = edge ? rtt(pop.d) + (2 * popReg * 1.25) / 200 : rtt(sel.d);
+    NB.stat("o-geo-rtt", Math.round(regR) + " ms" + (edge ? " <small style='font-size:12px;color:var(--text-faint)'>(PoP+백본)</small>" : ""));
+    NB.stat("o-geo-next", REG[nxt.i][0] + " · " + Math.round(rtt(nxt.d)) + " ms");
+    NB.stat("o-geo-first", edge ? `<span class="ok-txt">${Math.round(rtt(pop.d))} ms</span> <small style="font-size:12px;color:var(--text-faint)">(엣지 PoP)</small>` : Math.round(rtt(sel.d)) + " ms <small style='font-size:12px;color:var(--text-faint)'>(리전)</small>");
+    gcv.redraw();
+  }
+  const LAT0 = 78, LAT1 = -58;
+  const gx = (lon, w) => ((lon + 180) / 360) * w;
+  const gy = (lat, h) => ((LAT0 - lat) / (LAT0 - LAT1)) * h;
+  const gcv = NB.canvas("#cv-geo", (ctx, w, h) => {
+    if (!GEO) return;
+    const P = NB.palette(), small = w < 520;
+    LAND.forEach((poly) => { ctx.beginPath(); poly.forEach(([lo, la], i) => (i ? ctx.lineTo(gx(lo, w), gy(la, h)) : ctx.moveTo(gx(lo, w), gy(la, h)))); ctx.closePath(); ctx.fillStyle = P.surface; ctx.fill(); ctx.strokeStyle = P.border; ctx.lineWidth = 1; ctx.stroke(); });
+    POP.forEach((p) => { ctx.beginPath(); ctx.arc(gx(p[0], w), gy(p[1], h), small ? 1.8 : 2.4, 0, 7); ctx.fillStyle = P.warn; ctx.globalAlpha = 0.7; ctx.fill(); ctx.globalAlpha = 1; });
+    const U = [gx(user[0], w), gy(user[1], h)];
+    const R = (i) => [gx(REG[i][1], w), gy(REG[i][2], h)];
+    const sel = R(GEO.sel.i), nx = R(GEO.nxt.i);
+    ctx.strokeStyle = P.faint; ctx.setLineDash([3, 4]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(U[0], U[1]); ctx.lineTo(nx[0], nx[1]); ctx.stroke(); ctx.setLineDash([]);
+    if (GEO.edge) {
+      const pp = [gx(POP[GEO.pop.i][0], w), gy(POP[GEO.pop.i][1], h)];
+      ctx.strokeStyle = P.warn; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(U[0], U[1]); ctx.lineTo(pp[0], pp[1]); ctx.stroke();
+      ctx.strokeStyle = P.accent2; ctx.lineWidth = 2.4; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(pp[0], pp[1]); ctx.lineTo(sel[0], sel[1]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(pp[0], pp[1], 6, 0, 7); ctx.strokeStyle = P.warn; ctx.lineWidth = 2; ctx.stroke();
+    } else { ctx.strokeStyle = P.accent; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(U[0], U[1]); ctx.lineTo(sel[0], sel[1]); ctx.stroke(); }
+    REG.forEach((r, i) => {
+      const [x, y] = R(i), s = small ? 7 : 9, f = i === GEO.failed, on = i === GEO.sel.i;
+      ctx.fillStyle = f ? P.bad : on ? P.accent : P.accent2; ctx.fillRect(x - s / 2, y - s / 2, s, s);
+      if (f) NB.text(ctx, "✕", x, y - 12, { align: "center", size: 13, bold: true, color: P.bad });
+      if (!small || on || f) { const left = r[0] === "런던" || r[0] === "오리건"; NB.text(ctx, r[0], left ? x - 7 : x + 7, y + 10, { align: left ? "right" : "left", size: small ? 9.5 : 10.5, color: on ? P.accent : P.dim, bold: on }); }
+    });
+    ctx.beginPath(); ctx.arc(U[0], U[1], 7, 0, 7); ctx.fillStyle = P.ok; ctx.fill(); ctx.strokeStyle = P.bg; ctx.lineWidth = 2; ctx.stroke();
+    NB.text(ctx, "나", U[0] - 10, U[1] - 4, { align: "right", size: 12, bold: true, color: P.ok });
+  }, { aspect: 0.5, minHeight: 200, maxHeight: 460 });
+  $("cv-geo").addEventListener("click", (e) => {
+    const r = e.target.getBoundingClientRect();
+    const lon = ((e.clientX - r.left) / r.width) * 360 - 180, lat = LAT0 - ((e.clientY - r.top) / r.height) * (LAT0 - LAT1);
+    user = [lon, lat]; geo();
+  });
+  geo();
+})();
+</script>
+</body>
+</html>

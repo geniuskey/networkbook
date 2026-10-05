@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>네트워크란 무엇인가 · NetworkBook</title>
+<meta name="description" content="연결이 왜 힘이 되는가. 노드와 링크, 토폴로지, 집에서 해저 케이블까지 이어지는 '망들의 망' 인터넷, 대역폭과 지연, 빛의 속도가 정하는 한계를 시뮬레이터로 둘러본다.">
+<link rel="canonical" href="https://networkbook.euiyun.com/chapters/intro.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="NetworkBook">
+<meta property="og:title" content="네트워크란 무엇인가 · NetworkBook">
+<meta property="og:description" content="연결이 왜 힘이 되는가. 노드와 링크, 토폴로지, 집에서 해저 케이블까지 이어지는 &#x27;망들의 망&#x27; 인터넷, 대역폭과 지연, 빛의 속도가 정하는 한계를 시뮬레이터로 둘러본다.">
+<meta property="og:url" content="https://networkbook.euiyun.com/chapters/intro.html">
+<meta property="og:image" content="https://networkbook.euiyun.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"네트워크란 무엇인가","name":"네트워크란 무엇인가 · NetworkBook","url":"https://networkbook.euiyun.com/chapters/intro.html","mainEntityOfPage":"https://networkbook.euiyun.com/chapters/intro.html","inLanguage":"ko","isAccessibleForFree":true,"learningResourceType":"interactive textbook chapter","position":1,"image":"https://networkbook.euiyun.com/og.png","dateModified":"2026-10-05","isPartOf":{"@type":"Book","@id":"https://networkbook.euiyun.com/#book","name":"NetworkBook — 인터랙티브 네트워크 교과서","url":"https://networkbook.euiyun.com/"},"publisher":{"@type":"Organization","name":"NetworkBook","url":"https://networkbook.euiyun.com/"},"description":"연결이 왜 힘이 되는가. 노드와 링크, 토폴로지, 집에서 해저 케이블까지 이어지는 '망들의 망' 인터넷, 대역폭과 지연, 빛의 속도가 정하는 한계를 시뮬레이터로 둘러본다."},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"NetworkBook","item":"https://networkbook.euiyun.com/"},{"@type":"ListItem","position":2,"name":"01 네트워크란 무엇인가","item":"https://networkbook.euiyun.com/chapters/intro.html"}]}]}</script>
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<style>
+  .trip-desc { padding: 12px 18px; border-top: 1px solid var(--border); font-size: 15px; min-height: 96px; line-height: 1.6; }
+  .trip-desc .hop { font-weight: 700; color: var(--accent); }
+  .trip-desc .meta { display: block; margin-top: 4px; font-size: 13px; color: var(--text-dim); font-family: var(--mono); }
+  .mapfig a rect { transition: opacity .15s; }
+  .mapfig a:hover rect { opacity: .75; }
+  .mapfig a text { pointer-events: none; }
+  .bignum { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin: 18px 0; }
+  .bignum div { padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-elev); }
+  .bignum b { display: block; font-size: 22px; color: var(--accent); line-height: 1.2; }
+  .bignum span { font-size: 13px; color: var(--text-dim); }
+</style>
+</head>
+<body data-chapter="intro">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 01</div>
+    <h1>네트워크란 무엇인가</h1>
+    <p class="lead">휴대폰으로 사진 한 장을 보내면 1초도 안 되어 친구 화면에 뜬다. 그 사이 사진은 전파가 되었다가, 구리선의 전압이 되었다가, 유리실 속 빛이 되어 수십 대의 장비를 거친다. 이 모든 것을 우리는 한 단어로 “네트워크”라 부른다. 이 장은 책 전체의 지도다. 왜 모든 것을 연결하려 하는지, 인터넷은 어떻게 생겼는지, “빠르다”는 말에 숨은 두 가지 뜻은 무엇인지부터 살펴본다.</p>
+    <ul class="objectives">
+      <li>모두를 직접 잇는 것과 교환기를 두는 것의 차이를 선 개수로 계산한다.</li>
+      <li>노드·링크·토폴로지라는 말로 어떤 네트워크든 그림으로 그릴 수 있다.</li>
+      <li>버스·링·스타·트리·메시 토폴로지의 비용과 고장 내성을 비교한다.</li>
+      <li>집에서 해외 서버까지, 인터넷이 “망들의 망”으로 이어진 구조를 따라간다.</li>
+      <li>대역폭과 지연을 구분하고, 전송 시간에서 어느 쪽이 지배하는지 판단한다.</li>
+      <li>빛의 속도로 거리별 최소 지연을 어림한다.</li>
+      <li>이 책 26개 장이 어떤 층을 이루는지 지도를 머릿속에 그린다.</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="power">
+    <h2>연결이 힘이다</h2>
+    <p>1876년 전화가 발명된 직후, 전화기를 산 사람은 통화할 상대의 집까지 직접 전선을 깔아야 했다. 두 집이면 선 한 가닥으로 충분하다. 세 집이면 세 가닥, 네 집이면 여섯 가닥이다. 동네 사람 모두가 서로 통화하려면 어떻게 될까? 실제로 1880년대 뉴욕 거리에는 전신주마다 수백 가닥의 전선이 거미줄처럼 걸려 하늘을 가렸다.</p>
+    <p>해결책은 동네 한가운데 <span class="term">교환기</span><span class="en">(switchboard, exchange)</span>를 두는 것이었다. 집마다 교환기까지 선 하나만 깔고, 교환원이 플러그를 꽂아 원하는 두 집을 그때그때 이어 준다. 1878년 미국 뉴헤이븐에 첫 상업용 전화 교환국이 문을 열었고, 이 생각은 오늘날 모든 네트워크의 뼈대가 되었다. 인터넷의 스위치와 라우터도 결국 “자동화된 교환원”이다.</p>
+    <div class="formula">모두 직접 연결: 선 = n(n−1)/2 &nbsp;&nbsp;|&nbsp;&nbsp; 교환기 하나: 선 = n
+      <div class="where">n = 연결할 집(장치)의 수. 100집이면 직접 연결은 4,950가닥, 교환기 방식은 100가닥.</div></div>
+    <div class="sim" id="sim-conn">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>모두 직접 잇기 vs 교환기 하나</h3></div>
+      <div class="sim-view"><canvas id="cv-conn"></canvas></div>
+      <div class="sim-controls">
+        <label class="ctrl"><span>전화기(장치) 수 n <output id="cn-out"></output></span><input type="range" id="cn" min="2" max="60" value="8"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">직접 연결(메시) 선 수</span><span class="v" id="o-mesh">—</span></div>
+        <div class="stat"><span class="k">교환기(스타) 선 수</span><span class="v" id="o-star">—</span></div>
+        <div class="stat"><span class="k">가능한 통화 쌍</span><span class="v" id="o-pairs">—</span></div>
+        <div class="stat"><span class="k">집마다 필요한 단자</span><span class="v" id="o-port">—</span></div>
+      </div>
+      <div class="sim-note">해볼 것: n을 2배로 늘려 보자. 교환기 방식의 선은 2배가 되지만, 직접 연결의 선과 통화 가능한 쌍은 거의 4배가 된다. 가정: 선 한 가닥은 두 집만 잇고, 교환기는 아무 두 집이나 이어 줄 수 있다. 1,000만 대를 직접 연결하려면 약 50조 가닥이 필요하다.</div>
+    </div>
+    <p>시뮬레이터에서 “가능한 통화 쌍”은 직접 연결의 선 수와 똑같이 n²에 비례해 늘어난다. 장치가 하나 더 붙을 때마다 기존의 모든 장치와 새 대화가 생기기 때문이다. 이더넷을 발명한 로버트 메트칼프는 이 점을 들어 “네트워크의 가치는 사용자 수의 제곱에 비례한다”고 했다. 이를 <span class="term">메트칼프의 법칙</span><span class="en">(Metcalfe's law)</span>이라 한다. 엄밀한 법칙이라기보다 경험칙이고, 모든 연결이 똑같이 가치 있지는 않으므로 실제로는 n²보다 느리게 는다는 반론도 많다. 그래도 방향은 분명하다. <b>연결된 사람이 많을수록 연결에 끼고 싶은 사람도 많아진다.</b> 메신저, 전화, 인터넷이 한번 커지기 시작하면 걷잡을 수 없이 커지는 이유다.</p>
+    <div class="callout tip"><strong>비용은 n, 가치는 n²</strong><p>교환기 방식에서는 선(비용)은 n에 비례해 늘고, 쓸모(연결 가능한 쌍)는 n²에 비례해 는다. 이 비대칭이 네트워크 사업의 핵심이다. 전국을 잇는 데 드는 돈은 크지만, 일단 이어 놓으면 쓸모가 비용보다 훨씬 빨리 커진다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="topology">
+    <h2>노드와 링크, 그리고 모양(토폴로지)</h2>
+    <p>어떤 네트워크든 점과 선으로 그릴 수 있다. 점은 <span class="term">노드</span><span class="en">(node)</span>, 즉 데이터를 보내거나 받거나 넘겨주는 장치다. 선은 <span class="term">링크</span><span class="en">(link)</span>, 즉 두 노드를 잇는 통로다. 링크는 구리선(4장)일 수도, 광섬유(5장)일 수도, 눈에 보이지 않는 전파(11장)일 수도 있다. 점과 선을 어떤 모양으로 배치했는지를 <span class="term">토폴로지</span><span class="en">(topology, 연결 형태)</span>라 한다.</p>
+    <div style="overflow-x:auto">
+    <figure class="diagram" style="min-width:560px">
+      <svg viewBox="0 0 800 270" role="img" aria-label="다섯 가지 토폴로지: 버스, 링, 스타, 트리, 메시">
+        <g class="t" text-anchor="middle" style="font-weight:700"><text x="80" y="24">버스</text><text x="240" y="24">링</text><text x="400" y="24">스타</text><text x="560" y="24">트리</text><text x="720" y="24">메시</text></g>
+        <!-- bus -->
+        <g transform="translate(0,40)">
+          <path d="M14 90 H146" stroke="var(--accent)" stroke-width="4"/>
+          <g class="s-line"><path d="M30 90 V60 M62 90 V120 M94 90 V60 M126 90 V120"/></g>
+          <g class="f-elev"><circle cx="30" cy="54" r="9"/><circle cx="62" cy="126" r="9"/><circle cx="94" cy="54" r="9"/><circle cx="126" cy="126" r="9"/></g>
+        </g>
+        <!-- ring -->
+        <g transform="translate(240,130)">
+          <circle r="60" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+          <g class="f-elev"><circle cx="0" cy="-60" r="9"/><circle cx="57" cy="-19" r="9"/><circle cx="35" cy="49" r="9"/><circle cx="-35" cy="49" r="9"/><circle cx="-57" cy="-19" r="9"/></g>
+        </g>
+        <!-- star -->
+        <g transform="translate(400,130)">
+          <g stroke="var(--accent)" stroke-width="2.5"><path d="M0 0 L0 -62 M0 0 L59 -19 M0 0 L36 50 M0 0 L-36 50 M0 0 L-59 -19"/></g>
+          <rect x="-15" y="-11" width="30" height="22" rx="5" class="f-acc"/>
+          <g class="f-elev"><circle cx="0" cy="-62" r="9"/><circle cx="59" cy="-19" r="9"/><circle cx="36" cy="50" r="9"/><circle cx="-36" cy="50" r="9"/><circle cx="-59" cy="-19" r="9"/></g>
+        </g>
+        <!-- tree -->
+        <g transform="translate(560,0)">
+          <g stroke="var(--accent)" stroke-width="2.5"><path d="M0 70 L-40 125 M0 70 L40 125 M-40 125 L-62 185 M-40 125 L-18 185 M40 125 L18 185 M40 125 L62 185"/></g>
+          <rect x="-15" y="59" width="30" height="22" rx="5" class="f-acc"/>
+          <rect x="-53" y="115" width="26" height="20" rx="5" class="f-acc"/><rect x="27" y="115" width="26" height="20" rx="5" class="f-acc"/>
+          <g class="f-elev"><circle cx="-62" cy="185" r="9"/><circle cx="-18" cy="185" r="9"/><circle cx="18" cy="185" r="9"/><circle cx="62" cy="185" r="9"/></g>
+        </g>
+        <!-- mesh -->
+        <g transform="translate(720,130)">
+          <g stroke="var(--accent)" stroke-width="1.8" fill="none"><path d="M0 -60 L57 -19 L35 49 L-35 49 L-57 -19 Z M0 -60 L35 49 M0 -60 L-35 49 M57 -19 L-35 49 M57 -19 L-57 -19 M35 49 L-57 -19"/></g>
+          <g class="f-elev"><circle cx="0" cy="-60" r="9"/><circle cx="57" cy="-19" r="9"/><circle cx="35" cy="49" r="9"/><circle cx="-35" cy="49" r="9"/><circle cx="-57" cy="-19" r="9"/></g>
+        </g>
+        <g class="t-dim" text-anchor="middle">
+          <text x="80" y="222">선 하나를 함께 씀</text><text x="80" y="240">옛 동축 이더넷</text>
+          <text x="240" y="222">옆으로 차례차례</text><text x="240" y="240">도시 광 링, 토큰 링</text>
+          <text x="400" y="222">가운데 장비가 교환</text><text x="400" y="240">가정·사무실 스위치</text>
+          <text x="560" y="222">스타를 층층이</text><text x="560" y="240">건물·통신사 접속망</text>
+          <text x="720" y="222">여러 갈래로 연결</text><text x="720" y="240">인터넷 백본</text>
+        </g>
+      </svg>
+      <figcaption><b>그림 1-1.</b> 다섯 가지 기본 토폴로지. 동그라미는 끝 장치(호스트), 파란 사각형은 중계 장비(스위치·라우터)다. 실제 네트워크는 이들을 섞어 쓴다. 집 안은 스타, 동네는 트리, 나라와 나라 사이는 메시에 가깝다.</figcaption>
+    </figure>
+    </div>
+    <p>노드는 하는 일에 따라 이름이 다르다. 이 책 내내 나오는 주인공들을 미리 만나 두자.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>장치</th><th>하는 일</th><th>택배 비유</th><th>자세히</th></tr></thead>
+      <tbody>
+        <tr><td><span class="term">호스트</span><span class="en">(host)</span></td><td>데이터를 처음 만들고 마지막에 받는 끝 장치. 휴대폰, 노트북, 서버.</td><td>보내는 사람·받는 사람</td><td>—</td></tr>
+        <tr><td>스위치</td><td>같은 건물·같은 망 안에서 프레임을 받아 해당 포트로만 내보낸다.</td><td>아파트 우편실</td><td>6장</td></tr>
+        <tr><td>라우터</td><td>목적지 IP 주소를 보고 다른 망으로 가는 다음 장비를 고른다.</td><td>물류 허브(분류 센터)</td><td>8장</td></tr>
+        <tr><td>무선 AP·기지국</td><td>전파와 유선 사이를 잇는 다리.</td><td>하늘길 정류장</td><td>13·14장</td></tr>
+        <tr><td>집 공유기</td><td>라우터 + 스위치 + Wi-Fi AP + 주소 변환(NAT)을 한 상자에 넣은 복합 장치.</td><td>현관 겸 우편함</td><td>7장</td></tr>
+      </tbody>
+    </table></div>
+    <p>토폴로지는 비용과 튼튼함 사이의 맞바꿈이다. 링크를 많이 깔수록 비싸지만, 하나가 끊겨도 돌아갈 길이 있다. 아래에서 직접 선을 끊고 장비를 고장 내 보자.</p>
+    <div class="sim" id="sim-topo">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>토폴로지별 고장 견디기: 선이나 장비를 눌러 고장 내 보세요</h3></div>
+      <div class="sim-view"><canvas id="cv-topo" style="cursor:pointer"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>토폴로지</span><div class="seg" id="tp"><button data-value="bus">버스</button><button data-value="ring">링</button><button data-value="star" class="on">스타</button><button data-value="tree">트리</button><button data-value="mesh">메시</button></div></div>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn" id="tp-rand">무작위 선 하나 끊기</button><button class="btn" id="tp-fix">모두 복구</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">깔아야 할 링크</span><span class="v" id="o-tl">—</span></div>
+        <div class="stat"><span class="k">통신 가능한 호스트 쌍</span><span class="v" id="o-tc">—</span></div>
+        <div class="stat"><span class="k">가장 먼 두 호스트 (거치는 링크)</span><span class="v" id="o-td">—</span></div>
+      </div>
+      <div class="sim-note">호스트 8대(동그라미) 사이의 28쌍 중 몇 쌍이 아직 대화할 수 있는지 센다. 해볼 것: 스타에서 가운데 스위치를 눌러 보자(단일 고장점). 링에서는 선 하나를 끊어도 반대쪽으로 돌아가지만, 두 개를 끊으면 갈라진다. 메시는 비싸지만 거의 무너지지 않는다. 버스는 공유 선 한 가닥에 모두 매달린 구조로 단순화했다.</div>
+    </div>
+    <div class="callout analogy"><strong>아파트 우편실과 물류 허브</strong><p>같은 아파트 안에서 주고받는 편지는 1층 우편실(스위치)이 호수만 보고 바로 넣어 준다. 다른 도시로 가는 상자는 동네 대리점을 거쳐 대형 허브(라우터)로 간다. 허브는 상자의 주소를 보고 “부산 방향 트럭”에 싣는다. 허브끼리는 여러 갈래의 고속도로(메시)로 이어져 있어서, 한 도로가 막혀도 다른 길로 돌아간다.</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="internet">
+    <h2>인터넷: 망들의 망</h2>
+    <p>“인터넷”이라는 단일한 기계나 회사는 없다. 인터넷<span class="en">(internet = inter + network)</span>은 이름 그대로 <b>네트워크와 네트워크를 이은 것</b>이다. 우리 집 공유기 안쪽의 작은 망, 통신사의 거대한 망, 대학·기업·클라우드 회사의 망이 각자 따로 운영되면서 서로 약속된 방식(IP, 7장)으로 이어져 있다. 이렇게 독립적으로 운영되는 망이 전 세계에 약 7만~8만 개 있고, 서로 경로 정보를 주고받으며(BGP, 8장) 하나처럼 동작한다.</p>
+    <div style="overflow-x:auto">
+    <figure class="diagram" style="min-width:640px">
+      <svg viewBox="0 0 800 330" role="img" aria-label="집에서 해외 데이터센터까지 인터넷의 계층 구조">
+        <defs><marker id="in-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker></defs>
+        <!-- bands -->
+        <g class="t-dim" style="font-size:11px">
+          <rect x="6" y="14" width="788" height="58" rx="10" fill="var(--accent-2-soft)"/><text x="16" y="32">국제·백본</text>
+          <rect x="6" y="80" width="788" height="92" rx="10" class="f-surface"/><text x="16" y="98">통신사(ISP) 망</text>
+          <rect x="6" y="180" width="788" height="140" rx="10" fill="var(--accent-soft)"/><text x="16" y="198">접속망 · 집 · 데이터센터</text>
+        </g>
+        <!-- home -->
+        <rect x="24" y="250" width="92" height="52" rx="10" class="f-elev"/><text x="70" y="272" text-anchor="middle" class="t">우리 집</text><text x="70" y="290" text-anchor="middle" class="t-mono">폰·PC·TV</text>
+        <rect x="140" y="250" width="86" height="52" rx="10" class="f-elev"/><text x="183" y="272" text-anchor="middle" class="t">공유기</text><text x="183" y="290" text-anchor="middle" class="t-mono">Wi-Fi·NAT</text>
+        <rect x="140" y="188" width="86" height="36" rx="10" class="f-elev"/><text x="183" y="211" text-anchor="middle" class="t">통신사 국사</text>
+        <!-- isp A -->
+        <rect x="140" y="110" width="150" height="48" rx="10" class="f-acc-soft"/><text x="215" y="132" text-anchor="middle" class="t" style="font-weight:700">A 통신사 백본</text><text x="215" y="149" text-anchor="middle" class="t-mono">라우터 수십~수백 대</text>
+        <!-- IXP -->
+        <rect x="332" y="110" width="120" height="48" rx="10" fill="color-mix(in srgb, var(--warn) 18%, transparent)" stroke="var(--warn)"/><text x="392" y="132" text-anchor="middle" class="t" style="font-weight:700">IXP</text><text x="392" y="149" text-anchor="middle" class="t-mono">망끼리 맞교환</text>
+        <!-- isp B -->
+        <rect x="494" y="110" width="150" height="48" rx="10" class="f-acc-soft"/><text x="569" y="132" text-anchor="middle" class="t" style="font-weight:700">B 통신사·클라우드</text><text x="569" y="149" text-anchor="middle" class="t-mono">다른 망</text>
+        <!-- DC -->
+        <rect x="494" y="250" width="150" height="52" rx="10" class="f-elev"/><text x="569" y="272" text-anchor="middle" class="t">데이터센터</text><text x="569" y="290" text-anchor="middle" class="t-mono">서버 수만 대</text>
+        <rect x="340" y="250" width="104" height="52" rx="10" class="f-elev"/><text x="392" y="272" text-anchor="middle" class="t">CDN 캐시</text><text x="392" y="290" text-anchor="middle" class="t-mono">가까운 사본</text>
+        <!-- subsea -->
+        <rect x="140" y="24" width="190" height="38" rx="10" class="f-elev"/><text x="235" y="48" text-anchor="middle" class="t">해저 케이블 육양국</text>
+        <rect x="560" y="24" width="190" height="38" rx="10" class="f-elev"/><text x="655" y="48" text-anchor="middle" class="t">해외 통신사·데이터센터</text>
+        <path d="M330 43 C 420 10, 470 76, 560 43" fill="none" stroke="var(--accent-2)" stroke-width="3" stroke-dasharray="7 4"/>
+        <text x="445" y="68" text-anchor="middle" class="t-mono" style="fill:var(--accent-2);font-size:10px">해저 광케이블 · 수천~1만 km</text>
+        <!-- arrows -->
+        <g class="s-acc" marker-end="url(#in-a)" marker-start="url(#in-a)">
+          <path d="M116 276 H136"/><path d="M183 248 V228"/><path d="M183 188 V162"/><path d="M290 134 H328"/><path d="M452 134 H490"/><path d="M569 158 V246"/><path d="M215 110 V66"/><path d="M286 158 L360 246"/>
+        </g>
+        <text x="660" y="212" class="t-dim">접속망: 집 ↔ 국사</text>
+        <text x="660" y="230" class="t-dim">(광 FTTH, 5장)</text>
+      </svg>
+      <figcaption><b>그림 1-2.</b> 인터넷의 대략적인 구조. 집은 접속망을 통해 통신사(ISP) 백본에 붙고, 통신사들은 IXP나 직접 연결로 서로 트래픽을 맞교환한다. 나라 밖으로는 해저 광케이블이 잇는다. 자주 보는 동영상은 통신사 안쪽의 CDN 캐시에서 바로 온다.</figcaption>
+    </figure>
+    </div>
+    <ul>
+      <li><b>접속망</b>: 집에서 통신사 건물(국사)까지의 마지막 구간을 <span class="term">접속망</span><span class="en">(access network)</span>이라 한다. 한국은 대부분 광섬유가 집이나 아파트 통신실까지 들어오는 FTTH 방식이고, 휴대폰은 기지국(14장)이 이 역할을 한다.</li>
+      <li><b>ISP</b>: 인터넷 접속을 파는 통신사를 <span class="term">ISP</span><span class="en">(Internet Service Provider)</span>라 한다. 각 ISP는 전국을 잇는 고속 라우터망, 즉 <span class="term">백본</span><span class="en">(backbone)</span>을 운영한다.</li>
+      <li><b>IXP</b>: 서로 다른 망이 트래픽을 주고받는 공동 교환 장소를 <span class="term">IXP</span><span class="en">(Internet Exchange Point)</span>라 한다. 여러 회사의 라우터가 한 건물에 모여 거대한 스위치로 이어진다. 이게 없으면 옆 회사 망으로 가는 데이터가 해외를 돌아올 수도 있다.</li>
+      <li><b>해저 케이블</b>: 대륙 사이 데이터의 99% 이상은 위성이 아니라 바닷속 광케이블로 간다. 전 세계에 500개 안팎의 해저 케이블이 깔려 있고 총 길이는 100만 km가 넘는다(5장). 한국은 부산·거제·태안 등의 육양국에서 일본, 중국, 동남아, 미국으로 이어진다.</li>
+    </ul>
+    <div class="callout analogy"><strong>택배 물류망과 똑같다</strong><p>택배 상자는 우리 집 → 동네 대리점(접속망) → 지역 허브 터미널 → 간선 트럭으로 전국 허브(백본) → 상대 지역 터미널 → 배송 기사 → 받는 집으로 간다. 택배사가 다르면 중간 거점에서 물건을 넘겨준다(IXP·피어링). 해외 직구 상자는 항구에서 배(해저 케이블)를 탄다. 그리고 인기 상품은 아예 동네 창고에 미리 쌓아 둔다(CDN, 10장). 인터넷이 다른 점은 하나다. 상자가 1초에 수백만 개, 빛의 속도로 움직인다.</p></div>
+    <p>그럼 휴대폰에서 보낸 요청 하나가 실제로 어떤 장비를 거치는지 한 단계씩 따라가 보자.</p>
+    <div class="sim" id="sim-trip">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>요청 하나의 여행: 내 폰에서 서버까지</h3></div>
+      <div class="sim-controls" style="border-top:0">
+        <div class="ctrl"><span>목적지</span><div class="seg" id="trd"><button data-value="cdn">동영상 (통신사 안 CDN)</button><button data-value="kr" class="on">국내 포털 (수도권 데이터센터)</button><button data-value="us">미국 서부 서버</button></div></div>
+        <div class="ctrl"><span>&nbsp;</span><div class="btn-row"><button class="btn" id="tr-prev">← 이전</button><button class="btn primary" id="tr-next">다음 구간 →</button><button class="btn" id="tr-play">처음부터 재생</button></div></div>
+      </div>
+      <div class="sim-view"><canvas id="cv-trip"></canvas></div>
+      <div class="trip-desc" id="tr-desc"></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">지나온 거리 (대략)</span><span class="v" id="o-trkm">—</span></div>
+        <div class="stat"><span class="k">한쪽 방향 지연 누적</span><span class="v" id="o-trms">—</span></div>
+        <div class="stat"><span class="k">왕복(RTT) 예상</span><span class="v" id="o-trrtt">—</span></div>
+      </div>
+      <div class="sim-note">아래 막대는 구간별 지연이 전체에서 차지하는 몫이다. 해볼 것: “미국 서부 서버”를 골라 보자. 장비는 몇 개 안 늘었는데 지연이 열 배 넘게 커진다. 바다를 건너는 한 구간이 거의 전부다. 수치는 혼잡이 없을 때의 대표적인 크기이고, 서버의 처리 시간은 뺐다.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="speed">
+    <h2>대역폭과 지연: 도로의 폭과 길이</h2>
+    <p>“인터넷이 빠르다”는 말에는 전혀 다른 두 가지 뜻이 섞여 있다.</p>
+    <ul>
+      <li><span class="term">대역폭</span><span class="en">(bandwidth)</span>: 1초에 보낼 수 있는 데이터의 양. 단위는 bps(bit per second). 집 인터넷 1 Gbps는 1초에 10억 비트를 보낼 수 있다는 뜻이다. <b>도로의 차선 수</b>에 해당한다. (2장에서는 같은 단어가 신호가 차지하는 주파수 폭, Hz를 뜻하기도 한다. 둘은 깊이 연결되어 있다.)</li>
+      <li><span class="term">지연</span><span class="en">(latency)</span>: 비트 하나가 출발해서 도착하는 데 걸리는 시간. <b>도로의 길이</b>에 해당한다. 보통 갔다가 답이 돌아오는 <span class="term">왕복 시간</span><span class="en">(RTT, round-trip time)</span>으로 잰다. 게임의 “핑”이 바로 RTT다.</li>
+    </ul>
+    <figure class="diagram">
+      <svg viewBox="0 0 800 210" role="img" aria-label="대역폭은 도로 폭, 지연은 도로 길이">
+        <text x="20" y="26" class="t" style="font-weight:700">대역폭 = 차선 수 (한 번에 몇 대가 나란히 가나)</text>
+        <rect x="20" y="40" width="340" height="60" rx="6" class="f-surface"/>
+        <g stroke="var(--border)" stroke-dasharray="10 8" stroke-width="2"><path d="M20 60 H360 M20 80 H360"/></g>
+        <g fill="var(--accent)"><rect x="40" y="44" width="34" height="12" rx="3"/><rect x="90" y="44" width="34" height="12" rx="3"/><rect x="140" y="44" width="34" height="12" rx="3"/><rect x="60" y="64" width="34" height="12" rx="3"/><rect x="110" y="64" width="34" height="12" rx="3"/><rect x="40" y="84" width="34" height="12" rx="3"/><rect x="90" y="84" width="34" height="12" rx="3"/><rect x="160" y="84" width="34" height="12" rx="3"/></g>
+        <text x="20" y="124" class="t-dim">3차선: 1초에 지나가는 차가 많다</text>
+        <text x="440" y="26" class="t" style="font-weight:700">지연 = 도로 길이 (첫 차가 언제 도착하나)</text>
+        <path d="M440 70 H780" stroke="var(--text-dim)" stroke-width="10" stroke-linecap="round" opacity=".35"/>
+        <rect x="452" y="63" width="34" height="14" rx="3" fill="var(--accent-2)"/>
+        <circle cx="770" cy="70" r="10" fill="var(--ok)"/>
+        <text x="440" y="104" class="t-dim">차선을 늘려도 첫 차의 도착 시간은 그대로다.</text>
+        <text x="440" y="124" class="t-dim">줄이려면 길을 짧게 하거나 더 빨리 달려야 한다.</text>
+        <rect x="20" y="148" width="760" height="48" rx="10" fill="var(--accent-soft)"/>
+        <text x="40" y="177" class="t" style="font-weight:700">전송 시간 ≈ 왕복 지연(RTT) + 데이터 크기 ÷ 대역폭</text>
+        <text x="520" y="177" class="t-dim">작은 데이터는 앞 항이, 큰 데이터는 뒤 항이 지배</text>
+      </svg>
+      <figcaption><b>그림 1-3.</b> 대역폭과 지연. 대역폭은 “얼마나 많이”, 지연은 “얼마나 빨리 첫 반응이 오나”를 정한다. 웹 페이지처럼 작은 요청이 여러 번 오가는 일은 지연이, 큰 파일 내려받기는 대역폭이 좌우한다.</figcaption>
+    </figure>
+    <div class="callout tip"><strong>Mbps와 MB/s는 8배 차이</strong><p>통신 속도는 비트(b) 단위, 파일 크기는 바이트(B) 단위로 쓰는 관례가 있다. 1바이트 = 8비트이므로 500 Mbps 인터넷으로 받을 수 있는 최대 속도는 약 62.5 MB/s다. 여기에 포장재(헤더, 3장)와 재전송(9장) 몫이 빠지므로 실제로 체감하는 <span class="term">처리량</span><span class="en">(throughput)</span>은 그보다 조금 낮다.</p></div>
+    <div class="sim" id="sim-xfer">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>전송 시간 계산기: 지연이 지배할까, 대역폭이 지배할까</h3></div>
+      <div class="sim-view"><canvas id="cv-xfer"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>예시</span><div class="seg" id="xp"><button data-value="10">아이콘 10 KB</button><button data-value="37" class="on">사진 5 MB</button><button data-value="67">영화 5 GB</button><button data-value="90">백업 1 TB</button></div></div>
+        <label class="ctrl"><span>파일 크기 <output id="xs-out"></output></span><input type="range" id="xs" min="0" max="100" step="1" value="37"></label>
+        <label class="ctrl"><span>대역폭 <output id="xb-out"></output></span><input type="range" id="xb" min="0" max="100" step="1" value="60"></label>
+        <label class="ctrl"><span>왕복 지연 RTT <output id="xr-out"></output></span><input type="range" id="xr" min="1" max="600" step="1" value="30"></label>
+        <label class="check"><input type="checkbox" id="xtruck"> 트럭과 비교: 저장장치를 싣고 서울 → 부산 (약 5시간)</label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">총 전송 시간</span><span class="v" id="o-xt">—</span></div>
+        <div class="stat"><span class="k">지배하는 쪽</span><span class="v" id="o-xd">—</span></div>
+        <div class="stat"><span class="k">실제로 얻은 평균 속도</span><span class="v" id="o-xe">—</span></div>
+      </div>
+      <div class="sim-note">가정: 연결 준비와 요청에 왕복 1번(RTT), 그 뒤로는 대역폭을 꽉 채워 보낸다. 실제 TCP는 처음에 천천히 속도를 올리고(9장) 암호화 협상(22장)에 왕복이 더 들어서 작은 파일일수록 지연의 비중이 더 크다. 해볼 것: 사진 5 MB에서 대역폭만 1 Gbps → 10 Gbps로 올려 보자. 시간이 거의 줄지 않는 지점이 온다.</div>
+    </div>
+    <p>트럭 비교를 켜고 1 TB를 100 Mbps로 보내 보면 놀라운 결과가 나온다. 네트워크로는 하루 가까이 걸리지만, 저장장치를 트럭에 실으면 5시간이면 된다. 대역폭만 따지면 트럭이 이긴다. 컴퓨터 과학자 앤드루 타넨바움은 “고속도로를 달리는, 테이프를 가득 실은 스테이션왜건의 대역폭을 얕보지 말라”고 했다. 이렇게 물리 매체를 직접 나르는 방식을 <span class="term">스니커넷</span><span class="en">(sneakernet, 운동화로 나르는 망)</span>이라 부른다. 실제로 클라우드 회사들은 페타바이트 단위의 데이터를 옮길 때 저장장치 상자를 택배로 보내는 서비스를 운영한다. 물론 트럭의 지연은 5시간이라 메신저를 보내기엔 최악이다.</p>
+    <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">1 TB 백업을 100 Mbps 인터넷으로 보내는 것과, SSD에 담아 트럭으로 서울에서 부산까지(약 5시간) 나르는 것. 어느 쪽이 먼저 도착할까?</p><p class="wi-hint">전송 시간 계산기에서 “백업 1 TB”를 고르고 대역폭을 100 Mbps에 맞춘 뒤 트럭 비교를 켜 보자.</p><div class="opts">
+      <button class="opt">인터넷이 훨씬 빠르다 (몇 분)</button><button class="opt">거의 비슷하다</button><button class="opt" data-correct>트럭이 네 배 이상 빠르다</button>
+    </div><div class="quiz-exp">1 TB = 8×10¹² 비트를 1초에 10⁸ 비트씩 보내면 8만 초, 약 22시간이 걸린다. 트럭은 5시간이다. 반대로 1 Gbps라면 약 2.2시간으로 인터넷이 이긴다. 대역폭은 “1초에 얼마나”일 뿐이고, 큰 짐은 차선이 넓어야 빨리 간다.</div></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="light">
+    <h2>숫자 감각: 빛도 느리다</h2>
+    <p>지연은 돈으로 줄이기 어렵다. 차선(대역폭)은 광섬유를 더 깔거나 장비를 바꾸면 늘어나지만, 거리를 달리는 시간에는 넘을 수 없는 한계가 있다. 빛은 진공에서 1초에 약 30만 km를 가지만, 광섬유의 유리 안에서는 굴절률(약 1.47) 때문에 약 <b>20만 km/s</b>로 느려진다. 1 ms에 200 km, 서울에서 부산까지 직선으로 가는 데 약 1.6 ms다.</p>
+    <p>게다가 케이블은 직선으로 깔리지 않는다. 해안선과 도로를 따라 돌고, 라우터에서 줄을 서고(23장), 가장 가까운 길이 아니라 통신사끼리 계약된 길로 간다(8장). 그래서 실제 왕복 시간은 직선거리로 계산한 값의 보통 1.5~2배다.</p>
+    <div class="sim" id="sim-light">
+      <div class="sim-head"><span class="sim-tag">CALCULATOR</span><h3>서울에서 출발하는 빛의 왕복 시간</h3></div>
+      <div class="sim-view"><canvas id="cv-light"></canvas></div>
+      <div class="sim-controls">
+        <div class="ctrl"><span>목적지</span><div class="seg" id="lc"><button data-value="0">부산</button><button data-value="1" class="on">도쿄</button><button data-value="2">홍콩</button><button data-value="3">싱가포르</button><button data-value="4">런던</button><button data-value="5">LA</button><button data-value="6">뉴욕</button><button data-value="7">상파울루</button><button data-value="8">저궤도 위성</button><button data-value="9">정지궤도 위성</button></div></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">거리</span><span class="v" id="o-lkm">—</span></div>
+        <div class="stat"><span class="k">이론상 최소 RTT</span><span class="v" id="o-lmin">—</span></div>
+        <div class="stat"><span class="k">실제 측정 수준</span><span class="v" id="o-lreal">—</span></div>
+        <div class="stat"><span class="k">그동안 1 Gbps로 보낼 수 있는 양</span><span class="v" id="o-lbdp">—</span></div>
+      </div>
+      <div class="sim-note">진한 막대 = 광섬유 직선거리로 계산한 이론 최소, 옅은 막대 = 실제 측정되는 대략적인 범위(로그 눈금). 위성은 전파가 진공에서 30만 km/s로 가지만 “지상 → 위성 → 지상”을 왕복해 거리가 4배가 된다. 마지막 칸은 응답을 기다리는 동안 선 위에 떠 있는 데이터의 양(대역폭-지연 곱, 23장)이다.</div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>시간</th><th>그동안 빛(광섬유)이 가는 거리</th><th>네트워크에서 그 정도 걸리는 일</th></tr></thead>
+      <tbody>
+        <tr><td>1 ns</td><td>20 cm</td><td>칩 안의 신호 한 박자. 데이터센터 케이블 1 m를 지나는 시간은 5 ns</td></tr>
+        <tr><td>1 µs</td><td>200 m</td><td>스위치 한 대를 통과(수백 ns~수 µs)</td></tr>
+        <tr><td>1 ms</td><td>200 km</td><td>Wi-Fi 한 구간, 같은 도시 안 서버까지 왕복</td></tr>
+        <tr><td>100 ms</td><td>2만 km</td><td>태평양 건너 왕복. 사람이 “느리다”고 느끼기 시작하는 지점</td></tr>
+        <tr><td>500 ms</td><td>10만 km</td><td>정지궤도 위성 왕복. 영상 통화가 어색해진다</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="korea">
+    <h2>숫자로 보는 한국과 세계의 인터넷</h2>
+    <p>한국은 세계에서 유선 인터넷이 가장 빠르고 촘촘한 나라 중 하나다. 1990년대 말 초고속 인터넷이 빠르게 보급됐고, 아파트가 많은 주거 구조 덕분에 광섬유를 집 가까이까지 깔기 쉬웠다. 아래 숫자는 정확한 통계값이 아니라 2024~2025년 무렵의 대략적인 크기 수준이다.</p>
+    <div class="bignum">
+      <div><b>99% 이상</b><span>인터넷에 접속할 수 있는 가구 비율(한국)</span></div>
+      <div><b>약 2,400만</b><span>유선 초고속 인터넷 가입 회선(한국)</span></div>
+      <div><b>약 90%</b><span>유선 가입 중 광섬유(FTTH 등) 비중 수준(한국)</span></div>
+      <div><b>월 1 EB 안팎</b><span>무선 데이터 트래픽(한국). 1 EB = 10억 GB</span></div>
+      <div><b>약 55억~60억 명</b><span>세계 인터넷 이용자. 인류의 약 3분의 2 이상</span></div>
+      <div><b>매년 20~30%</b><span>세계 인터넷 트래픽 증가율 수준. 대부분 동영상</span></div>
+    </div>
+    <p>트래픽이 해마다 20~30%씩 늘면 3~4년마다 두 배가 된다. 그 증가분을 감당하려고 광 전송 기술(5·19장)은 한 가닥의 광섬유에 수십 Tbps를 싣는 수준까지 왔고, 데이터센터 스위치 칩(17장)은 칩 하나가 51.2 Tbps를 처리한다. 이 책의 후반부는 이 엄청난 속도를 떠받치는 반도체 이야기다.</p>
+    <div class="callout deep"><strong>“인터넷”과 “웹”은 다르다</strong><p>웹(WWW)은 인터넷 위에서 돌아가는 서비스 하나일 뿐이다. 1969년 미국의 아파넷(ARPANET)에서 시작한 인터넷은 1983년 TCP/IP로 통일됐고, 웹은 1989~1991년 팀 버너스리가 만들었다. 메일, 메신저, 게임, 영상 통화, 스마트폰 앱의 통신도 모두 인터넷 위의 서비스다(10·25장).</p></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="map">
+    <h2>이 책의 지도</h2>
+    <p>네트워크는 층층이 쌓인 구조물이다. 맨 아래에서는 전자가 구리선을 흔들고 빛이 유리실을 지나며, 맨 위에서는 앱이 “사진 보내 줘”라고 말한다. 각 층은 바로 아래층이 제공하는 서비스만 믿고 자기 일을 한다. 이 생각을 <b>계층화</b>라 하고, 3장에서 자세히 다룬다. 이 책도 그 층을 따라 아래에서 위로 올라가며, 마지막에는 그 모든 것을 가능하게 하는 칩으로 내려간다. 상자를 누르면 해당 장으로 간다.</p>
+    <div style="overflow-x:auto">
+    <figure class="diagram mapfig" style="min-width:600px">
+      <svg viewBox="0 0 800 410" role="img" aria-label="NetworkBook 장 구성 지도">
+        <!-- app -->
+        <a href="apps.html"><rect x="20" y="16" width="570" height="44" rx="10" class="f-acc-soft"/><text x="305" y="43" text-anchor="middle" class="t" style="font-weight:700">응용: DNS · 웹 · 스트리밍 (10장)</text></a>
+        <a href="tcp.html"><rect x="20" y="68" width="570" height="44" rx="10" class="f-acc-soft"/><text x="305" y="95" text-anchor="middle" class="t" style="font-weight:700">전송: TCP와 UDP (9장)</text></a>
+        <a href="ip.html"><rect x="20" y="120" width="280" height="44" rx="10" class="f-acc-soft"/><text x="160" y="147" text-anchor="middle" class="t" style="font-weight:700">IP 주소와 서브넷 (7장)</text></a>
+        <a href="routing.html"><rect x="310" y="120" width="280" height="44" rx="10" class="f-acc-soft"/><text x="450" y="147" text-anchor="middle" class="t" style="font-weight:700">라우팅 (8장)</text></a>
+        <!-- link layer -->
+        <a href="ethernet.html"><rect x="20" y="172" width="134" height="44" rx="10" class="f-acc2-soft"/><text x="87" y="199" text-anchor="middle" class="t">이더넷 (6)</text></a>
+        <a href="wifi.html"><rect x="165" y="172" width="134" height="44" rx="10" class="f-acc2-soft"/><text x="232" y="199" text-anchor="middle" class="t">Wi-Fi (13)</text></a>
+        <a href="cellular.html"><rect x="310" y="172" width="134" height="44" rx="10" class="f-acc2-soft"/><text x="377" y="199" text-anchor="middle" class="t">이동통신 (14)</text></a>
+        <a href="satellite.html"><rect x="456" y="172" width="134" height="44" rx="10" class="f-acc2-soft"/><text x="523" y="199" text-anchor="middle" class="t">위성 (15)</text></a>
+        <!-- physical -->
+        <a href="copper.html"><rect x="20" y="224" width="134" height="44" rx="10" class="f-surface"/><text x="87" y="251" text-anchor="middle" class="t">구리선 (4)</text></a>
+        <a href="optical.html"><rect x="165" y="224" width="134" height="44" rx="10" class="f-surface"/><text x="232" y="251" text-anchor="middle" class="t">광통신 (5)</text></a>
+        <a href="radio.html"><rect x="310" y="224" width="134" height="44" rx="10" class="f-surface"/><text x="377" y="251" text-anchor="middle" class="t">전파 (11)</text></a>
+        <a href="modulation.html"><rect x="456" y="224" width="134" height="44" rx="10" class="f-surface"/><text x="523" y="251" text-anchor="middle" class="t">변조·OFDM (12)</text></a>
+        <a href="signal.html"><rect x="20" y="276" width="570" height="44" rx="10" class="f-surface"/><text x="305" y="303" text-anchor="middle" class="t" style="font-weight:700">신호와 정보: 주파수 · 잡음 · 섀넌 한계 (2장)</text></a>
+        <!-- chips -->
+        <a href="serdes.html"><rect x="20" y="340" width="134" height="52" rx="10" fill="color-mix(in srgb, var(--warn) 18%, transparent)" stroke="var(--warn)"/><text x="87" y="362" text-anchor="middle" class="t">SerDes</text><text x="87" y="380" text-anchor="middle" class="t-mono">16장</text></a>
+        <a href="netchips.html"><rect x="165" y="340" width="134" height="52" rx="10" fill="color-mix(in srgb, var(--warn) 18%, transparent)" stroke="var(--warn)"/><text x="232" y="362" text-anchor="middle" class="t">스위치·NIC 칩</text><text x="232" y="380" text-anchor="middle" class="t-mono">17장</text></a>
+        <a href="rfchips.html"><rect x="310" y="340" width="134" height="52" rx="10" fill="color-mix(in srgb, var(--warn) 18%, transparent)" stroke="var(--warn)"/><text x="377" y="362" text-anchor="middle" class="t">RF 칩</text><text x="377" y="380" text-anchor="middle" class="t-mono">18장</text></a>
+        <a href="photonics.html"><rect x="456" y="340" width="134" height="52" rx="10" fill="color-mix(in srgb, var(--warn) 18%, transparent)" stroke="var(--warn)"/><text x="523" y="362" text-anchor="middle" class="t">광 반도체</text><text x="523" y="380" text-anchor="middle" class="t-mono">19장</text></a>
+        <!-- right column -->
+        <a href="layers.html"><rect x="606" y="16" width="174" height="96" rx="10" class="f-elev"/><text x="693" y="52" text-anchor="middle" class="t" style="font-weight:700">계층이라는 생각</text><text x="693" y="74" text-anchor="middle" class="t-dim">프로토콜과 계층</text><text x="693" y="94" text-anchor="middle" class="t-mono">3장</text></a>
+        <a href="datacenter.html"><rect x="606" y="120" width="174" height="44" rx="10" class="f-elev"/><text x="693" y="147" text-anchor="middle" class="t">데이터센터 (20)</text></a>
+        <a href="cloud.html"><rect x="606" y="172" width="174" height="44" rx="10" class="f-elev"/><text x="693" y="199" text-anchor="middle" class="t">클라우드 (21)</text></a>
+        <a href="security.html"><rect x="606" y="224" width="84" height="44" rx="10" class="f-elev"/><text x="648" y="251" text-anchor="middle" class="t">보안 22</text></a>
+        <a href="ops.html"><rect x="696" y="224" width="84" height="44" rx="10" class="f-elev"/><text x="738" y="251" text-anchor="middle" class="t">운영 23</text></a>
+        <a href="journey.html"><rect x="606" y="276" width="174" height="44" rx="10" class="f-elev"/><text x="693" y="303" text-anchor="middle" class="t">종합 여행 (24)</text></a>
+        <a href="history.html"><rect x="606" y="340" width="84" height="52" rx="10" class="f-elev"/><text x="648" y="370" text-anchor="middle" class="t">역사 25</text></a>
+        <a href="glossary.html"><rect x="696" y="340" width="84" height="52" rx="10" class="f-elev"/><text x="738" y="370" text-anchor="middle" class="t">용어 26</text></a>
+        <text x="305" y="334" text-anchor="middle" class="t-mono" style="font-size:10px">▲ 이 모든 층을 실리콘이 떠받친다 ▲</text>
+      </svg>
+      <figcaption><b>그림 1-4.</b> 이 책의 지도. 아래에서 위로 신호(2장) → 매체(4·5·11·12장) → 링크(6·13·14·15장) → 인터넷(7·8장) → 전송(9장) → 응용(10장)으로 쌓이고, 맨 아래를 통신 반도체(16~19장)가 받친다. 오른쪽 장들은 여러 층에 걸친 주제다.</figcaption>
+    </figure>
+    </div>
+    <p>어느 장부터 읽어도 되지만, 2장과 3장은 뒤의 모든 장이 기대는 기초다. 유선이 궁금하면 4~6장, 휴대폰과 Wi-Fi가 궁금하면 11~15장, 칩이 궁금하면 16~19장으로 바로 가도 좋다. 24장에서는 영상 통화 한 번이 이 지도의 모든 층을 위아래로 오가는 여행을 따라간다.</p>
+  </section>
+
+  <section class="keypoints" id="summary">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>n대를 모두 직접 이으면 선이 n(n−1)/2개 필요하지만, 교환기(스위치·라우터)를 두면 n개로 충분하다. 연결 가능한 쌍은 n²에 비례해 늘어 네트워크는 커질수록 가치가 커진다(메트칼프의 법칙).</li>
+      <li>모든 네트워크는 <b>노드</b>(장치)와 <b>링크</b>(통로)로 그릴 수 있고, 그 배치를 <b>토폴로지</b>라 한다. 링크가 많을수록 비싸지만 고장에 강하다.</li>
+      <li>인터넷은 독립적으로 운영되는 수만 개 망을 이은 <b>망들의 망</b>이다. 집 → 접속망 → ISP 백본 → IXP·해저 케이블 → 다른 망 → 데이터센터로 이어진다.</li>
+      <li><b>대역폭</b>은 1초에 보낼 수 있는 양(도로 폭), <b>지연</b>은 첫 비트가 도착하는 시간(도로 길이)이다. 전송 시간 ≈ RTT + 크기 ÷ 대역폭.</li>
+      <li>광섬유 속 빛은 약 20만 km/s, 1 ms에 200 km다. 대륙 간 지연은 물리 법칙에 묶여 있어 돈으로 줄이기 어렵다.</li>
+      <li>네트워크는 신호 → 매체 → 링크 → IP → 전송 → 응용으로 쌓인 계층 구조이고, 맨 아래를 통신 반도체가 받친다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec" id="quiz">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>집 20채를 모두 직접 전선으로 이어 아무 집끼리나 통화하게 하려면 선이 몇 가닥 필요할까?</p><div class="opts">
+        <button class="opt">20가닥</button><button class="opt">40가닥</button><button class="opt" data-correct>190가닥</button><button class="opt">400가닥</button>
+      </div><div class="quiz-exp">n(n−1)/2 = 20×19/2 = 190가닥. 교환기를 두면 20가닥이면 된다.</div></div>
+      <div class="quiz-q"><p>스타 토폴로지의 가장 큰 약점은?</p><div class="opts">
+        <button class="opt" data-correct>가운데 장비 하나가 고장 나면 모두 끊긴다</button>
+        <button class="opt">선이 n(n−1)/2개 필요해 너무 비싸다</button>
+        <button class="opt">두 호스트 사이 거리가 호스트 수에 비례해 길어진다</button>
+        <button class="opt">새 장치를 추가하기 어렵다</button>
+      </div><div class="quiz-exp">스타는 싸고 관리하기 쉽지만 가운데 스위치가 단일 고장점이다. 그래서 중요한 곳은 스위치를 두 대 두고 이중으로 연결한다.</div></div>
+      <div class="quiz-q"><p>서로 다른 통신사의 망들이 한곳에 모여 트래픽을 맞교환하는 장소는?</p><div class="opts">
+        <button class="opt">CDN</button><button class="opt">접속망</button><button class="opt">해저 케이블 육양국</button><button class="opt" data-correct>IXP</button>
+      </div><div class="quiz-exp">IXP(인터넷 교환 지점)에서 여러 망의 라우터가 만나 서로 트래픽을 넘겨준다. 택배사끼리 물건을 넘겨받는 중간 거점과 같다.</div></div>
+      <div class="quiz-q"><p>RTT가 100 ms인 해외 서버에서 아이콘(10 KB)을 받는다. 회선을 100 Mbps에서 1 Gbps로 올리면?</p><div class="opts">
+        <button class="opt">약 10배 빨라진다</button>
+        <button class="opt" data-correct>거의 그대로다. 시간 대부분이 지연(RTT)이다</button>
+        <button class="opt">약 2배 빨라진다</button>
+        <button class="opt">오히려 느려진다</button>
+      </div><div class="quiz-exp">10 KB를 100 Mbps로 보내는 데는 0.8 ms면 된다. 전체 약 100.8 ms 중 100 ms가 지연이므로 대역폭을 늘려도 거의 변하지 않는다.</div></div>
+      <div class="quiz-q"><p>광섬유에서 빛이 1 ms 동안 가는 거리는 대략?</p><div class="opts">
+        <button class="opt">2 km</button><button class="opt">20 km</button><button class="opt" data-correct>200 km</button><button class="opt">300 km</button>
+      </div><div class="quiz-exp">광섬유 속 빛은 약 20만 km/s(진공의 약 2/3)이므로 1 ms에 약 200 km를 간다. 300 km는 진공에서의 값이다.</div></div>
+      <div class="quiz-q"><p>정지궤도 위성 인터넷의 지연이 큰 가장 근본적인 이유는?</p><div class="opts">
+        <button class="opt">전파가 광섬유 속 빛보다 느려서</button>
+        <button class="opt">위성의 처리 장치가 느려서</button>
+        <button class="opt">위성의 대역폭이 작아서</button>
+        <button class="opt" data-correct>약 3만 6천 km 높이까지 오르내려 왕복 경로가 14만 km가 넘어서</button>
+      </div><div class="quiz-exp">요청과 응답이 각각 위성을 거쳐 올라갔다 내려오므로 왕복 약 14만 km, 빛의 속도로도 최소 약 0.48초다. 그래서 수백 km 높이의 저궤도 위성(15장)이 등장했다.</div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const fmtInt = (n) => Math.round(n).toLocaleString("ko-KR");
+
+  /* ---------------- 1. 메시 vs 스타 ---------------- */
+  const cn = NB.range("cn", (v) => v + "대", () => { connStats(); conn.redraw(); });
+  function connStats() {
+    const n = cn(), mesh = (n * (n - 1)) / 2;
+    NB.stat("o-mesh", fmtInt(mesh) + "가닥");
+    NB.stat("o-star", fmtInt(n) + "가닥");
+    NB.stat("o-pairs", fmtInt(mesh) + "쌍");
+    NB.stat("o-port", `${n - 1}개 vs 1개`);
+  }
+  const conn = NB.canvas("#cv-conn", (ctx, w, h) => {
+    const P = NB.palette(), n = cn();
+    const panels = [{ cx: w * 0.27, title: "모두 직접 연결 (메시)" }, { cx: w * 0.73, title: "교환기 하나 (스타)" }];
+    const R = Math.min(w * 0.2, h * 0.36), cy = h * 0.54;
+    const small = w < 520;
+    panels.forEach((pn, k) => {
+      NB.text(ctx, pn.title, pn.cx, 16, { align: "center", size: small ? 11.5 : 13, bold: true, color: P.text });
+      const pts = [];
+      for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + (i / n) * Math.PI * 2; pts.push([pn.cx + R * Math.cos(a), cy + R * Math.sin(a)]); }
+      ctx.lineWidth = n > 30 ? 0.5 : n > 15 ? 0.8 : 1.4;
+      if (k === 0) {
+        ctx.strokeStyle = P.accent; ctx.globalAlpha = n > 30 ? 0.35 : 0.7;
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[j][0], pts[j][1]); }
+        ctx.stroke(); ctx.globalAlpha = 1;
+      } else {
+        ctx.strokeStyle = P.accent2; ctx.lineWidth = n > 30 ? 1 : 1.6; ctx.beginPath();
+        pts.forEach((p) => { ctx.moveTo(pn.cx, cy); ctx.lineTo(p[0], p[1]); }); ctx.stroke();
+        NB.box(ctx, pn.cx - 20, cy - 13, 40, 26, { fill: P.accent2, stroke: P.accent2, text: "교환기", color: "#fff", size: 10.5, bold: true, r: 6 });
+      }
+      const r = n > 40 ? 3 : n > 20 ? 4.5 : 7;
+      pts.forEach((p) => { ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, 7); ctx.fillStyle = P.surface; ctx.fill(); ctx.strokeStyle = P.dim; ctx.lineWidth = 1; ctx.stroke(); });
+      const cnt = k === 0 ? (n * (n - 1)) / 2 : n;
+      NB.text(ctx, "선 " + fmtInt(cnt) + "가닥", pn.cx, h - 12, { align: "center", size: small ? 12 : 14, bold: true, color: k === 0 ? P.accent : P.accent2 });
+    });
+  }, { aspect: 0.5, minHeight: 280, maxHeight: 400 });
+  connStats();
+
+  /* ---------------- 2. 토폴로지 고장 ---------------- */
+  function buildTopo(kind, w, h) {
+    const N = [], E = [];
+    const cx = w / 2, cy = h / 2 + 4, R = Math.min(w * 0.4, h * 0.38);
+    const circle = (i, n, rr) => [cx + rr * Math.cos(-Math.PI / 2 + (i / n) * 2 * Math.PI), cy + rr * Math.sin(-Math.PI / 2 + (i / n) * 2 * Math.PI)];
+    if (kind === "bus") {
+      for (let i = 0; i < 8; i++) { const x = w * (0.08 + i * 0.12); N.push({ x, y: h * (i % 2 ? 0.78 : 0.24), k: "host" }); }
+      for (let i = 0; i < 8; i++) N.push({ x: w * (0.08 + i * 0.12), y: h * 0.5, k: "tap" });
+      for (let i = 0; i < 8; i++) E.push([i, 8 + i, 0.5]);
+      for (let i = 0; i < 7; i++) E.push([8 + i, 9 + i, 0]);
+    } else if (kind === "ring") {
+      for (let i = 0; i < 8; i++) { const [x, y] = circle(i, 8, R); N.push({ x, y, k: "host" }); }
+      for (let i = 0; i < 8; i++) E.push([i, (i + 1) % 8, 1]);
+    } else if (kind === "star") {
+      for (let i = 0; i < 8; i++) { const [x, y] = circle(i, 8, R); N.push({ x, y, k: "host" }); }
+      N.push({ x: cx, y: cy, k: "sw", label: "스위치" });
+      for (let i = 0; i < 8; i++) E.push([8, i, 1]);
+    } else if (kind === "tree") {
+      for (let i = 0; i < 8; i++) N.push({ x: w * (0.08 + i * 0.12), y: h * 0.84, k: "host" });
+      N.push({ x: w * 0.5, y: h * 0.16, k: "sw", label: "코어" });
+      N.push({ x: w * 0.26, y: h * 0.5, k: "sw", label: "SW" });
+      N.push({ x: w * 0.74, y: h * 0.5, k: "sw", label: "SW" });
+      E.push([8, 9, 1], [8, 10, 1]);
+      for (let i = 0; i < 8; i++) E.push([i < 4 ? 9 : 10, i, 1]);
+    } else {
+      for (let i = 0; i < 8; i++) { const [x, y] = circle(i, 8, R); N.push({ x, y, k: "host" }); }
+      for (let i = 0; i < 8; i++) for (let j = i + 1; j < 8; j++) E.push([i, j, 1]);
+    }
+    return { N, E };
+  }
+  let cut = new Set(), dead = new Set(), topoCache = null;
+  const tp = NB.seg("tp", () => { cut.clear(); dead.clear(); topoStats(); topo.redraw(); });
+  function geom() { const c = $("cv-topo"); return buildTopo(tp(), c.clientWidth || 600, parseFloat(c.style.height) || 320); }
+  function topoStats() {
+    const { N, E } = geom();
+    const hosts = N.map((n, i) => (n.k === "host" ? i : -1)).filter((i) => i >= 0);
+    const dist = (src) => {
+      const d = N.map(() => Infinity); d[src] = 0; const Q = new Set(N.map((_, i) => i));
+      while (Q.size) {
+        let u = -1; Q.forEach((k) => { if (u < 0 || d[k] < d[u]) u = k; }); Q.delete(u); if (d[u] === Infinity) break;
+        E.forEach((e, ei) => { if (cut.has(ei)) return; const [a, b, wt] = e; const v = a === u ? b : b === u ? a : -1; if (v < 0 || dead.has(v) || !Q.has(v)) return; if (d[u] + wt < d[v]) d[v] = d[u] + wt; });
+      }
+      return d;
+    };
+    let ok = 0, dia = 0;
+    hosts.forEach((a, ai) => { if (dead.has(a)) return; const d = dist(a); hosts.forEach((b, bi) => { if (bi <= ai || dead.has(b)) return; if (d[b] < Infinity) { ok++; dia = Math.max(dia, d[b]); } }); });
+    const k = tp();
+    const linkTxt = k === "bus" ? "공유 선 1 + 연결선 8" : E.length + "개";
+    NB.stat("o-tl", linkTxt);
+    const col = ok === 28 ? "var(--ok)" : ok > 14 ? "var(--warn)" : "var(--bad)";
+    NB.stat("o-tc", `<span style="color:${col}">${ok} / 28쌍</span>`);
+    NB.stat("o-td", ok ? Math.round(dia) + "개" : "—");
+  }
+  const topo = NB.canvas("#cv-topo", (ctx, w, h) => {
+    const P = NB.palette(); const { N, E } = buildTopo(tp(), w, h); topoCache = { N, E, w, h };
+    const isBus = tp() === "bus";
+    E.forEach((e, i) => {
+      const a = N[e[0]], b = N[e[1]]; const c = cut.has(i), off = dead.has(e[0]) || dead.has(e[1]);
+      ctx.strokeStyle = c ? P.bad : off ? P.border : P.accent; ctx.lineWidth = isBus && e[2] === 0 ? 6 : 2.5; ctx.setLineDash(c ? [4, 5] : []);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.setLineDash([]);
+      if (c) NB.text(ctx, "✕", (a.x + b.x) / 2, (a.y + b.y) / 2, { align: "center", size: 15, bold: true, color: P.bad });
+    });
+    let hi = 0;
+    N.forEach((n, i) => {
+      if (n.k === "tap") { ctx.beginPath(); ctx.arc(n.x, n.y, 3, 0, 7); ctx.fillStyle = P.accent; ctx.fill(); return; }
+      const d = dead.has(i);
+      if (n.k === "sw") NB.box(ctx, n.x - 24, n.y - 13, 48, 26, { fill: d ? P.surface : P.accent, stroke: d ? P.bad : P.accent, text: d ? "고장" : n.label, color: d ? P.bad : "#fff", size: 11, bold: true, r: 6 });
+      else {
+        hi++;
+        ctx.beginPath(); ctx.arc(n.x, n.y, 13, 0, 7); ctx.fillStyle = d ? P.surface : P.bg; ctx.fill(); ctx.strokeStyle = d ? P.bad : P.dim; ctx.lineWidth = 1.6; ctx.stroke();
+        NB.text(ctx, d ? "✕" : String.fromCharCode(64 + hi), n.x, n.y + 0.5, { align: "center", size: 11.5, bold: true, color: d ? P.bad : P.text });
+      }
+    });
+  }, { aspect: 0.55, minHeight: 280, maxHeight: 400 });
+  $("cv-topo").addEventListener("click", (ev) => {
+    if (!topoCache) return;
+    const r = ev.target.getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top;
+    const { N, E } = topoCache;
+    let ni = -1; N.forEach((n, i) => { if (n.k !== "tap" && Math.hypot(n.x - x, n.y - y) < 18) ni = i; });
+    if (ni >= 0) { dead.has(ni) ? dead.delete(ni) : dead.add(ni); }
+    else {
+      let best = -1, bd = 12;
+      E.forEach((e, i) => { const a = N[e[0]], b = N[e[1]]; const dx = b.x - a.x, dy = b.y - a.y; const t = NB.clamp(((x - a.x) * dx + (y - a.y) * dy) / (dx * dx + dy * dy || 1), 0, 1); const d = Math.hypot(x - (a.x + t * dx), y - (a.y + t * dy)); if (d < bd) { bd = d; best = i; } });
+      if (best < 0) return;
+      cut.has(best) ? cut.delete(best) : cut.add(best);
+    }
+    topoStats(); topo.redraw();
+  });
+  $("tp-rand").onclick = () => { const E = geom().E; const free = E.map((_, i) => i).filter((i) => !cut.has(i)); if (free.length) cut.add(free[Math.floor(Math.random() * free.length)]); topoStats(); topo.redraw(); };
+  $("tp-fix").onclick = () => { cut.clear(); dead.clear(); topoStats(); topo.redraw(); };
+  topoStats();
+
+  /* ---------------- 3. 요청 하나의 여행 ---------------- */
+  const HEAD = [
+    { n: "내 휴대폰", km: 0, ms: 0, t: "앱이 “영상 보여 줘” 요청을 만든다. 데이터는 패킷(택배 상자)에 담기고 받는 곳 주소(IP)가 붙는다.", ch: "3·7장" },
+    { n: "Wi-Fi 공유기", km: 0.01, ms: 1.5, t: "전파로 몇 m를 날아 공유기에 닿는다. 공유기는 무선을 유선으로 바꾸고, 집 안의 사설 주소를 바깥 주소로 바꿔 적는다(NAT). 택배로 치면 우리 집 현관이다.", ch: "13·7장" },
+    { n: "통신사 국사 (접속망)", km: 3, ms: 0.5, t: "아파트 통신실을 지나 광섬유로 동네 통신사 국사의 OLT 장비까지 간다. 동네 택배 대리점이다.", ch: "5장" },
+    { n: "지역 집중국 라우터", km: 20, ms: 0.5, t: "여러 국사의 트래픽을 모으는 지역망(메트로망)의 라우터가 목적지 주소를 보고 다음 길을 고른다. 지역 허브 터미널이다.", ch: "8장" },
+  ];
+  const TRIPS = {
+    cdn: HEAD.concat([{ n: "CDN 캐시 서버", km: 2, ms: 0.3, t: "인기 동영상은 이미 통신사 안쪽의 캐시 서버에 사본이 있다. 백본까지 갈 필요도 없이 여기서 바로 응답한다. 동네 창고에 미리 쌓아 둔 인기 상품과 같다.", ch: "10·21장" }]),
+    kr: HEAD.concat([
+      { n: "통신사 백본", km: 40, ms: 1, t: "전국을 잇는 백본 라우터. 초당 수 Tbps를 처리하는 대형 장비들이 여러 갈래(메시)로 연결되어 있다. 간선 고속도로다.", ch: "8·17장" },
+      { n: "IXP·직접 연결", km: 10, ms: 0.5, t: "포털 회사의 망은 다른 회사 망이다. 두 망은 IXP나 전용 연결(피어링)에서 트래픽을 넘겨준다. 택배사끼리 물건을 넘겨받는 거점이다.", ch: "8장" },
+      { n: "포털 데이터센터", km: 30, ms: 0.5, t: "데이터센터 입구 라우터 → 스파인 스위치 → 리프 스위치 → 서버. 수만 대 서버 중 하나가 요청을 받는다. 거대한 물류 창고다.", ch: "20장" },
+    ]),
+    us: HEAD.concat([
+      { n: "통신사 백본", km: 300, ms: 2.5, t: "국제 관문 라우터로 향한다. 해외로 나가는 트래픽은 해저 케이블이 닿는 해안 쪽으로 모인다.", ch: "8장" },
+      { n: "해저 케이블 육양국", km: 50, ms: 0.5, t: "케이블이 바다에서 땅으로 올라오는 건물. 부산·거제·태안 등에 있다. 이제 국제 항로를 탄다.", ch: "5장" },
+      { n: "태평양 해저 광케이블", km: 10500, ms: 53, t: "수심 수천 m의 해저를 따라 약 1만 km. 50~80 km마다 광 증폭기가 빛을 다시 키운다. 이 한 구간이 전체 지연의 대부분이다.", ch: "5·19장" },
+      { n: "미국 서부 육양국·백본", km: 900, ms: 5.5, t: "미국 해안에 상륙해 현지 통신사 백본을 지난다.", ch: "8장" },
+      { n: "미국 데이터센터", km: 50, ms: 0.5, t: "클라우드 데이터센터의 서버가 요청을 받는다. 같은 사진을 서울 CDN에서 받았다면 이 모든 구간이 필요 없었다.", ch: "20·21장" },
+    ]),
+  };
+  let trStep = 0, trAnim = -1;
+  const trd = NB.seg("trd", () => { trStep = 0; trAnim = -1; trUpdate(); });
+  function trUpdate() {
+    const T = TRIPS[trd()]; const s = T[trStep];
+    let km = 0, ms = 0; for (let i = 0; i <= trStep; i++) { km += T[i].km; ms += T[i].ms; }
+    $("tr-desc").innerHTML = `<span class="hop">${trStep + 1}/${T.length} · ${s.n}</span> — ${s.t}<span class="meta">이 구간: 약 ${NB.fmt(s.km)} km, ${s.ms} ms · 자세히: ${s.ch}</span>`;
+    NB.stat("o-trkm", "약 " + fmtInt(km) + " km");
+    NB.stat("o-trms", NB.fmt(ms, 3) + " ms");
+    NB.stat("o-trrtt", trStep === T.length - 1 ? "약 " + NB.fmt(ms * 2, 3) + " ms" : "<small>끝까지 가 보자</small>");
+    $("tr-prev").disabled = trStep === 0; $("tr-next").disabled = trStep === T.length - 1;
+    trip.redraw();
+  }
+  $("tr-next").onclick = () => { const T = TRIPS[trd()]; if (trStep < T.length - 1) { trAnim = trStep; trStep++; trT = 0; trUpdate(); } };
+  $("tr-prev").onclick = () => { if (trStep > 0) { trStep--; trAnim = -1; trUpdate(); } };
+  let autoPlay = false, autoT = 0;
+  $("tr-play").onclick = () => { trStep = 0; trAnim = -1; autoPlay = true; autoT = 0; trUpdate(); };
+  let trT = 0;
+  const trip = NB.canvas("#cv-trip", (ctx, w, h) => {
+    const P = NB.palette(), T = TRIPS[trd()], n = T.length;
+    const x0 = 22, x1 = w - 22, y = h * 0.3;
+    const X = (i) => x0 + ((x1 - x0) * i) / (n - 1);
+    for (let i = 0; i < n - 1; i++) {
+      const sea = T[i + 1].km > 5000;
+      ctx.strokeStyle = i < trStep ? (sea ? P.accent2 : P.accent) : P.border; ctx.lineWidth = sea ? 4 : 3; ctx.setLineDash(sea ? [7, 4] : []);
+      ctx.beginPath(); ctx.moveTo(X(i), y); ctx.lineTo(X(i + 1), y); ctx.stroke(); ctx.setLineDash([]);
+    }
+    for (let i = 0; i < n; i++) {
+      const on = i === trStep, past = i < trStep;
+      ctx.beginPath(); ctx.arc(X(i), y, on ? 14 : 11, 0, 7); ctx.fillStyle = on ? P.accent : past ? P.surface : P.bg; ctx.fill(); ctx.strokeStyle = on || past ? P.accent : P.border; ctx.lineWidth = 2; ctx.stroke();
+      NB.text(ctx, String(i + 1), X(i), y + 0.5, { align: "center", size: 11, bold: true, color: on ? "#fff" : P.text });
+    }
+    // 이동 중인 상자
+    if (trAnim >= 0 && trT < 1) {
+      const px = NB.lerp(X(trAnim), X(trAnim + 1), trT);
+      NB.box(ctx, px - 10, y - 30, 20, 14, { fill: P.warn, stroke: P.warn, r: 3 });
+    }
+    // 이름 (현재 단계만, 폭에 맞춰)
+    const name = T[trStep].n; const nx = NB.clamp(X(trStep), 70, w - 70);
+    NB.text(ctx, name, nx, y + 30, { align: "center", size: 12.5, bold: true, color: P.accent });
+    // 누적 지연 막대
+    const total = T.reduce((s, t) => s + t.ms, 0);
+    const by = h * 0.74, bh = 18; let bx = x0;
+    NB.text(ctx, "구간별 지연 비율 (한쪽 방향 총 " + NB.fmt(total, 3) + " ms)", x0, by - 12, { size: 11, color: P.dim });
+    T.forEach((t, i) => {
+      if (!t.ms) return;
+      const bw = ((x1 - x0) * t.ms) / total;
+      ctx.fillStyle = t.km > 5000 ? P.accent2 : P.series[i % 2 ? 0 : 3]; ctx.globalAlpha = i <= trStep ? 1 : 0.25;
+      ctx.fillRect(bx, by, Math.max(1, bw - 1), bh); ctx.globalAlpha = 1;
+      if (bw > 26) NB.text(ctx, String(i + 1), bx + bw / 2, by + bh / 2 + 0.5, { align: "center", size: 10, bold: true, color: "#fff" });
+      bx += bw;
+    });
+  }, { aspect: 0.3, minHeight: 170, maxHeight: 210 });
+  NB.loop($("cv-trip"), (dt) => {
+    let dirty = false;
+    if (trAnim >= 0 && trT < 1) { trT = Math.min(1, trT + dt * 2.2); dirty = true; }
+    if (autoPlay) {
+      autoT += dt;
+      if (autoT > 1.1) { autoT = 0; const T = TRIPS[trd()]; if (trStep < T.length - 1) { trAnim = trStep; trStep++; trT = 0; trUpdate(); } else autoPlay = false; }
+    }
+    if (dirty) trip.redraw();
+  });
+  trUpdate();
+
+  /* ---------------- 4. 전송 시간 ---------------- */
+  const sizeOf = (v) => 1e3 * Math.pow(10, v / 10);           // 1 KB … 10 TB
+  const bwOf = (v) => 1e6 * Math.pow(10, v / 20);             // 1 Mbps … 100 Gbps
+  const bpsTxt = (b) => NB.si(b, "bps");
+  const xs = NB.range("xs", (v) => NB.bytes(sizeOf(v)), xCalc);
+  const xb = NB.range("xb", (v) => bpsTxt(bwOf(v)), xCalc);
+  const xr = NB.range("xr", (v) => v + " ms", xCalc);
+  NB.seg("xp", (v) => xs.set(Number(v)));
+  $("xtruck").addEventListener("change", xCalc);
+  const TRUCK = 5 * 3600;
+  let xr_ = {};
+  function xCalc() {
+    const B = sizeOf(xs()), bw = bwOf(xb()), rtt = xr() / 1000;
+    const tx = (B * 8) / bw, T = rtt + tx;
+    xr_ = { B, bw, rtt, tx, T };
+    NB.stat("o-xt", NB.time(T));
+    NB.stat("o-xd", rtt > tx ? `<span style="color:var(--accent-2)">지연 (${Math.round((rtt / T) * 100)}%)</span>` : `<span style="color:var(--accent)">대역폭 (${Math.round((tx / T) * 100)}%)</span>`);
+    NB.stat("o-xe", bpsTxt((B * 8) / T) + (rtt > tx ? " <small>회선의 " + Math.max(0.1, Number(((B * 8) / T / bw * 100).toPrecision(2))) + "%</small>" : ""));
+    xcv.redraw();
+  }
+  const xcv = NB.canvas("#cv-xfer", (ctx, w, h) => {
+    const P = NB.palette(); if (!xr_.T) return;
+    const { rtt, tx, T } = xr_; const small = w < 500;
+    const x0 = 16, x1 = w - 16, y = 30, bh = 30;
+    NB.text(ctx, "총 시간 중 몫", x0, 14, { size: 11.5, color: P.dim });
+    const wr = ((x1 - x0) * rtt) / T;
+    ctx.fillStyle = P.accent2; ctx.fillRect(x0, y, wr, bh);
+    ctx.fillStyle = P.accent; ctx.fillRect(x0 + wr, y, x1 - x0 - wr, bh);
+    if (wr > 60) NB.text(ctx, "지연 " + Math.round((rtt / T) * 100) + "%", x0 + 8, y + bh / 2, { size: 12, bold: true, color: "#fff" });
+    if (x1 - x0 - wr > 70) NB.text(ctx, "전송 " + Math.round((tx / T) * 100) + "%", x1 - 8, y + bh / 2, { align: "right", size: 12, bold: true, color: "#fff" });
+    // 로그 시간축
+    const ay = h - 36, lo = -3, hi = 7; // 1 ms … 10^7 s
+    const X = (s) => x0 + 8 + ((Math.log10(Math.max(s, 1e-3)) - lo) / (hi - lo)) * (x1 - x0 - 16);
+    ctx.strokeStyle = P.axis; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, ay); ctx.lineTo(x1, ay); ctx.stroke();
+    const ticks = [[1e-3, "1ms"], [1, "1초"], [60, "1분"], [3600, "1시간"], [86400, "1일"], [86400 * 30, "1달"]];
+    ticks.forEach(([s, l], i) => { const px = X(s); ctx.beginPath(); ctx.moveTo(px, ay - 4); ctx.lineTo(px, ay + 4); ctx.stroke(); if (!small || i % 1 === 0) NB.text(ctx, l, px, ay + 14, { align: "center", size: small ? 9.5 : 11, color: P.dim, mono: true }); });
+    const mark = (s, label, col, up) => {
+      const px = X(s); const yy = up ? ay - 34 : ay - 14;
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, ay, 6, 0, 7); ctx.fill();
+      ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(px, ay - 6); ctx.lineTo(px, yy + 6); ctx.stroke();
+      const al = px < w * 0.25 ? "left" : px > w * 0.75 ? "right" : "center";
+      NB.text(ctx, label, px + (al === "left" ? -4 : al === "right" ? 4 : 0), yy, { align: al, size: small ? 11 : 12, bold: true, color: col });
+    };
+    mark(T, "네트워크 " + NB.time(T), P.accent, false);
+    if ($("xtruck").checked) mark(TRUCK, "트럭 5시간", P.warn, true);
+  }, { aspect: 0.18, minHeight: 140, maxHeight: 150 });
+  xCalc();
+
+  /* ---------------- 5. 빛의 왕복 ---------------- */
+  // [이름, km, 매체(f=광섬유, s=위성), 실제 RTT 범위(ms)]
+  const DEST = [
+    ["부산", 325, "f", [6, 12]], ["도쿄", 1160, "f", [28, 40]], ["홍콩", 2070, "f", [35, 55]], ["싱가포르", 4670, "f", [70, 100]],
+    ["런던", 8860, "f", [220, 290]], ["LA", 9590, "f", [120, 150]], ["뉴욕", 11050, "f", [180, 230]], ["상파울루", 18350, "f", [300, 380]],
+    ["저궤도 위성", 550, "s", [25, 60]], ["정지궤도 위성", 35786, "s", [550, 700]],
+  ];
+  const minRtt = (d) => (d[2] === "s" ? (4 * d[1]) / 300000 : (2 * d[1]) / 200000) * 1000;
+  const lc = NB.seg("lc", () => { lCalc(); lcv.redraw(); });
+  function lCalc() {
+    const d = DEST[Number(lc())], m = minRtt(d);
+    NB.stat("o-lkm", d[2] === "s" ? "고도 " + fmtInt(d[1]) + " km" : "직선 " + fmtInt(d[1]) + " km");
+    NB.stat("o-lmin", NB.fmt(m, 3) + " ms");
+    NB.stat("o-lreal", d[3][0] + "~" + d[3][1] + " ms");
+    NB.stat("o-lbdp", NB.bytes((1e9 * ((d[3][0] + d[3][1]) / 2) / 1000) / 8));
+  }
+  const lcv = NB.canvas("#cv-light", (ctx, w, h) => {
+    const P = NB.palette(); const sel = Number(lc()); const small = w < 500;
+    const lx = small ? 82 : 110, x1 = w - 14, top = 12, rh = (h - top - 30) / DEST.length;
+    const lo = 0, hi = 3; const X = (ms) => lx + ((Math.log10(Math.max(ms, 1)) - lo) / (hi - lo)) * (x1 - lx);
+    [1, 10, 100, 1000].forEach((v) => { const px = X(v); ctx.strokeStyle = P.grid; ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px, h - 26); ctx.stroke(); NB.text(ctx, v >= 1000 ? "1 s" : v + " ms", px, h - 14, { align: "center", size: 10.5, color: P.dim, mono: true }); });
+    DEST.forEach((d, i) => {
+      const y = top + i * rh + rh / 2, on = i === sel, m = minRtt(d);
+      NB.text(ctx, d[0], lx - 8, y, { align: "right", size: small ? 11 : 12.5, bold: on, color: on ? P.text : P.dim });
+      const c = d[2] === "s" ? P.accent2 : P.accent;
+      ctx.globalAlpha = on ? 0.3 : 0.15; ctx.fillStyle = c; ctx.fillRect(X(d[3][0]), y - rh * 0.32, X(d[3][1]) - X(d[3][0]), rh * 0.64);
+      ctx.globalAlpha = on ? 1 : 0.55; ctx.fillRect(lx, y - rh * 0.18, X(m) - lx, rh * 0.36); ctx.globalAlpha = 1;
+      if (on) NB.text(ctx, NB.fmt(m, 3) + " ms", Math.min(X(m) + 6, x1 - 60), y, { size: 11, bold: true, color: P.text, mono: true });
+    });
+  }, { height: 330 });
+  lCalc();
+})();
+</script>
+</body>
+</html>
