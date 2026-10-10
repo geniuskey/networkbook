@@ -501,9 +501,9 @@
       NB.stat("cs-o-wait", b.delivered ? Math.round(b.waitSum / b.delivered) + " 슬롯" : "—");
       NB.stat("cs-o-drop", b.drop ? `<span style="color:var(--bad)">${b.drop}개</span>` : "0개");
     } else {
-      NB.stat("cs-o-thr", Math.round(G * 100) + "% <small>(포트마다 전용)</small>");
+      NB.stat("cs-o-thr", Math.round(Math.min(G, 1) * 100) + "% <small>(포트 용량 한도)</small>");
       NB.stat("cs-o-col", "0% <small>충돌 없음</small>");
-      NB.stat("cs-o-wait", "≈ 0 슬롯");
+      NB.stat("cs-o-wait", G > 1 ? "<small>과부하 · 큐/손실 발생</small>" : "≈ 0 슬롯");
       NB.stat("cs-o-drop", G > 1 ? "<small>목적지 포트가 몰리면 버퍼에서</small>" : "0개");
     }
   }

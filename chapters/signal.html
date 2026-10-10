@@ -114,9 +114,9 @@
       <div class="sim-readout">
         <div class="stat"><span class="k">아날로그 도착 SNR</span><span class="v" id="o-asnr">—</span></div>
         <div class="stat"><span class="k">디지털: 틀린 비트 (이 화면)</span><span class="v" id="o-derr">—</span></div>
-        <div class="stat"><span class="k">디지털 이론 오류율</span><span class="v" id="o-dber">—</span></div>
+        <div class="stat"><span class="k">디지털 도착 비트 오류율 (이론)</span><span class="v" id="o-dber">—</span></div>
       </div>
-      <div class="sim-note">신호는 ±1, 잡음은 구간마다 독립인 정규분포로 가정했다. 아날로그는 잡음 전력이 구간 수만큼 쌓여 N배가 된다. 디지털은 각 구간에서 비트 중앙을 보고 0 기준으로 판정하므로, 한 구간의 오류 확률이 아주 작으면 구간이 늘어도 거의 깨끗하다. 해볼 것: 잡음을 0.25에 두고 구간을 30까지 늘려 보자. 그다음 잡음을 0.4로 올리면 디지털도 무너지기 시작한다. 이것이 “문턱 효과”다.</div>
+      <div class="sim-note">신호는 ±1, 잡음은 구간마다 독립인 정규분포로 가정했다. 아날로그는 잡음 전력이 구간 수만큼 쌓여 N배가 된다. 디지털은 각 구간에서 비트 중앙을 보고 0 기준으로 판정하므로, 한 구간의 오류 확률 p가 아주 작으면 구간이 늘어도 거의 깨끗하다. 최종 비트 오류는 홀수 번 뒤집혔을 때만 남으므로 이론 BER은 [1 − (1 − 2p)ᴺ]/2다. 두 번 뒤집히면 원래 비트로 돌아오므로 “한 번이라도 틀릴 확률”과 다르다. 해볼 것: 잡음을 0.25에 두고 구간을 30까지 늘려 보자. 그다음 잡음을 0.4로 올리면 디지털도 무너지기 시작한다. 이것이 “문턱 효과”다.</div>
     </div>
     <p>그래서 오늘날 전화, 방송, 인터넷은 모두 디지털이다. 목소리나 영상 같은 아날로그 정보도 먼저 숫자로 바꾼(샘플링·양자화) 뒤 보낸다. 다만 “디지털 신호”라 해도 선 위를 달리는 것은 결국 아날로그 전압이나 빛이다. 디지털의 힘은 신호가 아니라 <b>받는 쪽이 정해진 값 중 하나로 판정한다</b>는 약속에서 나온다.</p>
   </section>
@@ -500,7 +500,7 @@
     const snr = 1 / (N * sg * sg);
     NB.stat("o-asnr", (10 * Math.log10(snr)).toFixed(1) + " dB" + (snr < 10 ? ' <small style="color:var(--bad)">알아듣기 힘듦</small>' : ""));
     NB.stat("o-derr", `<span style="color:${errs ? "var(--bad)" : "var(--ok)"}">${errs} / ${NB_}</span>`);
-    const p1 = Q(1 / sg), pN = 1 - Math.pow(1 - p1, N);
+    const p1 = Q(1 / sg), pN = -Math.expm1(N * Math.log1p(-2 * p1)) / 2;
     NB.stat("o-dber", sci(pN));
     if (repCv) repCv.redraw();
   }

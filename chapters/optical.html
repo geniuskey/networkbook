@@ -214,7 +214,7 @@
         <div class="ctrl"><span>파장 (손실)</span><div class="seg" id="bd-wl"><button data-value="0.35">1310 nm · 0.35 dB/km</button><button data-value="0.2" class="on">1550 nm · 0.2 dB/km</button></div></div>
         <label class="ctrl"><span>커넥터 개수 (0.5 dB씩) <output id="bd-con-out"></output></span><input type="range" id="bd-con" min="0" max="10" step="1" value="4"></label>
         <div class="ctrl"><span>수신기</span><div class="seg" id="bd-rx"><button data-value="-14">PIN · −14 dBm</button><button data-value="-24" class="on">APD · −24 dBm</button></div></div>
-        <label class="check"><input type="checkbox" id="bd-amp"> 필요하면 EDFA를 자동으로 넣기</label>
+        <label class="check"><input type="checkbox" id="bd-amp"> 필요하면 EDFA를 자동으로 넣기 (1550 nm만)</label>
       </div>
       <div class="sim-readout">
         <div class="stat"><span class="k">총 손실</span><span class="v" id="bd-o-loss">—</span></div>
@@ -222,7 +222,7 @@
         <div class="stat"><span class="k">여유 (margin)</span><span class="v" id="bd-o-m">—</span></div>
         <div class="stat"><span class="k">판정</span><span class="v" id="bd-o-v" style="font-size:15px">—</span></div>
       </div>
-      <div class="sim-note">그래프는 거리에 따른 빛의 세기(dBm)다. 양 끝의 계단은 커넥터, 기울기는 광섬유 손실(융착 접속 4 km마다 0.1 dB 포함), 위로 솟는 곳은 EDFA다. 해볼 것: 1550 nm·APD로 몇 km까지 증폭 없이 갈 수 있을까? 1310 nm로 바꾸면? 거리를 400 km로 늘리고 EDFA를 켜 보자. 단순화: EDFA는 출력을 송신 출력까지 되돌리고, 잡음 누적과 분산은 무시했다. PIN/APD 감도는 10 Gbps급의 대표값이다.</div>
+      <div class="sim-note">그래프는 거리에 따른 빛의 세기(dBm)다. 양 끝의 계단은 커넥터, 기울기는 광섬유 손실(융착 접속 4 km마다 0.1 dB 포함), 위로 솟는 곳은 EDFA다. 해볼 것: 1550 nm·APD로 몇 km까지 증폭 없이 갈 수 있을까? 1310 nm로 바꾸면? 1550 nm에서 거리를 400 km로 늘리고 EDFA를 켜 보자. 1310 nm는 EDFA의 증폭 대역 밖이므로 이 계산기에서는 증폭하지 않는다. 재생 중계기나 해당 대역용 다른 증폭기가 필요하다. 단순화: EDFA는 출력을 송신 출력까지 되돌리고, 잡음 누적과 분산은 무시했다. PIN/APD 감도는 10 Gbps급의 대표값이다.</div>
     </div>
     <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">증폭기 없이 0.2 dB/km 광섬유로 서울에서 로스앤젤레스까지 약 10,000 km를 보낸다면, 도착하는 빛은 처음의 몇 분의 1일까?</p><p class="wi-hint">손실 dB = 0.2 × 거리. 10 dB가 1/10이다.</p><div class="opts">
       <button class="opt">약 1/100</button><button class="opt">약 1/1만</button><button class="opt">약 1/100만</button><button class="opt" data-correct>1 뒤에 0이 200개 붙은 수분의 1 — 사실상 0</button>
@@ -385,7 +385,7 @@
       <li>광섬유는 굴절률이 조금 높은 <b>코어</b>를 <b>클래딩</b>이 감싼 구조이고, <b>임계각</b>보다 비스듬히 닿은 빛이 <b>전반사</b>로 갇힌다.</li>
       <li>다중 모드 광섬유는 경로마다 길이가 달라 <b>모드 분산</b>이 크고, 단일 모드도 파장마다 속도가 달라 <b>색 분산</b>이 남는다. 분산은 속도 × 거리를 제한한다.</li>
       <li>레일리 산란과 적외선 흡수 사이의 골짜기 때문에 <b>850·1310·1550 nm</b> 창을 쓰고, 장거리는 C·L 밴드를 쓴다.</li>
-      <li><b>링크 예산</b>은 송신 출력 − 손실 ≥ 수신 감도 + 여유. 모자라면 <b>EDFA</b>가 빛을 전기 변환 없이 증폭한다.</li>
+      <li><b>링크 예산</b>은 송신 출력 − 손실 ≥ 수신 감도 + 여유. C·L 대역에서 모자라면 해당 대역의 <b>EDFA</b>가 빛을 전기 변환 없이 증폭한다. 1310 nm에는 EDFA를 쓸 수 없다.</li>
       <li><b>WDM</b>은 한 가닥에 수십~100여 개 파장을, <b>코히어런트</b> 광은 위상과 두 편광까지 써서 파장당 수백 Gbps를 실어 한 가닥 수십 Tbps를 만든다.</li>
       <li>FTTH의 <b>PON</b>은 수동 분배기로 한 가닥을 32~64집이 나눠 쓴다. 하향은 방송, 상향은 시간을 나눠 쓴다(TDMA).</li>
       <li><b>해저 케이블</b>은 대륙 간 트래픽의 대부분을 나른다. 50~100 km마다 중계기, 해안에서 고전압 직류 급전, 수명 약 25년, 고장의 대부분은 어망과 닻 때문이다.</li>
@@ -682,7 +682,8 @@
     const tx = bdTx(), km = bdKm(), a = Number(bdWl()) + 0.1 / 4, con = bdCon() * 0.5, sens = Number(bdRx());
     const fiber = a * km, loss = fiber + con;
     let amps = 0;
-    if ($("bd-amp").checked) {
+    const edfaSupported = bdWl() === "0.2";
+    if ($("bd-amp").checked && edfaSupported) {
       const avail = tx - sens - MARGIN - con; // 구간마다 쓸 수 있는 광섬유 손실
       if (avail > 0 && loss > tx - sens - MARGIN) amps = Math.max(0, Math.ceil(fiber / avail) - 1);
     }
@@ -695,7 +696,7 @@
       if (s < amps) { p = tx; pts.push([xe, p]); }
     }
     const rx = p - con / 2; pts.push([km, rx]);
-    return { tx, km, a, con, sens, loss, amps, rx, pts, span };
+    return { tx, km, a, con, sens, loss, amps, rx, pts, span, edfaSupported };
   }
   function bdUpd() {
     const m = bdModel(), mg = m.rx - m.sens;
@@ -705,6 +706,7 @@
     let v;
     if (mg >= MARGIN) v = m.amps ? `<span style="color:var(--ok)">통과 · EDFA ${m.amps}대 (구간 ${Math.round(m.span)} km)</span>` : "<span style='color:var(--ok)'>통과 · 증폭기 불필요</span>";
     else if (mg >= 0) v = "<span style='color:var(--warn)'>아슬아슬 · 여유 부족</span>";
+    else if (!m.edfaSupported) v = "<span style='color:var(--bad)'>실패 · 1310 nm는 EDFA 대역 밖 (재생 중계 등 필요)</span>";
     else v = $("bd-amp").checked ? "<span style='color:var(--bad)'>실패 · 커넥터 손실이 너무 큼</span>" : "<span style='color:var(--bad)'>실패 · EDFA가 필요</span>";
     NB.stat("bd-o-v", v);
     bdCv.m = m; bdCv.redraw();

@@ -600,6 +600,19 @@
     if (a === "lc") { let b = ups[0], bv = Infinity; ups.forEach((i) => { const v = LB.sv[i].busy.length + LB.sv[i].q.length + Math.random() * 0.01; if (v < bv) { bv = v; b = i; } }); return b; }
     return ups[hashInt("client-" + client) % ups.length];
   }
+  function drainJobs(s, now, complete) {
+    // filter 안에서 push한 대체 작업은 filter 반환 배열에서 사라진다.
+    // 가장 먼저 끝난 작업부터 처리해 대기 작업을 실제 완료 시각에 이어 붙인다.
+    s.busy.sort((a, b) => a.end - b.end);
+    while (s.busy.length && s.busy[0].end <= now) {
+      const job = s.busy.shift(); complete(job); s.done++;
+      if (s.q.length) {
+        const next = s.q.shift();
+        next.end = Math.max(job.end, next.arr) + next.svc;
+        s.busy.push(next); s.busy.sort((a, b) => a.end - b.end);
+      }
+    }
+  }
   function lbStep(dt) {
     const L = LB; L.t += dt;
     const cap = L.sv.reduce((a, s) => a + (WORK * s.speed) / MEAN, 0);
@@ -616,7 +629,7 @@
       if (s.busy.length < WORK) { job.end = at + job.svc; s.busy.push(job); } else s.q.push(job);
     }
     L.sv.forEach((s) => {
-      s.busy = s.busy.filter((j) => { if (j.end <= L.t) { L.rec.push([L.t, j.end - j.arr]); s.done++; if (s.q.length) { const n = s.q.shift(); n.end = j.end + n.svc; s.busy.push(n); } return false; } return true; });
+      drainJobs(s, L.t, (j) => L.rec.push([L.t, j.end - j.arr]));
     });
     // 헬스 체크
     L.hcT += dt;

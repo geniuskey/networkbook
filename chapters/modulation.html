@@ -178,7 +178,7 @@
         <div class="stat"><span class="k">비트 오류율 (측정)</span><span class="v" id="con-ber">—</span></div>
         <div class="stat"><span class="k">비트 오류율 (이론)</span><span class="v" id="con-bth">—</span></div>
       </div>
-      <div class="sim-note">심볼 4만 개를 무작위로 보내 그중 2,500개를 그렸다. 빨간 점은 판정 경계를 넘어 틀리게 읽힌 심볼이다. 잡음은 I·Q 각각에 더해지는 가우스 잡음(AWGN)이고, 오류 정정 부호는 쓰지 않았다. 해볼 것: SNR을 20 dB에 고정하고 16QAM → 64QAM → 256QAM으로 올려 보자. 4096QAM을 깨끗하게 받으려면 SNR이 몇 dB 필요할까?</div>
+      <div class="sim-note">심볼 4만 개를 무작위로 보내 그중 2,500개를 그렸다. 빨간 점은 판정 경계를 넘어 틀리게 읽힌 심볼이다. 잡음은 I·Q 각각에 더해지는 가우스 잡음(AWGN)이고, 오류 정정 부호는 쓰지 않았다. SNR은 심볼 에너지/잡음(Es/N₀)이며, 이론 BER은 그레이 코드의 모든 판정 구간 확률을 더한 값이다(이웃 점만 고려하는 고 SNR 근사식은 쓰지 않는다). 해볼 것: SNR을 20 dB에 고정하고 16QAM → 64QAM → 256QAM으로 올려 보자. 4096QAM을 깨끗하게 받으려면 SNR이 몇 dB 필요할까?</div>
     </div>
     <div class="whatif quiz-q"><div class="wi-head">예측해 보기</div><p class="wi-q">SNR 20 dB에서 16QAM은 거의 오류가 없다. 같은 20 dB에서 256QAM으로 바꾸면?</p><p class="wi-hint">성좌도 시뮬레이터에서 SNR을 20 dB로 두고 차수만 바꿔 보자.</p><div class="opts">
       <button class="opt">비트가 2배이므로 오류도 정확히 2배</button><button class="opt">점 개수만 늘었으니 오류율은 같다</button><button class="opt" data-correct>점 간격이 약 4분의 1로 좁아져 심볼의 상당수(수십 %)가 틀린다</button><button class="opt">오류가 줄어든다</button>
@@ -408,7 +408,7 @@
     <ol>
       <li>메시지를 높은 주파수의 <b>반송파</b>에 실어(변조) 보내면 안테나가 작아지고 주파수를 나눠 쓸 수 있다. AM은 세기, FM은 진동 빠르기를 바꾼다.</li>
       <li>디지털 변조는 심볼마다 진폭(ASK)·주파수(FSK)·위상(PSK)을 바꾼다. <b>I/Q</b>로 진폭과 위상을 함께 바꾸면 성좌도 위의 점 하나가 log₂M 비트를 나른다.</li>
-      <li>QAM 차수가 높을수록 점 간격이 좁아져 더 높은 <b>SNR</b>이 필요하다. 그레이 코드는 심볼 오류를 1비트 오류로 줄인다.</li>
+      <li>QAM 차수가 높을수록 점 간격이 좁아져 더 높은 <b>SNR</b>이 필요하다. 그레이 코드는 이웃 점으로 잘못 판정하는 심볼 오류를 1비트 오류로 줄인다. 여러 칸을 건너뛰는 오류는 여러 비트를 바꿀 수 있다.</li>
       <li><b>적응 변조(AMC)</b>는 SNR에 맞춰 MCS를 계단식으로 바꿔, 가까우면 빠르고 멀면 튼튼하게 보낸다.</li>
       <li><b>OFDM</b>은 넓은 채널을 직교하는 부반송파 수천 개로 나눠 심볼을 길게 만들고, <b>사이클릭 프리픽스</b>로 다중 경로 메아리를 흡수한다. <b>OFDMA</b>는 시간×주파수 자원 블록을 사용자에게 나눠 준다.</li>
       <li><b>CDMA</b>는 직교 코드로 같은 주파수를 나눠 쓰고, 확산 스펙트럼은 잡음보다 약한 신호도 건진다.</li>
@@ -552,6 +552,24 @@
     if (M === 2) return { L: 2, k: 1, s: 1, bpsk: true };
     const L = Math.round(Math.sqrt(M)); return { L, k: Math.log2(L), s: 1 / Math.sqrt((2 * (M - 1)) / 3), bpsk: false };
   }
+  function conBer(M, snr) {
+    // 각 PAM 축의 모든 판정 구간을 적분한다. 낮은 SNR의 다중 비트 오류도 포함한다.
+    if (M === 2) return Q(Math.sqrt(2 * snr));
+    const g = conGeom(M), sigma = Math.sqrt(1 / (2 * snr));
+    let errors = 0;
+    for (let i = 0; i < g.L; i++) {
+      const x = (2 * i - (g.L - 1)) * g.s;
+      for (let j = 0; j < g.L; j++) {
+        const lo = j === 0 ? -Infinity : (2 * j - g.L) * g.s;
+        const hi = j === g.L - 1 ? Infinity : (2 * j - g.L + 2) * g.s;
+        const zl = (lo - x) / sigma, zh = (hi - x) / sigma;
+        // 오른쪽 꼬리는 Q의 차이를 직접 써 작은 BER의 상쇄 오차를 줄인다.
+        const prob = zl >= 0 ? Q(zl) - Q(zh) : Q(-zh) - Q(-zl);
+        errors += pop(gray(i) ^ gray(j)) * Math.max(0, prob);
+      }
+    }
+    return errors / (g.L * g.k);
+  }
   function conRun() {
     const M = Number(conM()), g = conGeom(M), snr = Math.pow(10, conSnr() / 10);
     const sig = Math.sqrt(1 / (2 * snr)), rnd = NB.rng(seed * 7919 + M), N = 40000, SHOW = 2500;
@@ -574,7 +592,7 @@
     const pct = (v) => (v === 0 ? "0 <small>(4만 개 중)</small>" : v < 1e-3 ? v.toExponential(1) : (v * 100).toFixed(v < 0.01 ? 2 : 1) + "%");
     NB.stat("con-ser", pct(se / N));
     NB.stat("con-ber", pct(be / (N * bps)));
-    const th = g.bpsk ? Q(Math.sqrt(2 * snr)) : Math.min(0.5, (4 / bps) * (1 - 1 / g.L) * Q(Math.sqrt((3 * snr) / (M - 1))));
+    const th = conBer(M, snr);
     NB.stat("con-bth", th < 1e-12 ? "< 10⁻¹²" : th < 1e-3 ? th.toExponential(1) : (th * 100).toFixed(2) + "%");
     concv.redraw();
   }
